@@ -153,8 +153,14 @@ settings.blackPieceColor = /^#[0-9a-f]{6}$/i.test(settings.blackPieceColor || ""
 // ============================================
 
 const board = $("board");
-const boardEffects = createBoardEffects(board, () => settings.sounds);
+const boardEffects = createBoardEffects(
+  board,
+  () => settings.sounds,
+  () => !document.body?.classList.contains('gc-no-piece-motion')
+);
+window.addEventListener('pagehide', () => boardEffects.dispose(), { once: true });
 let lastRenderedOrientation = null;
+let lastAnnouncedMateFen = '';
 
 function setEngineStatus(message) {
   $("engine-status").textContent = message;
@@ -579,6 +585,7 @@ function updateLabels() {
 function render() {
   const orientation = boardIsFlipped();
   renderBoard();
+  announceCheckmate();
   if (lastRenderedOrientation !== null && orientation !== lastRenderedOrientation) boardEffects.animateFlip();
   lastRenderedOrientation = orientation;
   updateHistory();
@@ -663,9 +670,22 @@ function findKingSquare(color) {
   return null;
 }
 
+function announceCheckmate() {
+  if (!game.isCheckmate()) {
+    lastAnnouncedMateFen = '';
+    return;
+  }
+  const fen = game.fen();
+  if (fen === lastAnnouncedMateFen) return;
+  lastAnnouncedMateFen = fen;
+  boardEffects.animateCheckmate(findKingSquare(game.turn()));
+  boardEffects.playSound('checkmate');
+}
+
 function finishMoveFeedback(move, motionSnapshot) {
   boardEffects.animateMove(motionSnapshot, move);
   if (move.promotion) boardEffects.animatePromotion(move.to);
+  if (game.isCheckmate()) return;
   if (game.isCheck()) {
     boardEffects.animateCheck(findKingSquare(game.turn()));
     boardEffects.playSound("check");
@@ -1425,6 +1445,7 @@ function installGlassChessPremiumBridge() {
     get draw() { return game.isDraw() || Boolean(gameTermination?.draw); },
     get termination() { return gameTermination ? { ...gameTermination } : null; },
     get generation() { return positionGeneration; },
+    getBoardEffectsDiagnostics() { return boardEffects.getDiagnostics(); },
     get turn() { return game.turn(); },
     get soundsEnabled() { return Boolean(settings.sounds); },
     setSoundEnabled(enabled) {
@@ -1701,7 +1722,7 @@ function installGlassChessPremiumBridge() {
 
 function launch() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(error => console.warn('Offline cache registration failed:', error));
+    navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(error => console.warn('Offline cache registration failed:', error));
   }
   installGlassChessPremiumBridge();
   createExtraControls();

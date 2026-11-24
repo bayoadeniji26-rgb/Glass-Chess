@@ -83,7 +83,8 @@ let online = { code: '', role: '', side: '', lastState: null, syncing: false, pr
 let dailyChallenge = { active: false, solution: '', notation: '', solved: false, rewardEligible: false };
 let finishedFen = '';
 let pieceObserver = null;
-let victoryTimer = null;
+let victoryKey = '';
+let previousVictoryFocus = null;
 let socketBound = false;
 
 function todayKey() {
@@ -243,10 +244,19 @@ function injectStyles() {
     #gc-plus-victory{position:fixed;inset:0;z-index:99999;display:grid;place-items:center;background:rgba(4,9,18,.72);backdrop-filter:blur(9px);animation:gc-victory-fade .25s ease}
     #gc-plus-victory .card{position:relative;overflow:hidden;width:min(430px,calc(100vw - 34px));padding:30px 22px;text-align:center;border-radius:22px;border:1px solid rgba(255,255,255,.25);background:linear-gradient(145deg,#15243a,#28214a 58%,#3b315c);color:#fff;box-shadow:0 24px 90px rgba(0,0,0,.45)}
     #gc-plus-victory h2{font-size:30px;letter-spacing:.04em;margin:7px 0}.gc-plus-crown{font-size:54px;filter:drop-shadow(0 5px 15px #d3b76d)}
-    #gc-plus-victory .confetti{position:absolute;inset:-20px;pointer-events:none;overflow:hidden}
-    #gc-plus-victory .confetti i{position:absolute;top:-20px;width:7px;height:13px;border-radius:2px;background:var(--c);left:var(--x);animation:gc-confetti var(--t) linear infinite;animation-delay:var(--d)}
     #gc-plus-victory .card button{margin-top:15px;padding:10px 18px;border-radius:10px;background:#e9d5a3;color:#182033;border:0;font-weight:800}
-    @keyframes gc-victory-fade{from{opacity:0}to{opacity:1}}@keyframes gc-confetti{to{transform:translate3d(30px,600px,0) rotate(650deg)}}
+    @keyframes gc-victory-fade{from{opacity:0}to{opacity:1}}
+    /* One restrained entrance and a quiet result surface replace the old confetti loop. */
+    #gc-plus-victory{background:rgba(5,10,19,.66);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);animation:gc-victory-fade .2s ease-out both}
+    #gc-plus-victory .card{width:min(400px,calc(100vw - 32px));padding:30px 26px 24px;border-radius:20px;border:1px solid rgba(224,211,177,.24);background:linear-gradient(150deg,rgba(24,35,55,.97),rgba(27,29,53,.97));box-shadow:0 24px 80px rgba(0,0,0,.38);animation:gc-victory-arrive .36s cubic-bezier(.2,.75,.25,1) both}
+    #gc-plus-victory .gc-victory-mark{width:68px;height:68px;display:grid;place-items:center;margin:0 auto 14px;border:1px solid rgba(232,207,151,.38);border-radius:21px;background:radial-gradient(circle at 35% 25%,rgba(237,214,169,.22),rgba(255,255,255,.035));color:#f0dcae;font-size:39px;filter:drop-shadow(0 5px 16px rgba(218,190,130,.17))}
+    #gc-plus-victory .gc-victory-kicker{margin:0 0 8px;color:#b5c0d5;font-size:9px;font-weight:800;letter-spacing:.2em}
+    #gc-plus-victory h2{margin:0 0 8px;color:#f4f0e8;font-size:25px;letter-spacing:.09em}
+    #gc-plus-victory #gc-plus-victory-message{margin:0;color:#c1cad9;font-size:13px;line-height:1.55}
+    #gc-plus-victory .card button{min-height:42px;margin-top:22px;padding:0 18px;border:1px solid rgba(239,218,174,.38);border-radius:11px;background:rgba(232,207,151,.13);color:#f4e4bd;font-size:12px;font-weight:750;cursor:pointer}
+    #gc-plus-victory .card button:hover{background:rgba(232,207,151,.2)}
+    @keyframes gc-victory-arrive{from{opacity:0;transform:translateY(9px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+    @media(prefers-reduced-motion:reduce){#gc-plus-victory,#gc-plus-victory .card{animation:none!important}}
     .gc-piece-glyph{display:inline-block!important;font-family:'Apple Symbols','Segoe UI Symbol','Noto Sans Symbols 2',serif!important;font-weight:900!important;line-height:1!important;transition:transform .16s ease,filter .16s ease!important;transform:translateZ(0);white-space:nowrap;user-select:none;-webkit-font-smoothing:antialiased}
     .gc-piece-glyph.gc-piece-enter{animation:gc-piece-arrive .22s cubic-bezier(.2,.8,.2,1)}
     @keyframes gc-piece-arrive{from{opacity:.65;transform:translateY(-5px) scale(.84)}to{opacity:1;transform:translateY(0) scale(1)}}
@@ -623,17 +633,55 @@ function startDailyChallenge() {
 }
 
 function showVictory(message) {
-  if (!state.animations) { toast(message); return; }
+  const checkmate = Boolean(api?.checkmate) || /checkmate/i.test(String(message));
+  if (!state.animations) {
+    toast(message);
+    return;
+  }
+
+  const key = String(api?.fen || '') + '|' + String(message);
   const existing = document.getElementById('gc-plus-victory');
-  if (existing) existing.remove();
+  if (existing && victoryKey === key) return;
+  existing?.remove();
+  victoryKey = key;
+  previousVictoryFocus = document.activeElement;
+
   const overlay = document.createElement('div');
   overlay.id = 'gc-plus-victory';
-  const confetti = Array.from({ length: 34 }, (_, i) => `<i style="--x:${(i * 37) % 100}%;--d:-${(i % 9) * .27}s;--t:${2.4 + (i % 5) * .3}s;--c:${['#f5d98a','#8ed6ff','#c4a4ff','#f49ea8','#a7e6c1'][i % 5]}"></i>`).join('');
-  overlay.innerHTML = `<div class="card"><div class="confetti">${confetti}</div><div class="gc-plus-crown">♛</div><div class="gc-plus-small" style="letter-spacing:.2em">GLASS CHESS</div><h2>${esc(message.toLowerCase().includes('checkmate') ? 'CHECKMATE' : 'GAME COMPLETE')}</h2><p>${esc(message)}</p><button type="button" id="gc-plus-victory-close">Back to board</button></div>`;
+  overlay.className = checkmate ? 'is-checkmate' : 'is-complete';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-labelledby', 'gc-plus-victory-title');
+  overlay.setAttribute('aria-describedby', 'gc-plus-victory-message');
+  overlay.tabIndex = -1;
+  overlay.innerHTML = `
+    <section class="card">
+      <span class="gc-victory-mark" aria-hidden="true">${checkmate ? '♛' : '♔'}</span>
+      <p class="gc-victory-kicker">GLASS CHESS · RESULT</p>
+      <h2 id="gc-plus-victory-title">${checkmate ? 'CHECKMATE' : 'GAME COMPLETE'}</h2>
+      <p id="gc-plus-victory-message">${esc(message)}</p>
+      <button type="button" id="gc-plus-victory-close">Back to board</button>
+    </section>`;
+
+  const close = () => {
+    overlay.remove();
+    if (victoryKey === key) victoryKey = '';
+    if (previousVictoryFocus?.isConnected) previousVictoryFocus.focus();
+    previousVictoryFocus = null;
+  };
+  overlay.querySelector('#gc-plus-victory-close').addEventListener('click', close);
+  overlay.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      close();
+    } else if (event.key === 'Tab') {
+      // There is one action on this result surface; keep keyboard focus inside it.
+      event.preventDefault();
+      overlay.querySelector('#gc-plus-victory-close')?.focus();
+    }
+  });
   document.body.appendChild(overlay);
-  overlay.querySelector('#gc-plus-victory-close').addEventListener('click', () => overlay.remove());
-  if (victoryTimer) clearTimeout(victoryTimer);
-  victoryTimer = window.setTimeout(() => overlay.remove(), 6500);
+  requestAnimationFrame(() => overlay.querySelector('#gc-plus-victory-close')?.focus({ preventScroll: true }));
   playChime('victory');
 }
 
