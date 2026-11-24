@@ -17,7 +17,10 @@ function getClientIdentity() {
     }
     return id;
   } catch {
-    return 'session-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    const bytes = new Uint8Array(16);
+    try { window.crypto.getRandomValues(bytes); }
+    catch { for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256); }
+    return Array.from(bytes, value => value.toString(16).padStart(2, '0')).join('');
   }
 }
 const CLIENT_ID = getClientIdentity();

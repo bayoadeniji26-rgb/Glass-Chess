@@ -21,7 +21,14 @@ let coordinate={active:false,target:'',hits:0,score:0,left:30,timer:null};
 let flashIndex=0;
 let recognition=null;
 
-function readPrefs(){try{return Object.assign({},BASE,JSON.parse(localStorage.getItem(KEY)||'{}'));}catch{return {...BASE};}}
+function readPrefs(){
+  try {
+    const value=Object.assign({},BASE,JSON.parse(localStorage.getItem(KEY)||'{}'));
+    if(!Array.isArray(value.lines))value.lines=[];
+    if(!value.reviews||typeof value.reviews!=='object')value.reviews={};
+    return value;
+  } catch { return {...BASE}; }
+}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(prefs));}catch{}}
 function el(id){return root.querySelector('#'+id);}
 function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -49,6 +56,13 @@ function mountUI(){
     '<div class="gc-card"><h4>Replay video export</h4><p class="gca-muted">Builds a downloadable WebM video from the current move history. Browser MediaRecorder support is required.</p><div class="gca-actions"><button class="primary" id="gca-export-replay">Export WebM replay</button></div><p class="gca-status" id="gca-export-status">No recording in progress.</p></div>'
   ].join('');
   nav.appendChild(tab);root.appendChild(view);
+  const zenExit=document.createElement('button');
+  zenExit.id='gca-zen-exit';zenExit.type='button';zenExit.textContent='Exit focus';
+  document.body.appendChild(zenExit);
+  zenExit.addEventListener('click',()=>{prefs.zen=false;el('gca-zen').checked=false;save();applyPresentation();});
+  window.addEventListener('keydown',event=>{
+    if(event.key==='Escape'&&prefs.zen){prefs.zen=false;el('gca-zen').checked=false;save();applyPresentation();}
+  });
   tab.addEventListener('click',event=>{event.stopPropagation();root.querySelectorAll('[data-tab]').forEach(node=>node.classList.toggle('active',node===tab));root.querySelectorAll('[data-view]').forEach(node=>node.classList.toggle('active',node===view));});
 }
 function applyPresentation(){
@@ -139,7 +153,11 @@ function dueCard(){
   flashIndex=OPENINGS.indexOf(card);el('gca-flash-front').textContent=card.front;el('gca-flash-note').textContent='Due now: '+due.length+' · Reveal the answer when ready.';
 }
 function revealCard(){const card=OPENINGS[flashIndex];el('gca-flash-front').textContent=card.back;el('gca-flash-note').textContent=card.note;}
-function rateCard(known){const card=OPENINGS[flashIndex];const old=prefs.reviews[card.id]||{step:0};const next=known?Math.min(3,(old.step||0)+1):0;const days=known?[1,3,7,14][next]:0;prefs.reviews[card.id]={step:next,due:Date.now()+days*86400000};save();dueCard();}
+function rateCard(known){
+  const card=OPENINGS[flashIndex],old=prefs.reviews[card.id]||{step:0};
+  const step=old.step||0,next=known?Math.min(3,step+1):0,days=known?[1,3,7,14][Math.min(3,step)]:0;
+  prefs.reviews[card.id]={step:next,due:Date.now()+days*86400000};save();dueCard();
+}
 function saveLine(){
   const side=el('gca-line-side').value;const name=el('gca-line-name').value.trim();const text=el('gca-line-moves').value.trim();
   if(!name||!text){el('gca-line-status').textContent='Enter a line name and SAN moves.';return;}

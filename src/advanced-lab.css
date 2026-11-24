@@ -23,3 +23,6 @@ body.gc-stream-safe #gc-plus-profile{filter:blur(7px)}
 body.gc-visit-heat #board .square[data-gca-visit]::before{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;background:rgba(40,210,150,var(--gca-visit-alpha,.06))}
 body.gc-visit-heat #board .square .gc-piece{z-index:2}
 @media(max-width:600px){#gc-premium .gca-grid{grid-template-columns:1fr}}
+
+#gca-zen-exit{display:none;position:fixed;z-index:9999;top:14px;right:14px;padding:9px 13px;border-radius:999px;border:1px solid rgba(255,255,255,.24);background:rgba(14,20,30,.78);backdrop-filter:blur(14px);color:#f4f7fb;cursor:pointer}
+body.gc-zen #gca-zen-exit{display:block}
