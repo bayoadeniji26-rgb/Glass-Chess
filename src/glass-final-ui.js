@@ -121,7 +121,8 @@ import './glass-final-ui.css';
         <button type="button" data-gc-analysis-focus aria-pressed="false" title="Open a focused analysis workspace">Analysis focus</button>
         <button type="button" data-gc-stage-fullscreen title="Enter fullscreen" aria-label="Enter fullscreen">⛶</button>
       </div>`;
-    stage.insertBefore(toolbar, board);
+    const boardFrame = board.closest('.board-frame');
+    stage.insertBefore(toolbar, boardFrame || board);
 
     const sizeSelect = toolbar.querySelector('#gc-final-size');
     sizeSelect.value = settings.size;
@@ -230,7 +231,7 @@ import './glass-final-ui.css';
 
   function prepareStage() {
     if (!board) return;
-    stage = board.parentElement;
+    stage = board.closest('.board-section') || board.parentElement;
     if (!stage) return;
     compactTopWhitespace();
     stage.classList.add('gc-final-board-stage');
@@ -315,9 +316,12 @@ import './glass-final-ui.css';
 
     // Normal mode uses a large viewport-based board.
     // Focus mode uses the remaining fullscreen space under the toolbar.
+    // Reserve room for both player labels, the board controls, promotion UI,
+    // and the toolbar so none of them get pushed below the visible board.
+    const surroundingUI = viewportWidth < 600 ? 142 : 156;
     const verticalCap = focusMode
-      ? Math.max(280, viewportHeight - toolbarHeight - 48)
-      : viewportHeight * 0.88;
+      ? Math.max(240, viewportHeight - toolbarHeight - surroundingUI - 28)
+      : Math.max(280, Math.min(viewportHeight * 0.76, viewportHeight - surroundingUI - 34));
 
     const factor = SIZE_FACTORS[settings.size] || 1;
     const baseSize = Math.min(widthCap, verticalCap, hardCap);
