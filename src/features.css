@@ -111,13 +111,24 @@
   stroke-linecap: round;
 }
 
-.gc-piece-medieval .gc-svg-piece {
-  --gc-piece-edge: rgba(30,24,18,.62);
+.gc-piece-medieval.piece-white .gc-svg-piece {
+  --gc-piece-edge: rgba(30,24,18,.68);
+}
+
+.gc-piece-medieval.piece-black .gc-svg-piece {
+  --gc-piece-edge: rgba(255,255,255,.48);
 }
 
 .gc-piece-modern .gc-svg-piece {
-  --gc-piece-edge: rgba(20,26,36,.55);
   stroke-width: 1.8;
+}
+
+.gc-piece-modern.piece-white .gc-svg-piece {
+  --gc-piece-edge: rgba(20,26,36,.62);
+}
+
+.gc-piece-modern.piece-black .gc-svg-piece {
+  --gc-piece-edge: rgba(255,255,255,.56);
 }
 
 .piece-white {
