@@ -812,11 +812,14 @@ function bindEvents() {
   $('gc-white-piece-color').value = appearance.whitePieceColor;
   $('gc-black-piece-color').value = appearance.blackPieceColor;
 
-  const savePieceAppearance = () => api.updateAppearance?.({
-    pieceStyle: $('gc-piece-style').value,
-    whitePieceColor: $('gc-white-piece-color').value,
-    blackPieceColor: $('gc-black-piece-color').value
-  });
+  const savePieceAppearance = () => {
+    api.updateAppearance?.({
+      pieceStyle: $('gc-piece-style').value,
+      whitePieceColor: $('gc-white-piece-color').value,
+      blackPieceColor: $('gc-black-piece-color').value
+    });
+    window.GlassChessOnlinePlus?.onManualAppearanceChange?.();
+  };
   $('gc-piece-style').addEventListener('change', savePieceAppearance);
   $('gc-white-piece-color').addEventListener('input', savePieceAppearance);
   $('gc-black-piece-color').addEventListener('input', savePieceAppearance);
