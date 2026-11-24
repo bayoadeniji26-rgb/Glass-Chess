@@ -346,7 +346,7 @@ import './visual-inspector.css';
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount,{once:true});
   else mount();
   const mountObserver=new MutationObserver(()=>{
-    if(document.getElementById('gc-options')&&!document.getElementById(PANEL_ID)){mount();mountObserver.disconnect();}
+    if((document.getElementById('gc-premium')||document.querySelector('.analysis-panel'))&&!document.getElementById(PANEL_ID)){mount();mountObserver.disconnect();}
   });
   mountObserver.observe(document.documentElement,{childList:true,subtree:true});
   window.setTimeout(()=>mountObserver.disconnect(),15000);

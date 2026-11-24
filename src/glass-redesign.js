@@ -12,7 +12,7 @@ import { APP_VERSION } from './version.js';
 
   function compareVersions(left,right){
     const a=String(left).split(/[.-]/).map(part=>Number.parseInt(part,10)||0);
-    const b=String(right).split(/[.\\-]/).map(part=>Number.parseInt(part,10)||0);
+    const b=String(right).split(/[.-]/).map(part=>Number.parseInt(part,10)||0);
     for(let i=0;i<Math.max(a.length,b.length);i++){
       const av=a[i]||0,bv=b[i]||0;
       if(av>bv)return 1;
