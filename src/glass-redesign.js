@@ -11,7 +11,7 @@ import { APP_VERSION } from './version.js';
   const state={phase:'idle',message:'Release status has not been checked yet.',currentVersion:APP_VERSION,latestVersion:APP_VERSION,checkedAt:null,error:null};
 
   function compareVersions(left,right){
-    const a=String(left).split(/[.\\-]/).map(part=>Number.parseInt(part,10)||0);
+    const a=String(left).split(/[.-]/).map(part=>Number.parseInt(part,10)||0);
     const b=String(right).split(/[.\\-]/).map(part=>Number.parseInt(part,10)||0);
     for(let i=0;i<Math.max(a.length,b.length);i++){
       const av=a[i]||0,bv=b[i]||0;
@@ -148,7 +148,7 @@ import { APP_VERSION } from './version.js';
       const page=await fetchNoStore('/?gc_update='+Date.now());
       if(!page.ok)throw new Error('The latest application page could not be loaded.');
       const html=await page.text();
-      const embedded=html.match(/<meta\\s+name=["']glass-chess-version["']\\s+content=["']([^"']+)["']/i)?.[1];
+      const embedded=html.match(/<meta\s+name=["']glass-chess-version["']\s+content=["']([^"']+)["']/i)?.[1];
       if(!embedded)throw new Error('The application page did not report its release version.');
       if(compareVersions(embedded,release.version)<0){
         throw new Error('The release manifest is newer than the application page currently being served. Try again after deployment finishes.');

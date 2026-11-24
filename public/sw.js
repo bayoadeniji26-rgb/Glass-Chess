@@ -52,7 +52,7 @@ self.addEventListener('fetch',event=>{
     return;
   }
 
-  const isApplicationCode=/\\.(?:js|mjs|css)$/.test(url.pathname);
+  const isApplicationCode=/\.(?:js|mjs|css)$/.test(url.pathname);
   if(isApplicationCode){
     event.respondWith(
       fetch(request,{cache:'no-store'}).then(response=>{

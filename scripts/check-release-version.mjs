@@ -12,8 +12,10 @@ const htmlVersion = indexSource.match(/name="glass-chess-version" content="([^"]
 
 if (!sourceVersion || sourceVersion !== manifestVersion || sourceVersion !== htmlVersion) {
   throw new Error(
-    \`Release version mismatch: src/version.js=\${sourceVersion || 'missing'}, public/version.json=\${manifestVersion || 'missing'}, index.html=\${htmlVersion || 'missing'}\`
+    'Release version mismatch: src/version.js=' + (sourceVersion || 'missing') +
+    ', public/version.json=' + (manifestVersion || 'missing') +
+    ', index.html=' + (htmlVersion || 'missing')
   );
 }
 
-console.log(\`Release version consistent: \${sourceVersion}\`);
+console.log('Release version consistent: ' + sourceVersion);
