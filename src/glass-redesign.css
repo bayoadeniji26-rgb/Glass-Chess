@@ -564,3 +564,9 @@ html, body {
     animation: none !important;
   }
 }
+
+/* Release refresh is driven by actual manifest, worker and page verification events. */
+.gc-update-track,.gc-update-progress-row{display:none!important}
+.gc-update-banner{gap:12px}
+.gc-update-copy small{max-width:330px;line-height:1.4}
+.gc-update-stage{margin-top:14px}
