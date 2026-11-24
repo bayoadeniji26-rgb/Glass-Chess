@@ -70,22 +70,62 @@
 .gc-piece {
   position: relative;
   z-index: 2;
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 88%;
+  height: 88%;
   font-size: clamp(27px, 5vw, 55px);
   line-height: 1;
+  color: var(--gc-piece-color, #f7f2e9);
   user-select: none;
   pointer-events: none;
 }
 
-.piece-white {
-  color: #fff;
-  text-shadow: 0 2px 3px rgba(0,0,0,0.7),
-               0 0 2px #000;
+.gc-piece-glass {
+  opacity: .94;
+  -webkit-text-stroke: .35px currentColor;
+  filter: drop-shadow(0 3px 3px rgba(0,0,0,.38));
 }
 
-.piece-black {
-  color: #20242d;
-  text-shadow: 0 1px 2px rgba(255,255,255,0.35);
+.gc-piece-glass.piece-white {
+  text-shadow: 0 2px 3px rgba(0,0,0,.72), 0 0 2px rgba(0,0,0,.7);
+}
+
+.gc-piece-glass.piece-black {
+  text-shadow: 0 1px 2px rgba(255,255,255,.38);
+}
+
+.gc-piece-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.gc-svg-piece {
+  fill: currentColor;
+  stroke: var(--gc-piece-edge, rgba(0,0,0,.5));
+  stroke-width: 2.3;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.gc-piece-medieval .gc-svg-piece {
+  --gc-piece-edge: rgba(30,24,18,.62);
+}
+
+.gc-piece-modern .gc-svg-piece {
+  --gc-piece-edge: rgba(20,26,36,.55);
+  stroke-width: 1.8;
+}
+
+.gc-piece-white {
+  --gc-piece-highlight: rgba(255,255,255,.86);
+}
+
+.gc-piece-black {
+  --gc-piece-highlight: rgba(0,0,0,.42);
 }
 
 .square {
@@ -160,6 +200,43 @@
 .gc-captures span {
   font-size: 19px;
   letter-spacing: 2px;
+}
+
+.gc-piece-customizer label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 10px 0;
+}
+
+.gc-piece-customizer select {
+  width: 100%;
+}
+
+.gc-piece-colors {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.gc-piece-colors label {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 7px;
+  font-size: 12px;
+}
+
+.gc-piece-colors input[type="color"] {
+  width: 100%;
+  height: 42px;
+  padding: 3px;
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 9px;
+  background: rgba(255,255,255,.06);
+  cursor: pointer;
 }
 
 .gc-promotion {
