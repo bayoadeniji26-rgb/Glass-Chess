@@ -49,6 +49,9 @@ import './glass-workspace.css';
     prepareDrawer(play, 'gc-workspace-left', 'Play settings');
     prepareDrawer(analysis, 'gc-workspace-right', 'Analysis Studio');
 
+    // Drawers live directly under body so the board layout cannot clip them.
+    document.body.append(play, analysis);
+
     function closeDrawer() {
       active = null;
       document.body.classList.remove(openClass);
