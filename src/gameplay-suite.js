@@ -558,7 +558,7 @@ function updateClassifications(results) {
       ? '<span class="gcl-review-suggest" title="'+esc('Stockfish recommendation: '+suggestion.piece+' '+suggestion.from+' to '+suggestion.to+' ('+suggestion.san+'). Hover to read the move; open to preview the resulting position.')+'"><b>Suggested:</b> '+esc(suggestion.piece)+' '+esc(suggestion.from)+'–'+esc(suggestion.to)+' <small>('+esc(suggestion.san)+')</small></span>'
       : '<span class="gcl-review-suggest">Suggested move unavailable</span>';
     const differs=suggestion&&String(item.best).toLowerCase()!==uci(item.move);
-    return '<details class="gcl-review-move"><summary><span class="gcl-review-move-main"><b>'+esc(actualPiece)+' '+esc(played)+'</b><small>Played · '+esc(item.label)+'</small></span>'+recommended+'</summary>'+(differs?miniReviewBoard(item,suggestion):'<p class="gcl-muted">This was Stockfish’s top move. No alternate move preview is needed.</p>')+'</details>';
+    return '<details class="gcl-review-move"><summary><span class="gcl-review-move-main"><b>'+esc(played)+'</b><small>Played · '+esc(item.label)+'</small></span>'+recommended+'</summary>'+(differs?miniReviewBoard(item,suggestion):'<p class="gcl-muted">This was Stockfish’s top move. No alternate move preview is needed.</p>')+'</details>';
   }).join('');
   host.innerHTML='<div class="gcl-counts">'+countMarkup+'</div><div class="gcl-review-move-list">'+moveMarkup+'</div>';
 }
