@@ -318,10 +318,14 @@ import './glass-final-ui.css';
     // Focus mode uses the remaining fullscreen space under the toolbar.
     // Reserve room for both player labels, the board controls, promotion UI,
     // and the toolbar so none of them get pushed below the visible board.
-    const surroundingUI = viewportWidth < 600 ? 142 : 156;
+    // Keep every control in the same visible workspace as the board.
+    // Focus mode reserves compact space for player labels, toolbar and actions.
+    const surroundingUI = focusMode
+      ? (viewportWidth < 600 ? 166 : 174)
+      : (viewportWidth < 600 ? 122 : 132);
     const verticalCap = focusMode
-      ? Math.max(240, viewportHeight - toolbarHeight - surroundingUI - 28)
-      : Math.max(280, Math.min(viewportHeight * 0.76, viewportHeight - surroundingUI - 34));
+      ? Math.max(190, viewportHeight - toolbarHeight - surroundingUI - 20)
+      : Math.max(220, Math.min(viewportHeight * 0.82, viewportHeight - surroundingUI - 24));
 
     const factor = SIZE_FACTORS[settings.size] || 1;
     const baseSize = Math.min(widthCap, verticalCap, hardCap);
@@ -361,6 +365,16 @@ import './glass-final-ui.css';
     board.style.setProperty("margin", "0 auto", "important");
     board.style.setProperty("overflow", "hidden", "important");
     board.style.setProperty("box-sizing", "border-box", "important");
+
+    const boardFrame = board.closest(".board-frame");
+    if (boardFrame) {
+      boardFrame.style.setProperty("width", `${safeSize + 16}px`, "important");
+      boardFrame.style.setProperty("max-width", "calc(100vw - 12px)", "important");
+      boardFrame.style.setProperty("height", "auto", "important");
+      boardFrame.style.setProperty("aspect-ratio", "auto", "important");
+      boardFrame.style.setProperty("padding", "8px", "important");
+      boardFrame.style.setProperty("flex", "0 0 auto", "important");
+    }
 
     for (const square of getSquares(board)) {
       square.style.setProperty("min-width", "0", "important");
