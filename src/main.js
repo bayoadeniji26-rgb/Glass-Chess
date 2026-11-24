@@ -9,6 +9,8 @@ import { createBoardEffects } from "./board-effects.js";
 
 const $ = id => document.getElementById(id);
 const game = new Chess();
+let gameStartFen = game.fen();
+let suppressGameCallbacks = false;
 
 const PIECES = {
   wk: "♔", wq: "♕", wr: "♖", wb: "♗", wn: "♘", wp: "♙",
@@ -553,6 +555,7 @@ function render() {
   updateLabels();
 
   $("evaluation").hidden = !settings.evaluation;
+  window.GlassChessGameplaySuite?.refresh?.();
 }
 
 // ============================================
@@ -660,7 +663,8 @@ function commitMove(input) {
       !game.isGameOver()
     ) {
       void computerMove();
-    } else if (gameMode === "analysis" && !game.isGameOver()) {
+    } else if (gameMode === "analysis" && !game.isGameOver() &&
+      !window.GlassChessGameplaySuite?.shouldSkipAutoAnalysis?.()) {
       void analyzePosition();
     }
   } catch (error) {
@@ -734,6 +738,7 @@ function getEngineMove(uci) {
 // ============================================
 
 function updateEvaluation(info, side) {
+  window.GlassChessGameplaySuite?.setEvaluation?.(info, side);
   if (!settings.evaluation || !info) return;
 
   let type = "";
@@ -795,7 +800,8 @@ async function computerMove() {
 
     if (token !== gameToken || result.cancelled) return;
 
-    const move = getEngineMove(result.bestMove);
+    const selectedUci = window.GlassChessGameplaySuite?.selectEngineMove?.(result) || result.bestMove;
+    const move = getEngineMove(selectedUci);
 
     if (!move) {
       throw new Error("Stockfish returned an invalid move.");
@@ -832,6 +838,7 @@ async function computerMove() {
       thinking = false;
       render();
       if (playedMove) finishMoveFeedback(playedMove, moveMotionSnapshot);
+      window.GlassChessGameplaySuite?.onEngineTurnReady?.();
     }
   }
 }
@@ -937,6 +944,7 @@ async function analyzePosition() {
     if (token === gameToken) {
       thinking = false;
       render();
+      window.GlassChessGameplaySuite?.refreshEngineArrows?.();
     }
   }
 }
@@ -970,6 +978,7 @@ async function newGame() {
   if (token !== gameToken) return;
 
   game.reset();
+  gameStartFen = game.fen();
 
   selected = null;
   legalMoves = [];
@@ -1015,7 +1024,8 @@ async function startGame() {
 
   if (engineReady) {
     try {
-      await engine.configure({
+      const labOptions = window.GlassChessGameplaySuite?.getEngineOptions?.();
+      await engine.configure(labOptions || {
         skillLevel: window.GlassChessOnlinePlus?.getEngineSkillLevel?.() ?? PROFILES[profile] ?? 10
       });
     } catch (error) {
@@ -1275,7 +1285,9 @@ function installGlassChessPremiumBridge() {
     get engineReady() { return engineReady; },
     get thinking() { return thinking; },
     get profile() { return profile; },
-    get initialFen() { return game.fen(); },
+    get initialFen() { return gameStartFen; },
+    get startFen() { return gameStartFen; },
+    get isFlipped() { return boardIsFlipped(); },
     get history() { return game.history({ verbose: true }); },
     get pgn() { return game.pgn(); },
     get fen() { return game.fen(); },
@@ -1330,6 +1342,27 @@ function installGlassChessPremiumBridge() {
       return this.appearance;
     },
     render() { render(); },
+    playMove(input) { return commitMove(input); },
+    startEngineTurn() {
+      if (gameMode === 'computer' && engineReady && !thinking && game.turn() !== getHumanSide() && !game.isGameOver()) {
+        void computerMove();
+      }
+    },
+    flip() { flipped = !flipped; render(); return flipped; },
+    loadFen(fen) {
+      const candidate = new Chess(fen);
+      thinking = false;
+      gameToken++;
+      void engine.stop();
+      game.load(candidate.fen());
+      gameStartFen = game.fen();
+      selected = null; legalMoves = []; lastMove = null; resigned = false; winner = "";
+      clearPromotion(); analysisBestMove = null; premiumReplayLock = false;
+      render();
+      window.GlassChessPremium?.onLoadedGame?.([], game.fen());
+      window.GlassChessGameplaySuite?.onPositionLoad?.(game.fen());
+      return game.fen();
+    },
     newGame() { return newGame(); },
     undo() { return undoMove(); },
     stopSearch() { return engine.stop(); },
@@ -1338,7 +1371,10 @@ function installGlassChessPremiumBridge() {
       if (thinking) throw new Error("Stockfish is busy with another move or analysis.");
       thinking = true;
       try {
-        return await engine.search(fen, { depth: depth || 12, onInfo });
+        return await engine.search(fen, { depth: depth || 12, onInfo: info => {
+          onInfo?.(info);
+          window.GlassChessGameplaySuite?.setEvaluation?.(info, String(fen).split(/\s+/)[1] || "w");
+        } });
       } finally {
         thinking = false;
       }
@@ -1376,36 +1412,45 @@ function installGlassChessPremiumBridge() {
         );
       const latestMove = extendsByOne ? moves[moves.length - 1] : null;
       const motionSnapshot = latestMove ? boardEffects.captureMove(latestMove) : null;
-      game.load(initialFen);
-      for (const move of moves) {
-        game.move({ from: move.from, to: move.to, promotion: move.promotion });
-      }
+      gameStartFen = initialFen;
+      suppressGameCallbacks = true;
+      try {
+        game.load(initialFen);
+        for (const move of moves) game.move({ from: move.from, to: move.to, promotion: move.promotion });
+      } finally { suppressGameCallbacks = false; }
       render();
       if (latestMove && motionSnapshot) finishMoveFeedback(latestMove, motionSnapshot);
     },
     calculatePositions(initialFen, moveList) {
       const savedMoves = game.history({ verbose: true });
       const result = [];
-      game.load(initialFen);
-      result.push(game.fen());
-      for (const move of moveList) {
-        game.move({ from: move.from, to: move.to, promotion: move.promotion });
+      suppressGameCallbacks = true;
+      try {
+        game.load(initialFen);
         result.push(game.fen());
-      }
-      game.load(initialFen);
-      for (const move of savedMoves) {
-        game.move({ from: move.from, to: move.to, promotion: move.promotion });
-      }
+        for (const move of moveList) {
+          game.move({ from: move.from, to: move.to, promotion: move.promotion });
+          result.push(game.fen());
+        }
+        game.load(initialFen);
+        for (const move of savedMoves) game.move({ from: move.from, to: move.to, promotion: move.promotion });
+      } finally { suppressGameCallbacks = false; }
       render();
       return result;
     },
     loadPgn(pgn) {
+      thinking = false;
+      gameToken++;
+      void engine.stop();
       game.loadPgn(pgn);
+      const fenHeader = String(pgn).match(/\[FEN\s+"([^"]+)"\]/i);
+      gameStartFen = fenHeader ? fenHeader[1] : new Chess().fen();
       updateLabels();
       render();
       if (window.GlassChessPremium && typeof window.GlassChessPremium.onLoadedGame === 'function') {
         window.GlassChessPremium.onLoadedGame(game.history({ verbose: true }), game.fen());
       }
+      window.GlassChessGameplaySuite?.onPositionLoad?.(game.fen());
     }
   };
 
@@ -1413,8 +1458,11 @@ function installGlassChessPremiumBridge() {
   game.move = function (...args) {
     const beforeFen = game.fen();
     const move = originalMove(...args);
-    if (move && window.GlassChessPremium && typeof window.GlassChessPremium.onMove === 'function') {
-      window.GlassChessPremium.onMove(move, beforeFen, game.fen());
+    if (move && !suppressGameCallbacks) {
+      if (window.GlassChessPremium && typeof window.GlassChessPremium.onMove === 'function') {
+        window.GlassChessPremium.onMove(move, beforeFen, game.fen());
+      }
+      window.GlassChessGameplaySuite?.onMove?.(move, beforeFen, game.fen());
     }
     return move;
   };
@@ -1425,6 +1473,7 @@ function installGlassChessPremiumBridge() {
     if (window.GlassChessPremium && typeof window.GlassChessPremium.onReset === 'function') {
       window.GlassChessPremium.onReset(game.fen());
     }
+    window.GlassChessGameplaySuite?.onReset?.(game.fen());
     return result;
   };
 
@@ -1438,8 +1487,12 @@ function installGlassChessPremiumBridge() {
   };
 
   import('./premium.js')
-    .then(({ mount }) => mount(window.GlassChess))
-    .catch(error => console.error('Glass Chess Premium could not start:', error));
+    .then(async ({ mount }) => {
+      mount(window.GlassChess);
+      const { mountGameplaySuite } = await import('./gameplay-suite.js');
+      mountGameplaySuite(window.GlassChess, document.getElementById('gc-premium'));
+    })
+    .catch(error => console.error('Glass Chess Premium / Game Lab could not start:', error));
 }
 
 function launch() {

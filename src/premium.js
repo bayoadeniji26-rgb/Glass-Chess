@@ -472,7 +472,7 @@ function onUndo(history, fen) {
 }
 
 function onLoadedGame(history, fen) {
-  startFen = START_FEN;
+  startFen = api.startFen || START_FEN;
   moves = history.map(move => ({ from: move.from, to: move.to, promotion: move.promotion, san: move.san, color: move.color }));
   try {
     suppressTracking = true;

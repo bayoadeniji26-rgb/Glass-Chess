@@ -5,6 +5,7 @@ class ChessEngine {
     this.startPromise = null;
     this.activeSearch = null;
     this.skillLevel = 3;
+    this.multiPV = 1;
   }
 
   start() {
@@ -23,8 +24,8 @@ class ChessEngine {
           const message = String(event.data).trim();
 
           if (message === "uciok") {
-            this.send("setoption name Skill Level value " + 
-this.skillLevel);
+            this.send("setoption name Skill Level value " + this.skillLevel);
+            this.send("setoption name MultiPV value " + this.multiPV);
             this.send("isready");
           }
 
@@ -38,7 +39,8 @@ this.skillLevel);
             const parsed = this.parseInfo(message);
             if (this.activeSearch && parsed) {
               this.activeSearch.latestInfo = parsed;
-              this.activeSearch.onInfo?.(parsed, message);
+              this.activeSearch.variations.set(parsed.multipv || 1, parsed);
+              if ((parsed.multipv || 1) === 1) this.activeSearch.onInfo?.(parsed, message);
             }
           }
 
@@ -76,15 +78,14 @@ this.skillLevel);
     await this.stop();
 
     if (Number.isFinite(options.skillLevel)) {
-      this.skillLevel = Math.max(
-        0,
-        Math.min(20, Math.round(options.skillLevel))
-      );
+      this.skillLevel = Math.max(0, Math.min(20, Math.round(options.skillLevel)));
+    }
+    if (Number.isFinite(options.multiPV)) {
+      this.multiPV = Math.max(1, Math.min(5, Math.round(options.multiPV)));
     }
 
-    this.send(
-      "setoption name Skill Level value " + this.skillLevel
-    );
+    this.send("setoption name Skill Level value " + this.skillLevel);
+    this.send("setoption name MultiPV value " + this.multiPV);
 
     this.send("isready");
 
@@ -118,6 +119,7 @@ this.skillLevel);
           reject,
           onInfo: options.onInfo,
           latestInfo: null,
+          variations: new Map(),
           cancelled: false
         };
 
@@ -126,6 +128,7 @@ this.skillLevel);
           Math.min(30, Number(options.depth) || 10)
         );
 
+        this.send("setoption name MultiPV value " + this.multiPV);
         this.send("position fen " + fen);
         this.send("go depth " + depth);
       });
@@ -164,8 +167,9 @@ this.skillLevel);
     const bestMove = match ? match[1] : null;
 
     search.resolve({
-      ...(search.latestInfo || {}),
+      ...(search.variations.get(1) || search.latestInfo || {}),
       bestMove,
+      variations: Array.from(search.variations.values()).sort((a,b)=>(a.multipv||1)-(b.multipv||1)),
       cancelled: search.cancelled
     });
   }
