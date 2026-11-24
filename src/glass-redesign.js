@@ -5,7 +5,7 @@ import './glass-redesign.css';
 
   // Bump this value whenever a new release is published. public/version.json
   // must be changed to the same value in that release.
-  const APP_VERSION = '2026.11.24.2';
+  const APP_VERSION = '2026.11.24.3';
   const VERSION_URL = '/version.json';
   let updateBanner = null;
   let updateOverlay = null;
