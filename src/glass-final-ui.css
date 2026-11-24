@@ -241,3 +241,43 @@ body.gc-final-focus-mode { overflow:hidden !important; }
     font-size: 12px !important;
   }
 }
+
+
+/* Compact, unified play area: controls stay directly beneath the board. */
+.gc-final-board-stage {
+  gap: 5px !important;
+  padding: 3px 6px 6px !important;
+}
+.gc-final-board-stage > .player-label {
+  width: min(var(--gc-final-board-size, 760px), calc(100vw - 18px)) !important;
+  min-height: 29px !important;
+  padding: 2px 3px !important;
+  margin: 0 !important;
+}
+.gc-final-board-stage > .board-frame {
+  margin: 0 !important;
+}
+.gc-final-board-stage > .board-controls {
+  width: min(var(--gc-final-board-size, 760px), calc(100vw - 18px)) !important;
+  margin: 2px 0 0 !important;
+  gap: 6px !important;
+}
+.gc-final-board-stage > .board-controls button {
+  min-height: 34px !important;
+  padding: 6px 12px !important;
+}
+.gc-final-focus-mode .gc-final-board-stage {
+  gap: 5px !important;
+  padding: 6px !important;
+  overflow: auto !important;
+  overscroll-behavior: contain;
+}
+.gc-final-focus-mode .gc-final-board-stage > .player-label {
+  min-height: 26px !important;
+}
+@media (max-height: 760px) {
+  .gc-final-board-stage { gap: 3px !important; }
+  .gc-final-board-stage > .player-label { min-height: 24px !important; }
+  .gc-final-board-stage > .board-controls { margin-top: 0 !important; }
+  .gc-final-board-stage > .board-controls button { min-height: 30px !important; }
+}
