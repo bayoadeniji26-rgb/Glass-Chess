@@ -40,12 +40,13 @@ let startFen = START_FEN;
 let replaying = false;
 let suppressTracking = false;
 let puzzle = null;
-let clock = { white: 300, black: 300, increment: 0, active: false, side: 'w', last: 0, interval: null };
 let lastRecordedResult = '';
 let reviewResults = [];
 let audioContext = null;
 let liveAnalysisToken = 0;
 let liveAnalysisRunning = false;
+let reviewToken = 0;
+let puzzleToken = 0;
 
 function loadData() {
   try {
@@ -63,18 +64,6 @@ function saveData() {
 
 function esc(value) {
   return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-}
-
-function formatClock(seconds) {
-  const safe = Math.max(0, Math.ceil(seconds));
-  const minutes = Math.floor(safe / 60);
-  const secs = safe % 60;
-  return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-}
-
-function parseControl(value) {
-  const [minutes, increment] = value.split('+').map(Number);
-  return { base: (minutes || 5) * 60, increment: increment || 0 };
 }
 
 function uciFromMove(move) {
@@ -167,7 +156,7 @@ function buildInterface() {
         <div class="gc-card"><div class="gc-stat" id="gc-draws">0</div><div class="gc-stat-label">Draws</div></div>
         <div class="gc-card"><div class="gc-stat" id="gc-losses">0</div><div class="gc-stat-label">Losses</div></div>
       </div>
-      <div class="gc-card"><div class="gc-row"><h4>Chess clock</h4><span class="gc-pill" id="gc-clock-state">Paused</span></div><div class="gc-grid"><div><div class="gc-stat-label">White</div><div class="gc-clock" id="gc-white-clock">05:00</div></div><div><div class="gc-stat-label">Black</div><div class="gc-clock" id="gc-black-clock">05:00</div></div></div><label class="gc-muted" for="gc-time-control">Time control</label><select id="gc-time-control"><option value="1+0">Bullet · 1+0</option><option value="3+2">Blitz · 3+2</option><option value="5+0" selected>Blitz · 5+0</option><option value="10+0">Rapid · 10+0</option><option value="15+10">Rapid · 15+10</option><option value="30+0">Classical · 30+0</option></select><div class="gc-actions"><button class="primary" id="gc-clock-start">Start / Restart</button><button id="gc-clock-pause">Pause</button></div><p class="gc-muted">Clock runs locally and switches sides after each legal move. It does not automatically force a timeout result.</p></div>
+      <div class="gc-card"><div class="gc-row"><h4>Chess clock</h4><span class="gc-pill">One clock · Game Lab</span></div><p class="gc-muted">Time controls and the live countdown are managed in Game Lab, so there is only one authoritative clock per match.</p><button id="gc-open-clock-tools">Open Game Lab clock</button></div>
       <div class="gc-card gc-live-engine-card">
         <div class="gc-row"><h4>Live Engine Lab</h4><span class="gc-pill" id="gc-engine-status">Connecting to Stockfish…</span></div>
         <div class="gc-row gc-live-score-row"><strong id="gc-live-eval">—</strong><span class="gc-muted" id="gc-live-depth">Ready for analysis</span></div>
@@ -247,48 +236,12 @@ function renderProfile() {
   $('gc-puzzle-count').textContent = `${data.puzzlesSolved} solved · ${data.puzzleStreak} streak`;
   data.sound = Boolean(api.soundsEnabled);
   $('gc-sound-toggle').checked = data.sound;
-  $('gc-time-control').value = data.timeControl;
   renderSavedGames();
 }
 
-function renderClock() {
-  $('gc-white-clock').textContent = formatClock(clock.white);
-  $('gc-black-clock').textContent = formatClock(clock.black);
-  $('gc-white-clock').classList.toggle('active', clock.active && clock.side === 'w');
-  $('gc-black-clock').classList.toggle('active', clock.active && clock.side === 'b');
-  $('gc-clock-state').textContent = clock.active ? 'Running' : 'Paused';
-}
-
-function stopClock() {
-  clock.active = false;
-  if (clock.interval) clearInterval(clock.interval);
-  clock.interval = null;
-  renderClock();
-}
-
-function startClock() {
-  stopClock();
-  const control = parseControl($('gc-time-control').value);
-  data.timeControl = $('gc-time-control').value;
-  saveData();
-  clock.white = control.base;
-  clock.black = control.base;
-  clock.increment = control.increment;
-  clock.side = api.turn;
-  clock.active = true;
-  clock.last = performance.now();
-  clock.interval = setInterval(() => {
-    const now = performance.now();
-    const elapsed = Math.max(0, (now - clock.last) / 1000);
-    clock.last = now;
-    if (!clock.active) return;
-    const key = clock.side === 'w' ? 'white' : 'black';
-    clock[key] = Math.max(0, clock[key] - elapsed);
-    if (clock[key] <= 0) stopClock();
-    else renderClock();
-  }, 100);
-  renderClock();
-}
+function renderClock() { window.GlassChessGameplaySuite?.renderClock?.(); }
+function stopClock() { window.GlassChessGameplaySuite?.stopClock?.(); }
+function startClock() { window.GlassChessGameplaySuite?.startClock?.(); }
 
 function playTone(kind = 'move') {
   if (!data.sound) return;
@@ -391,17 +344,18 @@ function exportPgn() {
 }
 
 function recordFinishedGame() {
-  if (!api.gameOver || api.mode === 'analysis') return;
+  if (!api.gameOver || api.mode === 'analysis' || window.GlassChessOnlinePlus?.isOnline?.()) return;
   const pgn = api.pgn || '';
   const key = `${pgn}|${api.fen}`;
   if (key === lastRecordedResult || !api.history.length) return;
   lastRecordedResult = key;
-  const isDraw = api.draw || !api.checkmate;
-  let result = 'draw';
-  if (!isDraw) {
-    const winner = api.turn === 'w' ? 'b' : 'w';
-    result = winner === (api.playerColor === 'black' ? 'b' : 'w') ? 'win' : 'loss';
-  }
+  const termination = api.termination;
+  const isDraw = api.draw || Boolean(termination?.draw);
+  const winningSide = termination
+    ? (termination.winner === 'White' ? 'w' : termination.winner === 'Black' ? 'b' : null)
+    : (api.turn === 'w' ? 'b' : 'w');
+  const playerSide = api.playerColor === 'black' ? 'b' : 'w';
+  const result = isDraw ? 'draw' : winningSide === playerSide ? 'win' : 'loss';
   data.games += 1;
   if (result === 'win') data.wins += 1;
   else if (result === 'loss') data.losses += 1;
@@ -421,13 +375,6 @@ function onMove(move, beforeFen, afterFen) {
   window.GlassChessOnlinePlus?.handleMove?.(move, beforeFen, afterFen);
   moves.push({ from: move.from, to: move.to, promotion: move.promotion, san: move.san, color: move.color });
   positions.push(afterFen);
-  if (clock.active) {
-    const mover = move.color === 'w' ? 'white' : 'black';
-    clock[mover] += clock.increment;
-    clock.side = api.turn;
-    clock.last = performance.now();
-    renderClock();
-  }
   renderOpening();
   if (puzzle?.active) handlePuzzleMove(move, afterFen);
   if (api.gameOver) { recordFinishedGame(); stopClock(); window.GlassChessOnlinePlus?.onGameFinished?.(); }
@@ -436,6 +383,8 @@ function onMove(move, beforeFen, afterFen) {
 }
 
 function onReset(fen) {
+  reviewToken++; puzzleToken++;
+  void api.stopSearch?.();
   window.GlassChessOnlinePlus?.onReset?.(fen);
   startFen = fen;
   moves = [];
@@ -458,6 +407,7 @@ function onReset(fen) {
 
 function onUndo(history, fen) {
   if (suppressTracking || replaying) return;
+  reviewToken++; puzzleToken++; puzzle = null;
   moves = history.map(move => ({ from: move.from, to: move.to, promotion: move.promotion, san: move.san, color: move.color }));
   lastRecordedResult = '';
   try {
@@ -472,6 +422,8 @@ function onUndo(history, fen) {
 }
 
 function onLoadedGame(history, fen) {
+  reviewToken++; puzzleToken++; puzzle = null;
+  stopClock();
   startFen = api.startFen || START_FEN;
   moves = history.map(move => ({ from: move.from, to: move.to, promotion: move.promotion, san: move.san, color: move.color }));
   try {
@@ -526,10 +478,11 @@ async function createPuzzle() {
   if (!api.engineReady) { $('gc-puzzle-status').textContent = 'Stockfish is still loading. Try again when the engine is ready.'; return; }
   if (api.thinking) { $('gc-puzzle-status').textContent = 'Wait for the current engine calculation to finish.'; return; }
   if (replaying) exitReplay();
-  const fen = api.fen;
+  const token = ++puzzleToken, generation = api.generation, fen = api.fen;
   $('gc-puzzle-status').textContent = 'Stockfish is selecting a challenge move…';
   try {
     const result = await api.search(fen, 13, () => {});
+    if (token !== puzzleToken || generation !== api.generation || fen !== api.fen || result.cancelled) return;
     const best = String(result?.bestMove || '').toLowerCase();
     if (!/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(best)) throw new Error('Stockfish did not return a legal move.');
     puzzle = { fen, best, active: true, hinted: false };
@@ -538,7 +491,7 @@ async function createPuzzle() {
     $('gc-puzzle-hint').textContent = 'Show hint';
     switchTab('train');
   } catch (error) {
-    $('gc-puzzle-status').textContent = `Puzzle could not be created: ${error.message}`;
+    if (token === puzzleToken) $('gc-puzzle-status').textContent = `Puzzle could not be created: ${error.message}`;
   }
 }
 
@@ -718,6 +671,11 @@ async function reviewGame() {
   if (api.thinking) { $('gc-review-status').textContent = 'Engine is busy'; return; }
   if (!moves.length) { $('gc-review-status').textContent = 'Play moves first'; return; }
   if (replaying) exitReplay();
+  const token = ++reviewToken;
+  const generation = api.generation;
+  const snapshotFen = api.fen;
+  const snapshotMoves = moves.slice();
+  const snapshotPositions = positions.slice();
   reviewResults = [];
   $('gc-review-status').textContent = 'Reviewing…';
   $('gc-move-review').innerHTML = '<div class="gc-empty">Stockfish is reviewing the moves. Keep this tab open.</div>';
@@ -726,14 +684,16 @@ async function reviewGame() {
   let totalAccuracy = 0;
   let ratedMoves = 0;
   try {
-    for (let i = 0; i < moves.length; i++) {
-      const before = positions[i];
-      const after = positions[i + 1];
+    for (let i = 0; i < snapshotMoves.length; i++) {
+      if (token !== reviewToken || generation !== api.generation || snapshotFen !== api.fen) break;
+      const before = snapshotPositions[i], after = snapshotPositions[i + 1];
       if (!before || !after) continue;
       let beforeScore = null, afterScore = null;
       const pre = await api.search(before, 7, info => { const score = scoreFromInfo(info); if (score != null) beforeScore = score; });
+      if (token !== reviewToken || generation !== api.generation || snapshotFen !== api.fen || pre.cancelled) break;
       beforeScore ??= scoreFromInfo(pre);
       const post = await api.search(after, 7, info => { const score = scoreFromInfo(info); if (score != null) afterScore = score; });
+      if (token !== reviewToken || generation !== api.generation || snapshotFen !== api.fen || post.cancelled) break;
       afterScore ??= scoreFromInfo(post);
       let loss = null;
       if (beforeScore != null && afterScore != null) {
@@ -744,24 +704,34 @@ async function reviewGame() {
       const [label, color] = loss == null ? ['Reviewed', ''] : moveClass(loss);
       const accuracy = loss == null ? null : Math.max(0, 100 - loss * 14);
       if (accuracy != null) { totalAccuracy += accuracy; ratedMoves += 1; }
-      const whiteEval = beforeScore == null ? null : (moves[i].color === 'w' ? beforeScore : -beforeScore);
+      const whiteEval = beforeScore == null ? null : (snapshotMoves[i].color === 'w' ? beforeScore : -beforeScore);
       if (whiteEval != null) evals.push(whiteEval);
-      reviewResults.push({ san: moves[i].san, color: moves[i].color, label, colorClass: color, loss, accuracy });
+      reviewResults.push({ san: snapshotMoves[i].san, color: snapshotMoves[i].color, label, colorClass: color, loss, accuracy });
       $('gc-move-review').innerHTML = reviewResults.map((item, index) => `
         <div class="gc-move"><span>${index + 1}. ${item.color === 'w' ? 'White' : 'Black'} · <strong>${esc(item.san)}</strong></span><span class="gc-pill ${item.colorClass}">${esc(item.label)}${item.loss == null ? '' : ` · ${item.loss.toFixed(2)}`}</span></div>`).join('');
       $('gc-review-moves').textContent = String(reviewResults.length);
-      $('gc-review-status').textContent = `Reviewing ${i + 1}/${moves.length}`;
+      $('gc-review-status').textContent = `Reviewing ${i + 1}/${snapshotMoves.length}`;
     }
+    if (token !== reviewToken || generation !== api.generation || snapshotFen !== api.fen) return;
     $('gc-accuracy').textContent = ratedMoves ? `${Math.round(totalAccuracy / ratedMoves)}%` : '—';
     $('gc-review-status').textContent = 'Review complete';
     renderReviewGraph(evals);
     window.GlassChessOnlinePlus?.onReviewComplete?.();
   } catch (error) {
-    $('gc-review-status').textContent = 'Review stopped';
-    $('gc-move-review').innerHTML += `<div class="gc-muted">${esc(error.message)}</div>`;
+    if (token === reviewToken) {
+      $('gc-review-status').textContent = 'Review stopped';
+      $('gc-move-review').innerHTML += `<div class="gc-muted">${esc(error.message)}</div>`;
+    }
   } finally {
-    api.setReplayLock(false);
+    if (token === reviewToken) api.setReplayLock(false);
   }
+}
+
+function stopPremiumReview() {
+  reviewToken++;
+  void api.stopSearch?.();
+  api.setReplayLock(false);
+  $('gc-review-status').textContent = 'Review stopped';
 }
 
 function exportProfile() {
@@ -778,9 +748,10 @@ function resetProfile() {
 function bindEvents() {
   root.querySelectorAll('[data-tab]').forEach(button => button.addEventListener('click', () => switchTab(button.dataset.tab)));
   $('gc-save-name').addEventListener('click', () => { data.name = $('gc-name-input').value.trim().slice(0, 22) || 'Player'; saveData(); renderProfile(); });
-  $('gc-time-control').addEventListener('change', () => { data.timeControl = $('gc-time-control').value; saveData(); });
-  $('gc-clock-start').addEventListener('click', startClock);
-  $('gc-clock-pause').addEventListener('click', stopClock);
+  $('gc-open-clock-tools').addEventListener('click', () => {
+    root.querySelector('[data-tab="game-lab"]')?.click();
+    root.querySelector('[data-view="game-lab"]')?.scrollIntoView?.({behavior:'smooth',block:'start'});
+  });
   $('gc-live-analyze').addEventListener('click', analyzeCurrent);
   $('gc-live-stop').addEventListener('click', stopLiveAnalysis);
   $('gc-live-depth-select').addEventListener('change', () => {
@@ -886,7 +857,6 @@ export function mount(chessApi) {
     .catch(error => console.error('Glass Chess Online + Advanced Lab could not start:', error));
   renderProfile();
   renderThemes();
-  renderClock();
   renderOpening();
   refreshReplayControls();
   $('gc-engine-status').textContent = api.engineReady ? 'Stockfish ready' : 'Loading Stockfish';
@@ -898,6 +868,9 @@ export function mount(chessApi) {
     onReset,
     onUndo,
     onLoadedGame,
+    onGameFinished: recordFinishedGame,
+    shouldSkipAutoAnalysis: () => Boolean(puzzle?.active),
+    stopReview: stopPremiumReview,
     isReplaying: () => replaying,
     setTheme: applyTheme,
     setSoundEnabled(enabled) {

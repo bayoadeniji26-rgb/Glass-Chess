@@ -531,24 +531,28 @@ function classifyLoss(loss, playedBest, playedMove) {
 let reviewToken=0;
 async function analyzeGame() {
   if (!api.engineReady) { document.getElementById('gcl-review-status').textContent='Stockfish is not ready'; return; }
+  if (api.thinking) { document.getElementById('gcl-review-status').textContent='Stockfish is busy'; return; }
+  stopClock();
   const token=++reviewToken;
+  const generation=api.generation;
+  const snapshotFen=api.fen;
   const start=api.startFen||START_FEN;
   const moves=api.history.slice();
   const positions=api.calculatePositions(start,moves);
   const results=[];
   const summary=document.getElementById('gcl-review-status');
   const progress=document.querySelector('#gcl-review-progress span');
-  let totalAccuracy=0, rated=0;
+  let totalAccuracy=0, rated=0, aborted=false;
   const sideAccuracy={w:{total:0,count:0},b:{total:0,count:0}};
   api.setReplayLock(true);
   document.getElementById('gcl-review').disabled=true;
   try {
     for(let i=0;i<moves.length;i++){
-      if(token!==reviewToken)break;
+      if(token!==reviewToken||generation!==api.generation||snapshotFen!==api.fen){aborted=true;break;}
       const before=await api.search(positions[i],8);
-      if(token!==reviewToken)break;
+      if(token!==reviewToken||generation!==api.generation||snapshotFen!==api.fen||before.cancelled){aborted=true;break;}
       const after=await api.search(positions[i+1],8);
-      if(token!==reviewToken)break;
+      if(token!==reviewToken||generation!==api.generation||snapshotFen!==api.fen||after.cancelled){aborted=true;break;}
       const pre=scoreFromInfo(before);
       const post=scoreFromInfo(after);
       const loss=pre==null||post==null?0:Math.max(0,pre+post);
@@ -573,7 +577,7 @@ async function analyzeGame() {
       summary.textContent='Analyzing '+(i+1)+' / '+moves.length;
       progress.style.width=((i+1)/Math.max(1,moves.length)*100)+'%';
     }
-    if(token===reviewToken){
+    if(token===reviewToken&&generation===api.generation&&snapshotFen===api.fen&&!aborted){
       updateClassifications(results);
       renderSummary(results,rated?Math.round(totalAccuracy/rated):null,sideAccuracy);
       retryQueue=results.filter(item=>['Mistake','Blunder'].includes(item.label) && (api.mode!=='computer'||item.move.color===(api.playerColor==='black'?'b':'w')));
@@ -581,10 +585,12 @@ async function analyzeGame() {
       summary.textContent='Review complete';
     }
   } catch(error) {
-    summary.textContent='Review paused: '+error.message;
+    if(token===reviewToken)summary.textContent='Review paused: '+error.message;
   } finally {
-    api.setReplayLock(false);
-    document.getElementById('gcl-review').disabled=false;
+    if(token===reviewToken){
+      api.setReplayLock(false);
+      document.getElementById('gcl-review').disabled=false;
+    }
   }
 }
 function renderSummary(results,accuracy,sideAccuracy={w:{total:0,count:0},b:{total:0,count:0}}) {
@@ -599,10 +605,20 @@ function renderSummary(results,accuracy,sideAccuracy={w:{total:0,count:0},b:{tot
   host.querySelectorAll('[data-turn]').forEach(btn=>btn.addEventListener('click',()=>inspectPly(Number(btn.dataset.turn)-1)));
   const matches=safeHistory();const latest=matches.find(item=>item.pgn===api.pgn);if(latest){latest.accuracy=accuracy;saveHistory(matches);renderMatchHistory();}
 }
-function stopReview() { reviewToken++;void api.stopSearch?.();document.getElementById('gcl-review-status').textContent='Review stopped'; }
+function stopReview() {
+  reviewToken++;
+  void api.stopSearch?.();
+  api.setReplayLock(false);
+  const button=document.getElementById('gcl-review');
+  if(button)button.disabled=false;
+  document.getElementById('gcl-review-status').textContent='Review stopped';
+}
 
 function startRetry() {
   if(!retryQueue.length)return;
+  stopRush();
+  activePuzzle=null;
+  stopReview();
   retryIndex=0;retryActive=true;
   api.setMode('analysis',false);
   loadRetryPosition();
@@ -901,8 +917,30 @@ function renderClock() {
   if(b){b.textContent=formatClock(clockState.black);b.classList.toggle('low',clockState.black<10);}
 }
 function stopClock(){clockState.running=false;if(clockState.timer)clearInterval(clockState.timer);clockState.timer=null;renderClock();}
+function tickClockElapsed() {
+  if(!clockState.running)return false;
+  const now=performance.now();
+  const elapsed=Math.max(0,(now-clockState.last)/1000);
+  clockState.last=now;
+  const key=clockState.side==='w'?'white':'black';
+  clockState[key]=Math.max(0,clockState[key]-elapsed);
+  if(clockState[key]<=0){
+    stopClock();
+    document.getElementById('gcl-import-status').textContent=(key==='white'?'White':'Black')+' flag fell.';
+    api.setTimeoutResult?.(clockState.side);
+    return false;
+  }
+  renderClock();
+  return true;
+}
+function canMoveNow(){return !clockState.running||tickClockElapsed();}
 function startClock(reset=true) {
   stopClock();
+  if(api.gameOver){document.getElementById('gcl-import-status').textContent='The game has ended. Start a new game before starting the clock.';return;}
+  if(window.GlassChessOnlinePlus?.isOnline?.()){
+    document.getElementById('gcl-import-status').textContent='The local clock is disabled in online games because it is not server-authoritative.';
+    return;
+  }
   const preset=document.getElementById('gcl-time-preset').value;
   let minutes=5,increment=0;
   if(preset==='untimed'){document.getElementById('gcl-clock-white').textContent='∞';document.getElementById('gcl-clock-black').textContent='∞';return;}
@@ -910,13 +948,7 @@ function startClock(reset=true) {
   else [minutes,increment]=preset.split('+').map(Number);
   if(reset){clockState.white=minutes*60;clockState.black=minutes*60;clockState.increment=increment;}
   clockState.side=api.turn;clockState.last=performance.now();clockState.running=true;
-  clockState.timer=window.setInterval(()=>{
-    const now=performance.now(),elapsed=Math.max(0,(now-clockState.last)/1000);clockState.last=now;
-    const key=clockState.side==='w'?'white':'black';
-    clockState[key]=Math.max(0,clockState[key]-elapsed);
-    if(clockState[key]<=0){stopClock();document.getElementById('gcl-import-status').textContent=(key==='white'?'White':'Black')+' flag fell.';}
-    else renderClock();
-  },100);
+  clockState.timer=window.setInterval(tickClockElapsed,100);
   renderClock();
 }
 function tickClockAfterMove(move) {
@@ -929,13 +961,17 @@ function tickClockAfterMove(move) {
 }
 
 function saveCompletedMatch() {
-  if(!api.gameOver||api.mode==='analysis'||!api.history.length)return;
-  const key=api.pgn+'|'+api.fen;
+  if(!api.gameOver||api.mode==='analysis'||!api.history.length||window.GlassChessOnlinePlus?.isOnline?.())return;
+  const key=api.pgn+'|'+api.fen+'|'+JSON.stringify(api.termination||null);
   if(key===cachedMatchSaved)return;
   cachedMatchSaved=key;
-  const isDraw=api.draw||!api.checkmate;
-  const winner=api.turn==='w'?'b':'w';
-  const result=isDraw?'draw':winner===(api.playerColor==='black'?'b':'w')?'win':'loss';
+  const termination=api.termination;
+  const isDraw=api.draw||Boolean(termination?.draw);
+  const winningSide=termination
+    ? (termination.winner==='White'?'w':termination.winner==='Black'?'b':null)
+    : (api.turn==='w'?'b':'w');
+  const playerSide=api.playerColor==='black'?'b':'w';
+  const result=isDraw?'draw':winningSide===playerSide?'win':'loss';
   const item={id:Date.now()+'-'+Math.random().toString(36).slice(2,7),date:new Date().toISOString(),result,opponent:api.mode==='computer'?(PERSONAS[loadPrefs().persona||'maximum']?.label||'Stockfish'):'Local match',fen:api.startFen||START_FEN,moves:api.history.map(uci),pgn:api.pgn,accuracy:reviewData.length?Math.round(reviewData.reduce((sum,r)=>sum+r.accuracy,0)/reviewData.length):null};
   const items=safeHistory();items.unshift(item);saveHistory(items);renderMatchHistory();
 }
@@ -991,6 +1027,18 @@ function showConfirmButtons() {
 function cancelConfirm(){confirmCandidate=null;board?.querySelectorAll('.gcl-confirm-from,.gcl-confirm-to').forEach(el=>el.classList.remove('gcl-confirm-from','gcl-confirm-to'));document.getElementById('gcl-confirm-popover')?.classList.remove('show');}
 
 function onPositionLoad(fen) {
+  reviewToken++;
+  void api.stopSearch?.();
+  api.setReplayLock(false);
+  const reviewButton=document.getElementById('gcl-review');
+  if(reviewButton)reviewButton.disabled=false;
+  stopClock();
+  const keepsPuzzle=Boolean(activePuzzle&&activePuzzle.fen===fen);
+  const keepsRetry=Boolean(retryActive&&retryQueue[retryIndex]?.before===fen);
+  const keepsDrill=Boolean(activeDrill&&activeDrill.fen===fen);
+  if(!keepsPuzzle){if(rushTimer)stopRush();else activePuzzle=null;}
+  if(!keepsRetry){retryActive=false;retryQueue=[];retryIndex=0;}
+  if(!keepsDrill)activeDrill=null;
   currentStartFen=fen||START_FEN;
   lastAutoReviewKey='';
   reviewData=[];
@@ -998,9 +1046,21 @@ function onPositionLoad(fen) {
   inspectedIndex=null;
   cancelPreMove();
   cancelConfirm();
+  document.getElementById('gcl-summary').innerHTML='';
+  document.getElementById('gcl-classifications').innerHTML='';
+  document.getElementById('gcl-review-status').textContent='Position changed · review again';
+  const progress=document.querySelector('#gcl-review-progress span');
+  if(progress)progress.style.width='0%';
   renderMoveHistory();
 }
 function onReset(fen) {
+  reviewToken++;
+  void api.stopSearch?.();
+  api.setReplayLock(false);
+  const reviewButton=document.getElementById('gcl-review');
+  if(reviewButton)reviewButton.disabled=false;
+  activeDrill=null;
+  stopRush();
   currentStartFen=fen||START_FEN;
   lastAutoReviewKey='';
   reviewData=[];
@@ -1048,7 +1108,7 @@ function onMove(move,beforeFen,afterFen) {
   if(api.gameOver){
     stopClock();saveCompletedMatch();
     const reviewKey=api.pgn+'|'+api.fen;
-    if(api.mode!=='analysis'&&reviewKey!==lastAutoReviewKey){
+    if(api.mode!=='analysis'&&!api.termination&&reviewKey!==lastAutoReviewKey){
       lastAutoReviewKey=reviewKey;
       window.setTimeout(()=>{if(api.gameOver&&api.pgn+'|'+api.fen===reviewKey)void analyzeGame();},500);
     }
@@ -1071,6 +1131,9 @@ function loadNextPuzzle() {
 }
 function startPuzzle() {
   rushTimer && stopRush();
+  exitRetry();
+  activePuzzle=null;
+  stopReview();
   const puzzle=PUZZLES[rushScore%PUZZLES.length];
   activePuzzle={...puzzle};
   api.loadFen(puzzle.fen);api.setMode('analysis',false);
@@ -1080,7 +1143,10 @@ function startPuzzle() {
   document.getElementById('gcl-puzzle-status').textContent='Find the move. The solution is hidden.';
 }
 function startRush() {
-  stopRush();rushScore=0;rushSeconds=60;loadNextPuzzle();
+  stopRush();
+  exitRetry();
+  stopReview();
+  rushScore=0;rushSeconds=60;loadNextPuzzle();
   const host=document.getElementById('gcl-rush-clock');host.hidden=false;updateRushScore();
   rushTimer=window.setInterval(()=>{rushSeconds--;updateRushScore();if(rushSeconds<=0)stopRush();},1000);
 }
@@ -1197,6 +1263,31 @@ function buildControls() {
   if(window.matchMedia?.('(max-width: 650px)').matches && prefs.confirm==null){confirmEnabled=true;$id('gcl-confirm').checked=true;savePrefs({confirm:true});}
 }
 
+function onUserUndo() {
+  reviewToken++;
+  void api.stopSearch?.();
+  api.setReplayLock(false);
+  const reviewButton=document.getElementById('gcl-review');
+  if(reviewButton)reviewButton.disabled=false;
+  retryQueue=[];retryIndex=0;retryActive=false;activePuzzle=null;activeDrill=null;
+  stopRush();cancelPreMove();cancelConfirm();
+  if(clockState.running){clockState.side=api.turn;clockState.last=performance.now();renderClock();}
+  document.getElementById('gcl-retry-status').textContent='Training mode closed after undo.';
+  document.getElementById('gcl-review-status').textContent='Position changed · review again';
+  document.getElementById('gcl-summary').innerHTML='';
+  document.getElementById('gcl-classifications').innerHTML='';
+  const progress=document.querySelector('#gcl-review-progress span');
+  if(progress)progress.style.width='0%';
+}
+
+function onGameEnded() {
+  stopClock();
+  stopRush();
+  retryActive=false;retryQueue=[];retryIndex=0;activePuzzle=null;activeDrill=null;
+  cancelPreMove();cancelConfirm();
+  saveCompletedMatch();
+}
+
 function render() {
   if(arrowSvg&&arrowSvg.parentElement===board)board.appendChild(arrowSvg);
   renderMaterial();detectOpening();renderMoveHistory();paintHeatmap();paintPreMove();
@@ -1220,6 +1311,12 @@ export function mountGameplaySuite(chessApi,premiumRoot) {
   window.GlassChessGameplaySuite={
     onMove,
     onEngineTurnReady(){if(preMove)attemptPreMove();},
+    canMoveNow,
+    onGameEnded,
+    onUserUndo,
+    startClock,
+    stopClock,
+    renderClock,
     onReset,
     onPositionLoad,
     setEvaluation:updateEvaluation,

@@ -3,78 +3,145 @@ class ChessEngine {
     this.worker = null;
     this.ready = false;
     this.startPromise = null;
+    this.configureQueue = Promise.resolve();
+    this.searchPromise = null;
+    this.stopPromise = null;
     this.activeSearch = null;
     this.skillLevel = 3;
     this.multiPV = 1;
   }
 
   start() {
-    if (this.ready) return Promise.resolve();
+    if (this.ready && this.worker) return Promise.resolve();
     if (this.startPromise) return this.startPromise;
 
-    this.startPromise = new Promise((resolve, reject) => {
-      try {
-        this.worker = new Worker("/engine/stockfish.worker.js");
+    let resolveReady;
+    let rejectReady;
+    const pending = new Promise((resolve, reject) => {
+      resolveReady = resolve;
+      rejectReady = reject;
+    });
+    this.startPromise = pending;
 
-        const timeout = setTimeout(() => {
-          reject(new Error("Stockfish took too long to start."));
-        }, 20000);
+    let settled = false;
+    let timeout = null;
+    const failStart = error => {
+      if (settled) return;
+      settled = true;
+      if (timeout) clearTimeout(timeout);
+      this.ready = false;
+      try { this.worker?.terminate(); } catch {}
+      this.worker = null;
+      rejectReady(error instanceof Error ? error : new Error(String(error)));
+    };
+    const finishStart = () => {
+      if (settled) return;
+      settled = true;
+      if (timeout) clearTimeout(timeout);
+      this.ready = true;
+      resolveReady();
+    };
 
-        this.worker.onmessage = event => {
-          const message = String(event.data).trim();
+    try {
+      const worker = new Worker("/engine/stockfish.worker.js");
+      this.worker = worker;
 
-          if (message === "uciok") {
+      worker.onmessage = event => {
+        const message = String(event.data ?? "").trim();
+        if (message === "uciok") {
+          try {
             this.send("setoption name Skill Level value " + this.skillLevel);
             this.send("setoption name MultiPV value " + this.multiPV);
             this.send("isready");
+          } catch (error) {
+            failStart(error);
           }
+          return;
+        }
 
-          if (message === "readyok") {
-            clearTimeout(timeout);
-            this.ready = true;
-            resolve();
-          }
+        if (message === "readyok" && !this.ready) {
+          finishStart();
+          return;
+        }
 
-          if (message.startsWith("info")) {
-            const parsed = this.parseInfo(message);
-            if (this.activeSearch && parsed) {
-              this.activeSearch.latestInfo = parsed;
-              this.activeSearch.variations.set(parsed.multipv || 1, parsed);
-              if ((parsed.multipv || 1) === 1) this.activeSearch.onInfo?.(parsed, message);
+        if (message.startsWith("info")) {
+          const parsed = this.parseInfo(message);
+          if (this.activeSearch && parsed) {
+            this.activeSearch.latestInfo = parsed;
+            this.activeSearch.variations.set(parsed.multipv || 1, parsed);
+            if ((parsed.multipv || 1) === 1) {
+              try { this.activeSearch.onInfo?.(parsed, message); }
+              catch (error) { console.warn("Stockfish info callback failed:", error); }
             }
           }
+        }
 
-          if (message.startsWith("bestmove")) {
-            this.finishSearch(message);
-          }
-        };
+        if (message.startsWith("bestmove")) this.finishSearch(message);
+      };
 
-        this.worker.onerror = error => {
-          clearTimeout(timeout);
-          this.ready = false;
-          reject(error);
-        };
+      worker.onerror = error => {
+        if (!settled) {
+          failStart(error);
+        } else {
+          this.handleWorkerFailure(error);
+        }
+      };
 
-        this.send("uci");
-      } catch (error) {
-        reject(error);
-      }
-    });
+      timeout = setTimeout(() => {
+        failStart(new Error("Stockfish took too long to start."));
+      }, 20000);
+      worker.postMessage("uci");
+    } catch (error) {
+      failStart(error);
+    }
 
-    return this.startPromise;
+    pending.then(
+      () => { if (this.startPromise === pending) this.startPromise = null; },
+      () => { if (this.startPromise === pending) this.startPromise = null; }
+    );
+    return pending;
+  }
+
+  handleWorkerFailure(error) {
+    this.ready = false;
+    const active = this.activeSearch;
+    this.activeSearch = null;
+    if (active) {
+      try { active.reject(error instanceof Error ? error : new Error("Stockfish worker failed.")); }
+      catch {}
+    }
+    try { this.worker?.terminate(); } catch {}
+    this.worker = null;
   }
 
   send(command) {
-    if (this.worker) {
+    if (!this.worker) throw new Error("Stockfish worker is not available.");
+    try {
       this.worker.postMessage(command);
+    } catch (error) {
+      this.handleWorkerFailure(error);
+      throw error;
     }
   }
 
-  async configure(options = {}) {
-    if (!this.ready) {
-      throw new Error("Stockfish is not ready.");
-    }
+  async restartWorker() {
+    const previous = this.worker;
+    this.worker = null;
+    this.ready = false;
+    this.startPromise = null;
+    try { previous?.terminate(); } catch {}
+    await this.start();
+  }
 
+  configure(options = {}) {
+    const run = () => this.configureWorker(options);
+    const queued = this.configureQueue.then(run, run);
+    this.configureQueue = queued.catch(() => {});
+    return queued;
+  }
+
+  async configureWorker(options = {}) {
+    if (!this.ready || !this.worker) await this.start();
     await this.stop();
 
     if (Number.isFinite(options.skillLevel)) {
@@ -84,37 +151,67 @@ class ChessEngine {
       this.multiPV = Math.max(1, Math.min(5, Math.round(options.multiPV)));
     }
 
-    this.send("setoption name Skill Level value " + this.skillLevel);
-    this.send("setoption name MultiPV value " + this.multiPV);
+    const worker = this.worker;
+    if (!worker || !this.ready) throw new Error("Stockfish is not ready to configure.");
 
-    this.send("isready");
-
-    await new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        this.worker.removeEventListener?.("message", listener);
-        reject(new Error("Engine configuration timed out."));
-      }, 5000);
-
-      const listener = event => {
-        if (String(event.data).trim() === "readyok") {
-          clearTimeout(timeout);
-          this.worker.removeEventListener("message", listener);
+    try {
+      await new Promise((resolve, reject) => {
+        let settled = false;
+        let timeout = null;
+        const cleanup = () => {
+          if (timeout) clearTimeout(timeout);
+          worker.removeEventListener("message", listener);
+        };
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          cleanup();
           resolve();
-        }
-      };
+        };
+        const listener = event => {
+          if (String(event.data ?? "").trim() === "readyok") finish();
+        };
 
-      this.worker.addEventListener("message", listener);
-    });
+        worker.addEventListener("message", listener);
+        timeout = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          reject(new Error("Engine configuration timed out."));
+        }, 5000);
+
+        try {
+          worker.postMessage("setoption name Skill Level value " + this.skillLevel);
+          worker.postMessage("setoption name MultiPV value " + this.multiPV);
+          // Register the listener before isready so a quick readyok cannot be missed.
+          worker.postMessage("isready");
+        } catch (error) {
+          settled = true;
+          cleanup();
+          reject(error);
+        }
+      });
+    } catch (error) {
+      try { await this.restartWorker(); }
+      catch (restartError) {
+        throw new Error("Engine configuration failed and Stockfish could not restart: " + restartError.message);
+      }
+      throw error;
+    }
   }
 
   search(fen, options = {}) {
-    if (!this.ready) {
-      return Promise.reject(new Error("Stockfish is not ready."));
+    if (this.searchPromise) {
+      return Promise.reject(new Error("Stockfish is already running a search."));
     }
 
-    return this.stop().then(() => {
+    const task = (async () => {
+      if (!this.ready || !this.worker) await this.start();
+      if (this.activeSearch) await this.stop();
+
       return new Promise((resolve, reject) => {
-        this.activeSearch = {
+        const depth = Math.max(1, Math.min(30, Number(options.depth) || 10));
+        const search = {
           resolve,
           reject,
           onInfo: options.onInfo,
@@ -122,17 +219,25 @@ class ChessEngine {
           variations: new Map(),
           cancelled: false
         };
+        this.activeSearch = search;
 
-        const depth = Math.max(
-          1,
-          Math.min(30, Number(options.depth) || 10)
-        );
-
-        this.send("setoption name MultiPV value " + this.multiPV);
-        this.send("position fen " + fen);
-        this.send("go depth " + depth);
+        try {
+          this.send("setoption name MultiPV value " + this.multiPV);
+          this.send("position fen " + fen);
+          this.send("go depth " + depth);
+        } catch (error) {
+          if (this.activeSearch === search) this.activeSearch = null;
+          reject(error);
+        }
       });
-    });
+    })();
+
+    this.searchPromise = task;
+    task.then(
+      () => { if (this.searchPromise === task) this.searchPromise = null; },
+      () => { if (this.searchPromise === task) this.searchPromise = null; }
+    );
+    return task;
   }
 
   parseInfo(message) {
@@ -162,37 +267,76 @@ class ChessEngine {
 
     const search = this.activeSearch;
     this.activeSearch = null;
-
     const match = message.match(/^bestmove\s+(\S+)/);
-    const bestMove = match ? match[1] : null;
+    const rawBestMove = match ? match[1] : null;
+    const bestMove = rawBestMove && rawBestMove !== "(none)" && rawBestMove !== "0000"
+      ? rawBestMove
+      : null;
 
     search.resolve({
       ...(search.variations.get(1) || search.latestInfo || {}),
       bestMove,
-      variations: Array.from(search.variations.values()).sort((a,b)=>(a.multipv||1)-(b.multipv||1)),
+      variations: Array.from(search.variations.values())
+        .sort((a, b) => (a.multipv || 1) - (b.multipv || 1)),
       cancelled: search.cancelled
     });
   }
 
   stop() {
-    if (!this.activeSearch) {
-      return Promise.resolve();
-    }
+    if (!this.activeSearch) return Promise.resolve();
+    if (this.stopPromise) return this.stopPromise;
 
-    return new Promise(resolve => {
-      const search = this.activeSearch;
+    const search = this.activeSearch;
+    search.cancelled = true;
+    const originalResolve = search.resolve;
+    const originalReject = search.reject;
 
-      search.cancelled = true;
-
-      const originalResolve = search.resolve;
-
-      search.resolve = result => {
-        originalResolve(result);
+    this.stopPromise = new Promise(resolve => {
+      let finished = false;
+      let timeout = null;
+      const finish = () => {
+        if (finished) return;
+        finished = true;
+        if (timeout) clearTimeout(timeout);
+        this.stopPromise = null;
         resolve();
       };
 
-      this.send("stop");
+      search.resolve = result => {
+        try { originalResolve(result); }
+        finally { finish(); }
+      };
+      search.reject = error => {
+        try { originalReject(error); }
+        finally { finish(); }
+      };
+
+      timeout = setTimeout(async () => {
+        if (this.activeSearch === search) {
+          this.activeSearch = null;
+          try {
+            originalResolve({
+              ...(search.variations.get(1) || search.latestInfo || {}),
+              bestMove: null,
+              variations: Array.from(search.variations.values()),
+              cancelled: true
+            });
+          } catch {}
+          try { await this.restartWorker(); }
+          catch (error) { console.error("Stockfish restart after stop timeout failed:", error); }
+        }
+        finish();
+      }, 1500);
+
+      try { this.send("stop"); }
+      catch (error) {
+        if (this.activeSearch === search) this.activeSearch = null;
+        try { originalReject(error); } catch {}
+        finish();
+      }
     });
+
+    return this.stopPromise;
   }
 }
 

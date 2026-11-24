@@ -88,8 +88,23 @@ let analysisDepth = 12;
 let playerColor = "white";
 let profile = "casual";
 let gameToken = 0;
+let positionGeneration = 0;
+let startRequestToken = 0;
+let gameTermination = null;
+let allowEngineMove = false;
+const moveFeedback = new WeakMap();
 let resigned = false;
 let winner = "";
+
+function isGameOver() {
+  return game.isGameOver() || Boolean(gameTermination);
+}
+
+async function ensureEngineReady() {
+  await engine.start();
+  engineReady = Boolean(engine.ready);
+  return engineReady;
+}
 
 let settings = {
   legalMoves: true,
@@ -498,7 +513,19 @@ function updateCaptured() {
 // ============================================
 
 function updateGameStatus() {
-  if (resigned) {
+  if (gameTermination?.type === "timeout_draw") {
+    $("coach-title").textContent = "Draw on time";
+    $("coach-text").textContent = "The flagged side ran out of time, but the opponent did not have sufficient material to checkmate.";
+    return;
+  }
+
+  if (gameTermination?.type === "timeout") {
+    $("coach-title").textContent = "Time expired";
+    $("coach-text").textContent = gameTermination.winner + " wins on time.";
+    return;
+  }
+
+  if (resigned || gameTermination?.type === "resignation") {
     $("coach-title").textContent = "Game resigned";
     $("coach-text").textContent = `${winner} wins by resignation.`;
     return;
@@ -646,8 +673,12 @@ function finishMoveFeedback(move, motionSnapshot) {
 
 function commitMove(input) {
   if (premiumReplayLock) return;
-  if (thinking || resigned || game.isGameOver()) return;
+  if (thinking || resigned || isGameOver()) return;
   const online = window.GlassChessOnlinePlus;
+  if (!isHumanTurn()) {
+    online?.showMoveDenied?.();
+    return;
+  }
   if (online?.isOnline?.() && online.canMove?.(game.turn()) !== true) {
     online.showMoveDenied?.();
     return;
@@ -657,7 +688,18 @@ function commitMove(input) {
     const move = game.move(input);
 
     if (!move) return;
-    const motionSnapshot = boardEffects.captureMove(move);
+    const feedback = moveFeedback.get(move);
+    if (feedback) moveFeedback.delete(move);
+    if (feedback && !feedback.applied) {
+      const history = game.history({ verbose: true });
+      const previous = history[history.length - 1];
+      lastMove = previous ? { from: previous.from, to: previous.to } : null;
+      selected = null;
+      legalMoves = [];
+      render();
+      return;
+    }
+    const motionSnapshot = feedback?.motionSnapshot || boardEffects.captureMove(move);
 
     lastMove = {
       from: move.from,
@@ -673,11 +715,12 @@ function commitMove(input) {
     if (
       gameMode === "computer" &&
       game.turn() !== getHumanSide() &&
-      !game.isGameOver()
+      !isGameOver()
     ) {
       void computerMove();
-    } else if (gameMode === "analysis" && !game.isGameOver() &&
-      !window.GlassChessGameplaySuite?.shouldSkipAutoAnalysis?.()) {
+    } else if (gameMode === "analysis" && !isGameOver() &&
+      !window.GlassChessGameplaySuite?.shouldSkipAutoAnalysis?.() &&
+      !window.GlassChessPremium?.shouldSkipAutoAnalysis?.()) {
       void analyzePosition();
     }
   } catch (error) {
@@ -686,7 +729,7 @@ function commitMove(input) {
 }
 
 function handleSquare(square) {
-  if (thinking || resigned || game.isGameOver()) return;
+  if (thinking || resigned || isGameOver()) return;
   if (!isHumanTurn()) return;
 
   if (selected) {
@@ -783,16 +826,13 @@ function updateEvaluation(info, side) {
 // ============================================
 
 async function computerMove() {
-  if (
-    !engineReady ||
-    thinking ||
-    game.isGameOver() ||
-    resigned
-  ) return;
+  if (thinking || isGameOver() || resigned) return;
 
   thinking = true;
 
   const token = gameToken;
+  const generation = positionGeneration;
+  const fen = game.fen();
   const side = game.turn();
 
   selected = null;
@@ -806,12 +846,18 @@ async function computerMove() {
   let moveMotionSnapshot = null;
 
   try {
-    const result = await engine.search(game.fen(), {
+    await ensureEngineReady();
+    if (token !== gameToken || generation !== positionGeneration || game.fen() !== fen) return;
+    const result = await engine.search(fen, {
       depth: window.GlassChessGameplaySuite?.getEngineDepth?.() ?? DEPTH,
-      onInfo: info => updateEvaluation(info, side)
+      onInfo: info => {
+        if (token === gameToken && generation === positionGeneration && game.fen() === fen) {
+          updateEvaluation(info, side);
+        }
+      }
     });
 
-    if (token !== gameToken || result.cancelled) return;
+    if (token !== gameToken || generation !== positionGeneration || game.fen() !== fen || result.cancelled) return;
 
     const selectedUci = window.GlassChessGameplaySuite?.selectEngineMove?.(result) || result.bestMove;
     const move = getEngineMove(selectedUci);
@@ -821,12 +867,29 @@ async function computerMove() {
     }
 
     moveMotionSnapshot = boardEffects.captureMove(move);
-    const played = game.move({
-      from: move.from,
-      to: move.to,
-      promotion: move.promotion
-    });
+    let played;
+    allowEngineMove = true;
+    try {
+      played = game.move({
+        from: move.from,
+        to: move.to,
+        promotion: move.promotion
+      });
+    } finally {
+      allowEngineMove = false;
+    }
 
+    if (!played) throw new Error("Stockfish returned a move that could not be applied.");
+    const feedback = moveFeedback.get(played);
+    if (feedback) moveFeedback.delete(played);
+    if (feedback && !feedback.applied) {
+      const history = game.history({ verbose: true });
+      const previous = history[history.length - 1];
+      lastMove = previous ? { from: previous.from, to: previous.to } : null;
+      $("best-move").textContent = "Training move rejected. Try another move.";
+      return;
+    }
+    if (feedback?.motionSnapshot) moveMotionSnapshot = feedback.motionSnapshot;
     playedMove = played;
     lastMove = {
       from: played.from,
@@ -900,7 +963,7 @@ function createAnalysisStudio() {
 }
 
 async function analyzePosition() {
-  if (gameMode !== "analysis" || !engineReady || game.isGameOver()) return;
+  if (gameMode !== "analysis" || isGameOver() || thinking) return;
 
   const token = gameToken;
   const fen = game.fen();
@@ -917,6 +980,8 @@ async function analyzePosition() {
   render();
 
   try {
+    await ensureEngineReady();
+    if (token !== gameToken || game.fen() !== fen) return;
     const result = await engine.search(fen, {
       depth: analysisDepth,
       onInfo: info => {
@@ -990,6 +1055,7 @@ async function newGame() {
 
   if (token !== gameToken) return;
 
+  gameTermination = null;
   game.reset();
   gameStartFen = game.fen();
 
@@ -998,6 +1064,7 @@ async function newGame() {
   lastMove = null;
   resigned = false;
   winner = "";
+  gameTermination = null;
 
   clearPromotion();
 
@@ -1025,27 +1092,40 @@ async function newGame() {
 // ============================================
 
 async function startGame() {
-  gameMode = $("mode").value;
-
+  const request = ++startRequestToken;
+  const requestedMode = $("mode").value;
   const chosen = $("color").value;
-
-  playerColor = chosen === "random"
+  const requestedColor = chosen === "random"
     ? (Math.random() < 0.5 ? "white" : "black")
     : chosen;
+  const requestedProfile = $("profile").value;
+  const skillLevel = window.GlassChessOnlinePlus?.getEngineSkillLevel?.()
+    ?? PROFILES[requestedProfile] ?? 10;
+  const labOptions = window.GlassChessGameplaySuite?.getEngineOptions?.();
+  const options = labOptions || { skillLevel };
 
-  profile = $("profile").value;
+  const token = ++gameToken;
+  thinking = true;
+  analysisBestMove = null;
 
-  if (engineReady) {
-    try {
-      const labOptions = window.GlassChessGameplaySuite?.getEngineOptions?.();
-      await engine.configure(labOptions || {
-        skillLevel: window.GlassChessOnlinePlus?.getEngineSkillLevel?.() ?? PROFILES[profile] ?? 10
-      });
-    } catch (error) {
-      console.error("Could not change engine difficulty:", error);
-    }
+  try {
+    await engine.configure(options);
+    engineReady = Boolean(engine.ready);
+  } catch (error) {
+    engineReady = Boolean(engine.ready);
+    console.error("Could not configure Stockfish:", error);
   }
 
+  if (request !== startRequestToken) return;
+  if (token !== gameToken) {
+    thinking = false;
+    render();
+    return;
+  }
+  gameMode = requestedMode;
+  playerColor = requestedColor;
+  profile = requestedProfile;
+  thinking = false;
   await newGame();
 }
 
@@ -1083,6 +1163,9 @@ async function undoMove() {
     ? { from: previous.from, to: previous.to }
     : null;
 
+  gameTermination = null;
+  positionGeneration++;
+  window.GlassChessGameplaySuite?.onUserUndo?.();
   clearPromotion();
   render();
 
@@ -1094,28 +1177,31 @@ async function undoMove() {
 // ============================================
 
 async function hint() {
-  if (
-    !engineReady ||
-    thinking ||
-    game.isGameOver() ||
-    resigned
-  ) return;
+  if (thinking || isGameOver() || resigned) return;
 
   thinking = true;
 
   const token = gameToken;
+  const generation = positionGeneration;
+  const fen = game.fen();
   const side = game.turn();
 
   $("best-move").textContent = "Finding a hint...";
   setEngineStatus("Calculating hint...");
 
   try {
-    const result = await engine.search(game.fen(), {
+    await ensureEngineReady();
+    if (token !== gameToken || generation !== positionGeneration || game.fen() !== fen) return;
+    const result = await engine.search(fen, {
       depth: DEPTH,
-      onInfo: info => updateEvaluation(info, side)
+      onInfo: info => {
+        if (token === gameToken && generation === positionGeneration && game.fen() === fen) {
+          updateEvaluation(info, side);
+        }
+      }
     });
 
-    if (token !== gameToken || result.cancelled) return;
+    if (token !== gameToken || generation !== positionGeneration || game.fen() !== fen || result.cancelled) return;
 
     const move = getEngineMove(result.bestMove);
 
@@ -1143,7 +1229,7 @@ async function hint() {
 // ============================================
 
 function resign() {
-  if (resigned || game.isGameOver()) return;
+  if (resigned || isGameOver()) return;
 
   if (!window.confirm("Are you sure you want to resign?")) return;
 
@@ -1153,10 +1239,37 @@ function resign() {
 
   winner = loser === "white" ? "Black" : "White";
   resigned = true;
+  gameTermination = { type: "resignation", winner, loser };
   thinking = false;
+  gameToken++;
+  positionGeneration++;
 
   void engine.stop();
   render();
+  window.GlassChessPremium?.onGameFinished?.();
+  window.GlassChessGameplaySuite?.onGameEnded?.();
+  window.GlassChessOnlinePlus?.onGameFinished?.();
+}
+
+function finishOnTime(loserSide) {
+  if (!["w", "b"].includes(loserSide) || isGameOver()) return false;
+  const draw = game.isInsufficientMaterial();
+  const winningName = loserSide === "w" ? "Black" : "White";
+  gameTermination = draw
+    ? { type: "timeout_draw", draw: true, winner: null, loser: loserSide }
+    : { type: "timeout", draw: false, winner: winningName, loser: loserSide };
+  winner = draw ? "" : winningName;
+  resigned = false;
+  thinking = false;
+  gameToken++;
+  positionGeneration++;
+  void engine.stop();
+  setEngineStatus(draw ? "Draw on time" : winningName + " wins on time");
+  render();
+  window.GlassChessPremium?.onGameFinished?.();
+  window.GlassChessGameplaySuite?.onGameEnded?.();
+  window.GlassChessOnlinePlus?.onGameFinished?.();
+  return true;
 }
 
 // ============================================
@@ -1295,7 +1408,7 @@ function installGlassChessPremiumBridge() {
     get game() { return game; },
     get mode() { return gameMode; },
     get playerColor() { return playerColor; },
-    get engineReady() { return engineReady; },
+    get engineReady() { return Boolean(engine.ready); },
     get thinking() { return thinking; },
     get profile() { return profile; },
     get initialFen() { return gameStartFen; },
@@ -1304,9 +1417,11 @@ function installGlassChessPremiumBridge() {
     get history() { return game.history({ verbose: true }); },
     get pgn() { return game.pgn(); },
     get fen() { return game.fen(); },
-    get gameOver() { return game.isGameOver(); },
+    get gameOver() { return isGameOver(); },
     get checkmate() { return game.isCheckmate(); },
-    get draw() { return game.isDraw(); },
+    get draw() { return game.isDraw() || Boolean(gameTermination?.draw); },
+    get termination() { return gameTermination ? { ...gameTermination } : null; },
+    get generation() { return positionGeneration; },
     get turn() { return game.turn(); },
     get soundsEnabled() { return Boolean(settings.sounds); },
     setSoundEnabled(enabled) {
@@ -1357,15 +1472,18 @@ function installGlassChessPremiumBridge() {
     render() { render(); },
     playMove(input) { return commitMove(input); },
     startEngineTurn() {
-      if (gameMode === 'computer' && engineReady && !thinking && game.turn() !== getHumanSide() && !game.isGameOver()) {
+      if (gameMode === 'computer' && !thinking && game.turn() !== getHumanSide() && !isGameOver()) {
         void computerMove();
       }
     },
+    setTimeoutResult(loserSide) { return finishOnTime(loserSide); },
     flip() { flipped = !flipped; render(); return flipped; },
     loadFen(fen) {
       const candidate = new Chess(fen);
       thinking = false;
       gameToken++;
+      positionGeneration++;
+      gameTermination = null;
       void engine.stop();
       game.load(candidate.fen());
       gameStartFen = game.fen();
@@ -1374,34 +1492,54 @@ function installGlassChessPremiumBridge() {
       render();
       window.GlassChessPremium?.onLoadedGame?.([], game.fen());
       window.GlassChessGameplaySuite?.onPositionLoad?.(game.fen());
+      window.GlassChessAdvancedLab?.onReset?.();
       return game.fen();
     },
     newGame() { return newGame(); },
     undo() { return undoMove(); },
     stopSearch() { return engine.stop(); },
     async search(fen, depth, onInfo) {
-      if (!engineReady) throw new Error("Stockfish is not ready yet.");
       if (thinking) throw new Error("Stockfish is busy with another move or analysis.");
       thinking = true;
+      const token = gameToken;
+      const generation = positionGeneration;
       try {
+        await ensureEngineReady();
         return await engine.search(fen, { depth: depth || 12, onInfo: info => {
+          if (token !== gameToken || generation !== positionGeneration) return;
           onInfo?.(info);
           window.GlassChessGameplaySuite?.setEvaluation?.(info, String(fen).split(/\s+/)[1] || "w");
         } });
       } finally {
-        thinking = false;
+        engineReady = Boolean(engine.ready);
+        if (token === gameToken) thinking = false;
       }
     },
-    configureEngine(options = {}) { return engine.configure(options || {}); },
+    configureEngine(options = {}) {
+      return engine.configure(options || {}).then(result => {
+        engineReady = Boolean(engine.ready);
+        return result;
+      });
+    },
     setMode(mode, shouldAnalyze = true) {
       if (!['computer', 'local', 'analysis'].includes(mode)) return;
+      const changed = mode !== gameMode;
       gameMode = mode;
       const selector = $('mode');
       if (selector) selector.value = mode;
       analysisBestMove = null;
       updateLabels();
       render();
-      if (shouldAnalyze && mode === 'analysis' && engineReady && !game.isGameOver()) {
+      const canAnalyze = shouldAnalyze && mode === 'analysis' && !isGameOver()
+        && !window.GlassChessGameplaySuite?.shouldSkipAutoAnalysis?.()
+        && !window.GlassChessPremium?.shouldSkipAutoAnalysis?.();
+      if (changed) {
+        const token = ++gameToken;
+        thinking = false;
+        void engine.stop().then(() => {
+          if (token === gameToken && canAnalyze) void analyzePosition();
+        });
+      } else if (canAnalyze && !thinking) {
         void analyzePosition();
       }
     },
@@ -1426,6 +1564,11 @@ function installGlassChessPremiumBridge() {
       const latestMove = extendsByOne ? moves[moves.length - 1] : null;
       const motionSnapshot = latestMove ? boardEffects.captureMove(latestMove) : null;
       gameStartFen = initialFen;
+      gameToken++;
+      positionGeneration++;
+      gameTermination = null;
+      resigned = false;
+      winner = "";
       suppressGameCallbacks = true;
       try {
         game.load(initialFen);
@@ -1454,6 +1597,10 @@ function installGlassChessPremiumBridge() {
     loadPgn(pgn) {
       thinking = false;
       gameToken++;
+      positionGeneration++;
+      gameTermination = null;
+      resigned = false;
+      winner = "";
       void engine.stop();
       game.loadPgn(pgn);
       const fenHeader = String(pgn).match(/\[FEN\s+"([^"]+)"\]/i);
@@ -1464,11 +1611,26 @@ function installGlassChessPremiumBridge() {
         window.GlassChessPremium.onLoadedGame(game.history({ verbose: true }), game.fen());
       }
       window.GlassChessGameplaySuite?.onPositionLoad?.(game.fen());
+      window.GlassChessAdvancedLab?.onReset?.();
     }
   };
 
   const originalMove = game.move.bind(game);
   game.move = function (...args) {
+    const engineAuthorizedMove = allowEngineMove;
+    if (engineAuthorizedMove) allowEngineMove = false;
+
+    if (!suppressGameCallbacks && !engineAuthorizedMove &&
+        (premiumReplayLock || thinking || resigned || isGameOver())) {
+      throw new Error("The current game state does not allow a move.");
+    }
+    if (!suppressGameCallbacks && window.GlassChessGameplaySuite?.canMoveNow?.() === false) {
+      throw new Error("Your clock has expired. Start a new game to continue.");
+    }
+    if (!suppressGameCallbacks && !engineAuthorizedMove && !isHumanTurn()) {
+      window.GlassChessOnlinePlus?.showMoveDenied?.();
+      throw new Error("It is not this player's turn.");
+    }
     if (!suppressGameCallbacks && window.GlassChessOnlinePlus?.isOnline?.() &&
         window.GlassChessOnlinePlus?.canMove?.(game.turn()) !== true) {
       window.GlassChessOnlinePlus?.showMoveDenied?.();
@@ -1477,11 +1639,23 @@ function installGlassChessPremiumBridge() {
     const beforeFen = game.fen();
     const move = originalMove(...args);
     if (move && !suppressGameCallbacks) {
-      if (window.GlassChessPremium && typeof window.GlassChessPremium.onMove === 'function') {
-        window.GlassChessPremium.onMove(move, beforeFen, game.fen());
+      const afterFen = game.fen();
+      const feedback = { motionSnapshot: boardEffects.captureMove(move), applied: true };
+      moveFeedback.set(move, feedback);
+      positionGeneration++;
+
+      try { window.GlassChessPremium?.onMove?.(move, beforeFen, afterFen); }
+      catch (error) { console.error("Premium move hook failed:", error); }
+      if (game.fen() === afterFen) {
+        try { window.GlassChessGameplaySuite?.onMove?.(move, beforeFen, afterFen); }
+        catch (error) { console.error("Game Lab move hook failed:", error); }
       }
-      window.GlassChessGameplaySuite?.onMove?.(move, beforeFen, game.fen());
-      window.GlassChessAdvancedLab?.onMove?.(move, beforeFen, game.fen());
+      if (game.fen() === afterFen) {
+        try { window.GlassChessAdvancedLab?.onMove?.(move, beforeFen, afterFen); }
+        catch (error) { console.error("Advanced Lab move hook failed:", error); }
+      }
+
+      feedback.applied = game.fen() === afterFen;
     }
     return move;
   };
@@ -1489,6 +1663,12 @@ function installGlassChessPremiumBridge() {
   const originalReset = game.reset.bind(game);
   game.reset = function (...args) {
     const result = originalReset(...args);
+    if (!suppressGameCallbacks) {
+      positionGeneration++;
+      gameTermination = null;
+      resigned = false;
+      winner = "";
+    }
     if (window.GlassChessPremium && typeof window.GlassChessPremium.onReset === 'function') {
       window.GlassChessPremium.onReset(game.fen());
     }
@@ -1500,6 +1680,7 @@ function installGlassChessPremiumBridge() {
   const originalUndo = game.undo.bind(game);
   game.undo = function (...args) {
     const result = originalUndo(...args);
+    if (result && !suppressGameCallbacks) positionGeneration++;
     if (result && window.GlassChessPremium && typeof window.GlassChessPremium.onUndo === 'function') {
       window.GlassChessPremium.onUndo(game.history({ verbose: true }), game.fen());
     }
