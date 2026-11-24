@@ -321,11 +321,11 @@ import './glass-final-ui.css';
     // Keep every control in the same visible workspace as the board.
     // Focus mode reserves compact space for player labels, toolbar and actions.
     const surroundingUI = focusMode
-      ? (viewportWidth < 600 ? 166 : 174)
-      : (viewportWidth < 600 ? 122 : 132);
+      ? (viewportWidth < 600 ? 158 : 166)
+      : (viewportWidth < 600 ? 170 : 178);
     const verticalCap = focusMode
-      ? Math.max(190, viewportHeight - toolbarHeight - surroundingUI - 20)
-      : Math.max(220, Math.min(viewportHeight * 0.82, viewportHeight - surroundingUI - 24));
+      ? Math.max(180, viewportHeight - toolbarHeight - surroundingUI - 18)
+      : Math.max(180, Math.min(viewportHeight * 0.70, viewportHeight - toolbarHeight - surroundingUI - 72));
 
     const factor = SIZE_FACTORS[settings.size] || 1;
     const baseSize = Math.min(widthCap, verticalCap, hardCap);
