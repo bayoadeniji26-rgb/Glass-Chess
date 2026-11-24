@@ -3,13 +3,8 @@ import "./glass-dock.css";
 (() => {
   const DOCK_ID = "gc-floating-hub";
   const panelSelectors = [
-    "aside.analysis-panel",
-    ".analysis-panel",
     "#gc-online-plus",
-    ".gc-online-plus-panel",
-    ".right-sidebar",
-    ".sidebar-right",
-    "aside.panel"
+    ".gc-online-plus-panel"
   ];
 
   const categories = [
