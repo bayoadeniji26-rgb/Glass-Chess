@@ -7,6 +7,7 @@ class ChessEngine {
     this.searchPromise = null;
     this.stopPromise = null;
     this.activeSearch = null;
+    this.searchGeneration = 0;
     this.skillLevel = 3;
     this.multiPV = 1;
   }
@@ -103,6 +104,7 @@ class ChessEngine {
   }
 
   handleWorkerFailure(error) {
+    this.searchGeneration += 1;
     this.ready = false;
     const active = this.activeSearch;
     this.activeSearch = null;
@@ -205,13 +207,25 @@ class ChessEngine {
       return Promise.reject(new Error("Stockfish is already running a search."));
     }
 
+    // Invalidate a request even while it is awaiting worker startup.
+    const requestId = ++this.searchGeneration;
+    const cancelledResult = () => ({
+      bestMove: null,
+      variations: [],
+      cancelled: true,
+      searchId: requestId
+    });
+
     const task = (async () => {
+      await this.configureQueue;
+      if (requestId !== this.searchGeneration) return cancelledResult();
       if (!this.ready || !this.worker) await this.start();
-      if (this.activeSearch) await this.stop();
+      if (requestId !== this.searchGeneration) return cancelledResult();
 
       return new Promise((resolve, reject) => {
         const depth = Math.max(1, Math.min(30, Number(options.depth) || 10));
         const search = {
+          id: requestId,
           resolve,
           reject,
           onInfo: options.onInfo,
@@ -220,8 +234,12 @@ class ChessEngine {
           cancelled: false
         };
         this.activeSearch = search;
-
         try {
+          if (requestId !== this.searchGeneration) {
+            this.activeSearch = null;
+            resolve(cancelledResult());
+            return;
+          }
           this.send("setoption name MultiPV value " + this.multiPV);
           this.send("position fen " + fen);
           this.send("go depth " + depth);
@@ -278,11 +296,14 @@ class ChessEngine {
       bestMove,
       variations: Array.from(search.variations.values())
         .sort((a, b) => (a.multipv || 1) - (b.multipv || 1)),
-      cancelled: search.cancelled
+      cancelled: search.cancelled,
+      searchId: search.id
     });
   }
 
   stop() {
+    // Also cancels work that has not sent its UCI go command yet.
+    this.searchGeneration += 1;
     if (!this.activeSearch) return Promise.resolve();
     if (this.stopPromise) return this.stopPromise;
 
@@ -319,7 +340,8 @@ class ChessEngine {
               ...(search.variations.get(1) || search.latestInfo || {}),
               bestMove: null,
               variations: Array.from(search.variations.values()),
-              cancelled: true
+              cancelled: true,
+              searchId: search.id
             });
           } catch {}
           try { await this.restartWorker(); }
