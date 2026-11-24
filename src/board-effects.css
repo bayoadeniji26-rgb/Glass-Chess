@@ -8,7 +8,7 @@
 }
 .gc-motion-ghost {
   position: fixed;
-  z-index: 2147482100;
+  z-index: 2147481900;
   display: grid;
   place-items: center;
   pointer-events: none !important;
@@ -17,8 +17,8 @@
   will-change: transform, opacity;
 }
 .gc-motion-ghost-move,
-.gc-motion-ghost-castle-rook { z-index: 2147482200; }
-.gc-motion-ghost-capture { z-index: 2147482100; filter: saturate(.82); }
+.gc-motion-ghost-castle-rook { z-index: 2147481950; }
+.gc-motion-ghost-capture { z-index: 2147481900; filter: saturate(.82); }
 .gc-motion-ghost .gc-piece {
   width: 100% !important;
   height: 100% !important;
@@ -65,4 +65,9 @@
     animation: none !important;
     transition: none !important;
   }
+}
+
+#board [data-square]:hover .gc-piece,
+#board [data-square].selected .gc-piece {
+  transform: translate3d(0,-2px,0) scale(1.025);
 }

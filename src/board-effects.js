@@ -217,6 +217,10 @@ export function createBoardEffects(board, isSoundEnabled = () => true) {
         gain.gain.exponentialRampToValueAtTime(.0001, start + note.duration);
         oscillator.connect(gain);
         gain.connect(audioContext.destination);
+        oscillator.onended = () => {
+          oscillator.disconnect();
+          gain.disconnect();
+        };
         oscillator.start(start);
         oscillator.stop(start + note.duration + .015);
       }
