@@ -35,7 +35,11 @@ this.skillLevel);
           }
 
           if (message.startsWith("info")) {
-            this.activeSearch?.onInfo?.(message);
+            const parsed = this.parseInfo(message);
+            if (this.activeSearch && parsed) {
+              this.activeSearch.latestInfo = parsed;
+              this.activeSearch.onInfo?.(parsed, message);
+            }
           }
 
           if (message.startsWith("bestmove")) {
@@ -113,6 +117,7 @@ this.skillLevel);
           resolve,
           reject,
           onInfo: options.onInfo,
+          latestInfo: null,
           cancelled: false
         };
 
@@ -127,6 +132,28 @@ this.skillLevel);
     });
   }
 
+  parseInfo(message) {
+    const info = {};
+    const depth = message.match(/\bdepth\s+(\d+)/);
+    const seldepth = message.match(/\bseldepth\s+(\d+)/);
+    const multipv = message.match(/\bmultipv\s+(\d+)/);
+    const score = message.match(/\bscore\s+(cp|mate)\s+(-?\d+)/);
+    const nodes = message.match(/\bnodes\s+(\d+)/);
+    const nps = message.match(/\bnps\s+(\d+)/);
+    const time = message.match(/\btime\s+(\d+)/);
+    const pv = message.match(/\bpv\s+(.+)$/);
+
+    if (depth) info.depth = Number(depth[1]);
+    if (seldepth) info.seldepth = Number(seldepth[1]);
+    if (multipv) info.multipv = Number(multipv[1]);
+    if (score) info.score = { type: score[1], value: Number(score[2]) };
+    if (nodes) info.nodes = Number(nodes[1]);
+    if (nps) info.nps = Number(nps[1]);
+    if (time) info.time = Number(time[1]);
+    if (pv) info.pv = pv[1].trim().split(/\s+/);
+    return info;
+  }
+
   finishSearch(message) {
     if (!this.activeSearch) return;
 
@@ -137,6 +164,7 @@ this.skillLevel);
     const bestMove = match ? match[1] : null;
 
     search.resolve({
+      ...(search.latestInfo || {}),
       bestMove,
       cancelled: search.cancelled
     });
