@@ -1,0 +1,122 @@
+/* Final layout override: deliberately targets the existing board class too,
+   so it works even if the older smart-fit script misses its extra class. */
+.gc-responsive-board,
+.gc-smart-fit-board,
+.gc-responsive-board.gc-smart-fit-board,
+.gc-screen-board {
+  width: var(--gc-screen-board-size, min(92vw, 88svh, 860px)) !important;
+  max-width: min(var(--gc-screen-board-size, 860px), calc(100vw - 22px)) !important;
+  height: var(--gc-screen-board-size, min(92vw, 88svh, 860px)) !important;
+  max-height: var(--gc-screen-board-size, min(88svh, 860px)) !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  aspect-ratio: 1 / 1 !important;
+  margin: 0 auto !important;
+  padding: 0 !important;
+  flex: 0 0 auto !important;
+  display: grid !important;
+  grid-template-columns: repeat(8, minmax(0, 1fr)) !important;
+  grid-template-rows: repeat(8, minmax(0, 1fr)) !important;
+  gap: 0 !important;
+  overflow: hidden !important;
+  border-radius: 15px !important;
+  box-shadow: 0 18px 52px rgba(0,0,0,.34), 0 0 0 1px rgba(223,229,255,.10), 0 0 42px rgba(105,135,220,.10) !important;
+}
+
+.gc-board-screen-stage {
+  --gc-board-lift: 0px;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 8px !important;
+  padding: 4px 8px 12px !important;
+  margin: 0 !important;
+  transform: translateY(calc(-1 * var(--gc-board-lift))) !important;
+  box-sizing: border-box !important;
+}
+.gc-board-screen-frame {
+  min-width: 0 !important;
+  min-height: 0 !important;
+  align-content: start !important;
+}
+.gc-screen-board [data-square],
+.gc-responsive-board [data-square],
+.gc-smart-fit-board [data-square] {
+  width: auto !important;
+  height: auto !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  aspect-ratio: 1 / 1 !important;
+  box-sizing: border-box !important;
+  padding: 0 !important;
+  line-height: 1 !important;
+  font-size: clamp(25px, calc(var(--gc-screen-board-size, 640px) / 13), 68px) !important;
+  overflow: hidden !important;
+}
+.gc-screen-board [data-square] img,
+.gc-screen-board [data-square] svg {
+  width: auto !important;
+  height: auto !important;
+  max-width: 88% !important;
+  max-height: 88% !important;
+}
+
+#gc-board-toolbar {
+  width: min(var(--gc-screen-board-size, 860px), calc(100vw - 22px));
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 10px;
+  border: 1px solid rgba(193,205,241,.14);
+  border-radius: 13px;
+  color: #eff3ff;
+  background: linear-gradient(110deg, rgba(36,46,70,.88), rgba(18,24,39,.80));
+  box-shadow: 0 6px 24px rgba(0,0,0,.18), inset 0 1px rgba(255,255,255,.06);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-sizing: border-box;
+}
+#gc-board-toolbar .gc-board-toolbar-brand { display:flex; align-items:center; gap:9px; min-width:0; }
+#gc-board-toolbar .gc-board-toolbar-mark {
+  width:29px; height:29px; flex:0 0 29px; display:grid; place-items:center;
+  border:1px solid rgba(228,198,126,.34); border-radius:9px;
+  color:#f0d391; background:linear-gradient(145deg,rgba(205,165,83,.2),rgba(255,255,255,.04));
+  font-size:19px; text-shadow:0 2px 7px rgba(240,190,94,.35);
+}
+#gc-board-toolbar strong { display:block; font-size:10px; letter-spacing:.15em; line-height:1.15; }
+#gc-board-toolbar small { display:block; margin-top:2px; color:#aab7d0; font-size:8px; letter-spacing:.12em; line-height:1.15; }
+#gc-board-toolbar .gc-board-toolbar-actions { display:flex; align-items:center; gap:6px; }
+#gc-board-toolbar button {
+  min-width:32px; height:29px; padding:0 9px; border:1px solid rgba(205,216,244,.17);
+  border-radius:9px; color:#e8edfa; background:rgba(255,255,255,.07);
+  font:600 11px/1 system-ui,sans-serif; cursor:pointer;
+  transition:background .15s ease, border-color .15s ease, transform .15s ease;
+}
+#gc-board-toolbar button:hover { background:rgba(142,165,225,.17); border-color:rgba(180,197,245,.38); transform:translateY(-1px); }
+#gc-board-toolbar button[aria-pressed="true"] { color:#f5dc9d; border-color:rgba(240,205,132,.5); background:rgba(197,157,81,.14); }
+.gc-board-focus-mode .gc-screen-board { box-shadow:0 22px 66px rgba(0,0,0,.42),0 0 0 1px rgba(235,215,164,.18),0 0 55px rgba(128,154,228,.14) !important; }
+
+@media (max-height: 720px) {
+  .gc-board-screen-stage { gap:5px !important; padding-top:2px !important; padding-bottom:6px !important; }
+  #gc-board-toolbar { min-height:36px; padding:3px 8px; }
+  #gc-board-toolbar .gc-board-toolbar-mark { width:25px; height:25px; flex-basis:25px; font-size:17px; }
+}
+@media (max-width: 760px) {
+  .gc-board-screen-stage { padding:3px 5px 8px !important; gap:6px !important; }
+  #gc-board-toolbar { width:calc(100vw - 12px); }
+  .gc-responsive-board, .gc-smart-fit-board, .gc-screen-board {
+    max-width:calc(100vw - 12px) !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #gc-board-toolbar button { transition:none !important; }
+}

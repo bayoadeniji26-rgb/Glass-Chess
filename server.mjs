@@ -1,0 +1,199 @@
+import http from 'node:http';
+import { randomBytes } from 'node:crypto';
+import { Server } from 'socket.io';
+import { Chess } from 'chess.js';
+
+const PORT = Number(process.env.PORT || 3001);
+const HOST = process.env.HOST || '0.0.0.0';
+const rooms = new Map();
+const httpServer = http.createServer((req, res) => {
+  res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' });
+  res.end('Glass Chess online server is running.');
+});
+const io = new Server(httpServer, {
+  cors: {
+    origin: process.env.GC_ALLOWED_ORIGIN || '*',
+    methods: ['GET', 'POST']
+  },
+  maxHttpBufferSize: 1e5,
+  pingInterval: 25000,
+  pingTimeout: 20000
+});
+
+const cleanName = value => String(value || 'Player').replace(/[<>\u0000-\u001f]/g, '').trim().slice(0, 20) || 'Player';
+const cleanCode = value => String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+const publicRoom = room => ({
+  code: room.code,
+  players: {
+    w: room.players.w ? { name: room.players.w.name, connected: true } : null,
+    b: room.players.b ? { name: room.players.b.name, connected: true } : null
+  },
+  spectators: room.spectators.size,
+  history: room.game.history({ verbose: true }).map(move => ({
+    from: move.from,
+    to: move.to,
+    promotion: move.promotion,
+    san: move.san,
+    color: move.color
+  })),
+  fen: room.game.fen(),
+  pgn: room.game.pgn(),
+  turn: room.game.turn(),
+  check: room.game.isCheck(),
+  checkmate: room.game.isCheckmate(),
+  draw: room.game.isDraw(),
+  gameOver: room.game.isGameOver(),
+  resigned: room.resigned,
+  result: room.resigned ? `${room.resigned === 'w' ? 'Black' : 'White'} wins by resignation` :
+    room.game.isCheckmate() ? `${room.game.turn() === 'w' ? 'Black' : 'White'} wins by checkmate` :
+    room.game.isDraw() ? 'Draw' : 'In progress'
+});
+
+function codeAvailable() {
+  let code;
+  do {
+    code = randomBytes(4).toString('hex').slice(0, 6).toUpperCase();
+  } while (rooms.has(code));
+  return code;
+}
+
+function broadcast(room) {
+  io.to(room.code).emit('room:state', publicRoom(room));
+}
+
+function removeSocketFromRoom(socket) {
+  const code = socket.data.roomCode;
+  if (!code) return;
+  const room = rooms.get(code);
+  if (room) {
+    for (const side of ['w', 'b']) {
+      if (room.players[side]?.id === socket.id) room.players[side] = null;
+    }
+    room.spectators.delete(socket.id);
+    broadcast(room);
+    if (!room.players.w && !room.players.b && room.spectators.size === 0) {
+      setTimeout(() => {
+        const current = rooms.get(code);
+        if (current && !current.players.w && !current.players.b && current.spectators.size === 0) rooms.delete(code);
+      }, 60000);
+    }
+  }
+  socket.leave(code);
+  socket.data.roomCode = null;
+  socket.data.role = null;
+}
+
+io.on('connection', socket => {
+  socket.on('room:create', (payload = {}, done = () => {}) => {
+    removeSocketFromRoom(socket);
+    const code = codeAvailable();
+    const room = {
+      code,
+      ownerId: socket.id,
+      players: { w: { id: socket.id, name: cleanName(payload.name) }, b: null },
+      spectators: new Map(),
+      game: new Chess(),
+      resigned: null
+    };
+    rooms.set(code, room);
+    socket.join(code);
+    socket.data.roomCode = code;
+    socket.data.role = 'w';
+    done({ ok: true, code, role: 'w', state: publicRoom(room) });
+    broadcast(room);
+  });
+
+  socket.on('room:join', (payload = {}, done = () => {}) => {
+    const code = cleanCode(payload.code);
+    const room = rooms.get(code);
+    if (!room) return done({ ok: false, error: 'Room not found. Check the code.' });
+    if (room.players.w?.id === socket.id) return done({ ok: true, code, role: 'w', state: publicRoom(room) });
+    if (room.players.b?.id === socket.id) return done({ ok: true, code, role: 'b', state: publicRoom(room) });
+    if (room.players.b) return done({ ok: false, error: 'That room already has two players. Join as a spectator instead.' });
+    removeSocketFromRoom(socket);
+    room.players.b = { id: socket.id, name: cleanName(payload.name) };
+    socket.join(code);
+    socket.data.roomCode = code;
+    socket.data.role = 'b';
+    done({ ok: true, code, role: 'b', state: publicRoom(room) });
+    broadcast(room);
+  });
+
+  socket.on('room:spectate', (payload = {}, done = () => {}) => {
+    const code = cleanCode(payload.code);
+    const room = rooms.get(code);
+    if (!room) return done({ ok: false, error: 'Room not found. Check the code.' });
+    removeSocketFromRoom(socket);
+    room.spectators.set(socket.id, cleanName(payload.name));
+    socket.join(code);
+    socket.data.roomCode = code;
+    socket.data.role = 'spectator';
+    done({ ok: true, code, role: 'spectator', state: publicRoom(room) });
+    broadcast(room);
+  });
+
+  socket.on('game:move', (payload = {}, done = () => {}) => {
+    const room = rooms.get(cleanCode(payload.code || socket.data.roomCode));
+    if (!room || socket.data.roomCode !== room.code) return done({ ok: false, error: 'You are not in that room.' });
+    if (room.resigned || room.game.isGameOver()) return done({ ok: false, error: 'This game has ended.' });
+    const side = ['w', 'b'].find(candidate => room.players[candidate]?.id === socket.id);
+    if (!side) return done({ ok: false, error: 'Spectators cannot move pieces.' });
+    if (room.game.turn() !== side) return done({ ok: false, error: 'It is not your turn.' });
+    const move = payload.move || {};
+    if (!/^[a-h][1-8]$/.test(move.from || '') || !/^[a-h][1-8]$/.test(move.to || '')) {
+      return done({ ok: false, error: 'Invalid square coordinates.' });
+    }
+    try {
+      const legalMove = { from: move.from, to: move.to };
+      if (['q', 'r', 'b', 'n'].includes(move.promotion)) legalMove.promotion = move.promotion;
+      room.game.move(legalMove);
+      done({ ok: true });
+      broadcast(room);
+    } catch {
+      done({ ok: false, error: 'That move is not legal in the server position.' });
+    }
+  });
+
+  socket.on('room:resign', (done = () => {}) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!room) return done({ ok: false, error: 'You are not in a room.' });
+    const side = ['w', 'b'].find(candidate => room.players[candidate]?.id === socket.id);
+    if (!side) return done({ ok: false, error: 'Only players can resign.' });
+    room.resigned = side;
+    done({ ok: true });
+    broadcast(room);
+  });
+
+  socket.on('room:rematch', (done = () => {}) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!room || room.ownerId !== socket.id) return done({ ok: false, error: 'Only the room creator can start a rematch.' });
+    room.game = new Chess();
+    room.resigned = null;
+    done({ ok: true });
+    broadcast(room);
+  });
+
+  socket.on('chat:send', (payload = {}, done = () => {}) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!room) return done({ ok: false, error: 'Join a room to chat.' });
+    const text = String(payload.text || '').replace(/[<>\u0000-\u001f]/g, '').trim().slice(0, 240);
+    if (!text) return done({ ok: false, error: 'Write a message first.' });
+    const side = ['w', 'b'].find(candidate => room.players[candidate]?.id === socket.id);
+    const name = side ? room.players[side].name : room.spectators.get(socket.id) || 'Spectator';
+    const message = { name, text, time: new Date().toISOString() };
+    io.to(room.code).emit('chat:message', message);
+    done({ ok: true });
+  });
+
+  socket.on('room:leave', (done = () => {}) => {
+    removeSocketFromRoom(socket);
+    done({ ok: true });
+  });
+
+  socket.on('disconnect', () => removeSocketFromRoom(socket));
+});
+
+httpServer.listen(PORT, HOST, () => {
+  console.log(`Glass Chess online server listening on http://${HOST}:${PORT}`);
+  console.log('Use this computer name/IP plus port 3001 for other devices on the same network.');
+});

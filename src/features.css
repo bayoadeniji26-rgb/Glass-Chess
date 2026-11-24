@@ -1,0 +1,219 @@
+/* =========================================
+   GLASS CHESS — FEATURE STYLES
+   ========================================= */
+
+.gc-extra-panel,
+.gc-captures {
+  margin-top: 18px;
+  padding-top: 8px;
+}
+
+.gc-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+  color: #dce3ef;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.gc-option input {
+  accent-color: #8ba9ff;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.gc-option-label {
+  display: block;
+  margin: 16px 0 8px;
+  color: #aab5c8;
+  font-size: 12px;
+}
+
+.gc-theme-select {
+  width: 100%;
+  padding: 11px;
+  color: #edf2ff;
+  background: #202735;
+  border: 1px solid #39465b;
+  border-radius: 9px;
+}
+
+.gc-quick-tools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.gc-quick-tools button,
+.gc-promotion button {
+  padding: 9px 13px;
+  color: #e7edfa;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 9px;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.gc-quick-tools button:hover,
+.gc-promotion button:hover {
+  background: rgba(139,169,255,0.2);
+  border-color: #8ba9ff;
+  transform: translateY(-1px);
+}
+
+.gc-piece {
+  position: relative;
+  z-index: 2;
+  display: block;
+  font-size: clamp(27px, 5vw, 55px);
+  line-height: 1;
+  user-select: none;
+  pointer-events: none;
+}
+
+.piece-white {
+  color: #fff;
+  text-shadow: 0 2px 3px rgba(0,0,0,0.7),
+               0 0 2px #000;
+}
+
+.piece-black {
+  color: #20242d;
+  text-shadow: 0 1px 2px rgba(255,255,255,0.35);
+}
+
+.square {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  cursor: pointer;
+  aspect-ratio: 1;
+  transition: filter 0.12s ease;
+}
+
+.square:hover {
+  filter: brightness(1.13);
+}
+
+.square.selected {
+  box-shadow: inset 0 0 0 4px rgba(255,215,75,0.9);
+}
+
+.square.legal::after {
+  content: "";
+  position: absolute;
+  width: 23%;
+  height: 23%;
+  border-radius: 50%;
+  background: rgba(30,35,42,0.35);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.square.capture::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border: 5px solid rgba(30,35,42,0.38);
+  border-radius: 50%;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.gc-last-move {
+  box-shadow: inset 0 0 0 999px rgba(255,220,80,0.22);
+}
+
+.gc-coordinate {
+  position: absolute;
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0.75;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.gc-rank {
+  top: 3px;
+  left: 4px;
+}
+
+.gc-file {
+  bottom: 2px;
+  right: 4px;
+}
+
+.gc-captures p {
+  color: #cbd4e4;
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.gc-captures span {
+  font-size: 19px;
+  letter-spacing: 2px;
+}
+
+.gc-promotion {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 9px;
+  margin-top: 16px;
+  padding: 15px;
+  background: rgba(24,31,44,0.96);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+}
+
+.gc-promotion[hidden] {
+  display: none;
+}
+
+.gc-promotion strong {
+  width: 100%;
+  color: #edf2ff;
+  text-align: center;
+}
+
+.gc-promotion button {
+  font-size: 14px;
+}
+
+#evaluation {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 850px) {
+  .gc-quick-tools {
+    gap: 6px;
+  }
+
+  .gc-quick-tools button {
+    font-size: 11px;
+    padding: 8px 10px;
+  }
+}
+
+@media (max-width: 520px) {
+  .gc-piece {
+    font-size: clamp(22px, 8vw, 39px);
+  }
+
+  .gc-coordinate {
+    font-size: 8px;
+  }
+
+  .gc-option {
+    font-size: 12px;
+  }
+}

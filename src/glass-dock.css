@@ -1,0 +1,123 @@
+#gc-floating-hub {
+  --gc-hub-bg: rgba(13, 17, 27, .96);
+  --gc-hub-panel: rgba(24, 30, 43, .94);
+  --gc-hub-line: rgba(255, 255, 255, .10);
+  --gc-hub-text: #eef2fb;
+  --gc-hub-muted: #9ba8bd;
+  --gc-hub-accent: #b8a1ff;
+  --gc-hub-shadow: 0 24px 70px rgba(0,0,0,.46);
+  color: var(--gc-hub-text);
+  font: inherit;
+  z-index: 9999;
+}
+#gc-floating-hub * { box-sizing: border-box; }
+#gc-floating-hub .gc-hub-orb {
+  position: fixed; right: 24px; bottom: 24px; z-index: 10002;
+  width: 72px; height: 72px; border: 1px solid rgba(212,198,255,.65); border-radius: 50%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  color: #fff; cursor: pointer; overflow: hidden;
+  background: radial-gradient(circle at 32% 22%, #8c7bdb 0, #51459c 38%, #171b36 78%);
+  box-shadow: 0 10px 32px rgba(45,34,112,.48), inset 0 1px 8px rgba(255,255,255,.3);
+  transition: transform .22s ease, box-shadow .22s ease;
+}
+#gc-floating-hub .gc-hub-orb:hover { transform: translateY(-4px) scale(1.04); box-shadow: 0 16px 38px rgba(45,34,112,.58), inset 0 1px 8px rgba(255,255,255,.3); }
+#gc-floating-hub .gc-hub-orb-glyph { font-size: 30px; line-height: 1; text-shadow: 0 2px 8px rgba(0,0,0,.5); }
+#gc-floating-hub .gc-hub-orb-label { font-size: 8px; font-weight: 800; letter-spacing: 1.8px; opacity: .85; }
+#gc-floating-hub .gc-hub-orb-pulse { position: absolute; inset: 5px; border: 1px solid rgba(255,255,255,.18); border-radius: 50%; pointer-events: none; }
+#gc-floating-hub .gc-hub-orb:focus-visible, #gc-floating-hub button:focus-visible { outline: 2px solid #c8b8ff; outline-offset: 3px; }
+#gc-floating-hub .gc-hub-backdrop {
+  position: fixed; inset: 0; z-index: 10000; border: 0; padding: 0; margin: 0;
+  background: rgba(3,6,14,.25); opacity: 0; visibility: hidden; pointer-events: none;
+  transition: opacity .22s ease, visibility .22s ease;
+}
+#gc-floating-hub .gc-hub-drawer {
+  position: fixed; right: 24px; bottom: 110px; z-index: 10001;
+  width: min(430px, calc(100vw - 32px)); height: min(760px, calc(100vh - 150px));
+  display: flex; flex-direction: column; overflow: hidden;
+  border: 1px solid rgba(205,195,255,.20); border-radius: 22px;
+  background: var(--gc-hub-bg); color: var(--gc-hub-text); box-shadow: var(--gc-hub-shadow);
+  backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+  opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(18px) scale(.985); transform-origin: bottom right;
+  transition: opacity .22s ease, transform .22s ease, visibility .22s ease;
+}
+#gc-floating-hub.gc-hub-open .gc-hub-backdrop { opacity: 1; visibility: visible; pointer-events: auto; }
+#gc-floating-hub.gc-hub-open .gc-hub-drawer { opacity: 1; visibility: visible; pointer-events: auto; transform: translateY(0) scale(1); }
+#gc-floating-hub.gc-hub-open .gc-hub-orb { transform: scale(.94); }
+#gc-floating-hub .gc-hub-header { min-height: 68px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 15px; border-bottom: 1px solid var(--gc-hub-line); background: linear-gradient(110deg, rgba(107,90,183,.22), transparent 68%); }
+#gc-floating-hub .gc-hub-brand { display: flex; align-items: center; gap: 11px; min-width: 0; }
+#gc-floating-hub .gc-hub-brand-mark { width: 39px; height: 39px; display: grid; place-items: center; border: 1px solid rgba(205,190,255,.27); border-radius: 13px; background: linear-gradient(145deg, #6658ad, #24243f); font-size: 25px; }
+#gc-floating-hub .gc-hub-brand strong { display: block; font-size: 15px; letter-spacing: .2px; }
+#gc-floating-hub .gc-hub-brand small { display: block; margin-top: 2px; color: var(--gc-hub-muted); font-size: 10px; }
+#gc-floating-hub .gc-hub-header-actions { display: flex; gap: 7px; }
+#gc-floating-hub .gc-hub-header-actions button { width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid var(--gc-hub-line); border-radius: 10px; color: var(--gc-hub-text); background: rgba(255,255,255,.06); cursor: pointer; font-size: 17px; }
+#gc-floating-hub .gc-hub-header-actions button:hover { background: rgba(255,255,255,.13); }
+#gc-floating-hub .gc-hub-shortcuts { display: flex; gap: 7px; padding: 10px 12px; overflow-x: auto; border-bottom: 1px solid var(--gc-hub-line); scrollbar-width: thin; }
+#gc-floating-hub .gc-hub-icon-button { flex: 0 0 auto; min-width: 35px; height: 34px; padding: 0 10px; border: 1px solid var(--gc-hub-line); border-radius: 11px; color: #dce2f2; background: rgba(255,255,255,.055); cursor: pointer; font-size: 15px; }
+#gc-floating-hub .gc-hub-icon-button:hover { border-color: rgba(188,168,255,.48); color: #fff; background: rgba(149,128,232,.19); }
+#gc-floating-hub .gc-hub-scroll { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 12px; scrollbar-width: thin; scrollbar-color: rgba(184,161,255,.38) transparent; }
+#gc-floating-hub .gc-hub-content { width: 100%; min-width: 0; }
+#gc-floating-hub .gc-hub-docked-panel { display: block !important; position: static !important; inset: auto !important; float: none !important; width: 100% !important; max-width: none !important; min-width: 0 !important; max-height: none !important; height: auto !important; overflow: visible !important; margin: 0 !important; padding: 0 !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; background: transparent !important; }
+#gc-floating-hub .gc-hub-docked-panel > * { max-width: 100%; }
+#gc-floating-hub .gc-hub-docked-panel h1,
+#gc-floating-hub .gc-hub-docked-panel h2,
+#gc-floating-hub .gc-hub-docked-panel h3,
+#gc-floating-hub .gc-hub-docked-panel h4 { color: #f2f3ff; scroll-margin-top: 12px; }
+#gc-floating-hub .gc-hub-docked-panel .eyebrow { color: #b8a7ef; letter-spacing: 1.7px; }
+#gc-floating-hub .gc-hub-docked-panel button,
+#gc-floating-hub .gc-hub-docked-panel select,
+#gc-floating-hub .gc-hub-docked-panel input,
+#gc-floating-hub .gc-hub-docked-panel textarea { max-width: 100%; }
+#gc-floating-hub .gc-hub-docked-panel button { cursor: pointer; }
+#gc-floating-hub .gc-hub-target-flash { animation: gcHubFlash .9s ease; }
+@keyframes gcHubFlash { 0%,100% { filter: none; } 35% { filter: drop-shadow(0 0 9px rgba(184,161,255,.85)); } }
+#gc-floating-hub .gc-hub-footer { min-height: 35px; display: flex; align-items: center; gap: 7px; padding: 0 14px; border-top: 1px solid var(--gc-hub-line); color: var(--gc-hub-muted); font-size: 10px; }
+#gc-floating-hub .gc-hub-live-dot { width: 7px; height: 7px; border-radius: 50%; background: #67d6a0; box-shadow: 0 0 8px rgba(103,214,160,.5); }
+#gc-floating-hub .gc-hub-footer-spacer { flex: 1; }
+#gc-floating-hub.gc-hub-compact .gc-hub-scroll { padding: 7px; }
+#gc-floating-hub.gc-hub-compact .gc-hub-docked-panel > * { margin-block: 5px !important; }
+#gc-floating-hub.gc-hub-compact .gc-hub-docked-panel h1,
+#gc-floating-hub.gc-hub-compact .gc-hub-docked-panel h2,
+#gc-floating-hub.gc-hub-compact .gc-hub-docked-panel h3 { margin-block: 7px !important; }
+.gc-hub-original-panel-anchor { display: none !important; }
+.gc-hub-panel-grid-parent { grid-template-columns: minmax(0, 1fr) !important; }
+@media (max-width: 640px) {
+  #gc-floating-hub .gc-hub-orb { right: 14px; bottom: 14px; width: 62px; height: 62px; }
+  #gc-floating-hub .gc-hub-drawer { right: 10px; bottom: 86px; width: calc(100vw - 20px); height: min(72vh, 680px); border-radius: 19px; }
+  #gc-floating-hub .gc-hub-backdrop { background: rgba(3,6,14,.16); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #gc-floating-hub *, #gc-floating-hub *::before, #gc-floating-hub *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+}
+
+
+/* GLASS CHESS FOCUS HUB LAYER REPAIR */
+#gc-floating-hub {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  z-index: 2147482000 !important;
+  pointer-events: none !important;
+  isolation: isolate !important;
+}
+
+#gc-floating-hub .gc-hub-orb {
+  z-index: 3 !important;
+  pointer-events: auto !important;
+}
+
+#gc-floating-hub .gc-hub-backdrop {
+  z-index: 1 !important;
+  pointer-events: none;
+}
+
+#gc-floating-hub .gc-hub-drawer {
+  z-index: 2 !important;
+  pointer-events: none;
+}
+
+#gc-floating-hub.gc-hub-open .gc-hub-backdrop,
+#gc-floating-hub.gc-hub-open .gc-hub-drawer {
+  pointer-events: auto !important;
+}

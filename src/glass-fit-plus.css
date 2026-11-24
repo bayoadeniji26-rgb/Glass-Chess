@@ -1,0 +1,145 @@
+/* Smart board fit: use almost all of the available area, but preserve room for the app header and controls. */
+.gc-responsive-board.gc-smart-fit-board,
+.gc-smart-fit-board {
+  width: min(100%, 660px, calc(100vh - 205px)) !important;
+  max-width: min(100%, 660px, calc(100vh - 205px)) !important;
+  height: auto !important;
+  max-height: min(660px, calc(100vh - 205px)) !important;
+  aspect-ratio: 1 / 1 !important;
+  margin: 0 auto !important;
+  box-sizing: border-box !important;
+  grid-template-columns: repeat(8, minmax(0, 1fr)) !important;
+  grid-template-rows: repeat(8, minmax(0, 1fr)) !important;
+  gap: 0 !important;
+  flex: 0 1 auto !important;
+  overflow: hidden;
+  border-radius: 12px;
+  box-shadow: 0 12px 34px rgba(0,0,0,.22), 0 0 0 1px rgba(255,255,255,.08);
+}
+.gc-smart-fit-board [data-square] {
+  width: auto !important;
+  height: auto !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-width: 100% !important;
+  aspect-ratio: 1 / 1 !important;
+  box-sizing: border-box !important;
+  padding: 0 !important;
+  font-size: clamp(25px, 4.7vh, 49px) !important;
+  line-height: 1 !important;
+  position: relative !important;
+  overflow: hidden;
+  transition: background-color 160ms ease !important;
+}
+.gc-smart-fit-board [data-square] img,
+.gc-smart-fit-board [data-square] svg {
+  max-width: 88% !important;
+  max-height: 88% !important;
+}
+/* Small algebraic coordinates: ranks on the a-file, files along rank 1. */
+.gc-smart-fit-board [data-square^="a"]::before,
+.gc-smart-fit-board [data-square$="1"]:not([data-square="a1"])::after {
+  position: absolute;
+  z-index: 3;
+  font: 700 9px/1.1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: rgba(18,25,36,.48);
+  text-shadow: 0 1px 1px rgba(255,255,255,.22);
+  pointer-events: none;
+}
+.gc-smart-fit-board [data-square^="a"]::before {
+  content: attr(data-square);
+  left: 3px;
+  top: 3px;
+}
+.gc-smart-fit-board [data-square$="1"]:not([data-square="a1"])::after {
+  content: attr(data-square);
+  right: 3px;
+  bottom: 3px;
+}
+.gc-smart-fit-board .gc-piece-glyph,
+.gc-smart-fit-board .gc-piece-art {
+  display: inline-block;
+  transform-origin: center;
+  transition: transform 150ms ease, filter 150ms ease !important;
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,.27));
+}
+.gc-smart-fit-board [data-square]:hover .gc-piece-glyph,
+.gc-smart-fit-board [data-square]:hover .gc-piece-art {
+  transform: translateY(-1px) scale(1.035);
+}
+/* New theme accent colors for the premium workspace. */
+body.gc-theme-aurora #gc-premium { --gc-accent: #aab8ff; --gc-panel: #17182e; }
+body.gc-theme-royal #gc-premium { --gc-accent: #e6c078; --gc-panel: #211a2d; }
+body.gc-theme-sunset #gc-premium { --gc-accent: #ffb779; --gc-panel: #2b1920; }
+body.gc-theme-carbon #gc-premium { --gc-accent: #8fbce9; --gc-panel: #111720; }
+@supports (height: 100dvh) {
+  .gc-responsive-board.gc-smart-fit-board,
+  .gc-smart-fit-board {
+    width: min(100%, 660px, calc(100dvh - 205px)) !important;
+    max-width: min(100%, 660px, calc(100dvh - 205px)) !important;
+    max-height: min(660px, calc(100dvh - 205px)) !important;
+  }
+}
+@media (max-width: 760px) {
+  .gc-responsive-board.gc-smart-fit-board,
+  .gc-smart-fit-board {
+    width: min(94vw, 620px, calc(100vh - 245px)) !important;
+    max-width: min(94vw, 620px, calc(100vh - 245px)) !important;
+    max-height: min(620px, calc(100vh - 245px)) !important;
+  }
+  .gc-smart-fit-board [data-square] { font-size: clamp(22px, 6vw, 39px) !important; }
+}
+@supports (height: 100dvh) {
+  @media (max-width: 760px) {
+    .gc-responsive-board.gc-smart-fit-board,
+    .gc-smart-fit-board {
+      width: min(94vw, 620px, calc(100dvh - 245px)) !important;
+      max-width: min(94vw, 620px, calc(100dvh - 245px)) !important;
+      max-height: min(620px, calc(100dvh - 245px)) !important;
+    }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gc-smart-fit-board *, .gc-smart-fit-board [data-square] { transition: none !important; }
+}
+
+
+/* GLASS CHESS BOARD SIZE RESTORE v2 */
+.gc-responsive-board.gc-smart-fit-board,
+.gc-smart-fit-board {
+  width: min(84vh, 760px, calc(100vw - 390px)) !important;
+  max-width: min(84vh, 760px, calc(100vw - 390px)) !important;
+  height: auto !important;
+  max-height: min(84vh, 760px) !important;
+  aspect-ratio: 1 / 1 !important;
+  margin-inline: auto !important;
+  flex: 0 0 auto !important;
+  grid-template-columns: repeat(8, minmax(0, 1fr)) !important;
+  grid-template-rows: repeat(8, minmax(0, 1fr)) !important;
+}
+
+.gc-smart-fit-board [data-square] {
+  font-size: clamp(30px, 5.8vh, 58px) !important;
+}
+
+@media (max-width: 900px) and (min-width: 761px) {
+  .gc-responsive-board.gc-smart-fit-board,
+  .gc-smart-fit-board {
+    width: min(92vw, 78vh, 700px) !important;
+    max-width: min(92vw, 78vh, 700px) !important;
+    max-height: min(78vh, 700px) !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .gc-responsive-board.gc-smart-fit-board,
+  .gc-smart-fit-board {
+    width: min(94vw, 70vh, 640px) !important;
+    max-width: min(94vw, 70vh, 640px) !important;
+    max-height: min(70vh, 640px) !important;
+  }
+
+  .gc-smart-fit-board [data-square] {
+    font-size: clamp(25px, 6.5vw, 43px) !important;
+  }
+}

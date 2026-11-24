@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.glass-chess-backups/
+.DS_Store
+.env
+.env.*
+!.env.example
+*.backup-*
+*.before-*
+src/main.js.analysis-studio-backup

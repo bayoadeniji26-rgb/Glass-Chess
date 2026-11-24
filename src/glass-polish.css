@@ -1,0 +1,95 @@
+/* Compact, viewport-aware board sizing. The 8x8 grid remains unchanged. */
+.gc-responsive-board {
+  width: min(100%, 58vh, 600px) !important;
+  max-width: min(100%, 58vh, 600px) !important;
+  height: auto !important;
+  max-height: 58vh !important;
+  aspect-ratio: 1 / 1 !important;
+  margin-inline: auto !important;
+  grid-template-columns: repeat(8, minmax(0, 1fr)) !important;
+  grid-template-rows: repeat(8, minmax(0, 1fr)) !important;
+  gap: 0 !important;
+  flex: 0 1 auto !important;
+  animation: none !important;
+  transform: none !important;
+}
+.gc-responsive-board [data-square] {
+  min-width: 0 !important;
+  min-height: 0 !important;
+  width: auto !important;
+  height: auto !important;
+  aspect-ratio: 1 / 1 !important;
+  max-width: 100% !important;
+  padding: 0 !important;
+  line-height: 1 !important;
+  font-size: clamp(23px, 4.15vh, 43px) !important;
+  overflow: hidden;
+}
+.gc-responsive-board [data-square] img,
+.gc-responsive-board [data-square] svg {
+  max-width: 88% !important;
+  max-height: 88% !important;
+}
+.gc-responsive-board .gc-piece-art {
+  display: inline-block;
+  position: relative;
+  z-index: 1;
+  line-height: 1;
+  transform-origin: center;
+  will-change: transform, opacity;
+}
+.gc-piece-art.gc-capture-ghost {
+  animation: gcPieceCaptureSpin 480ms cubic-bezier(.2,.7,.25,1) forwards;
+  transform-origin: center;
+}
+@keyframes gcPieceCaptureSpin {
+  0% { opacity: 1; transform: rotate(0deg) scale(1); filter: brightness(1); }
+  45% { opacity: .95; transform: rotate(145deg) scale(1.12); filter: brightness(1.45); }
+  100% { opacity: 0; transform: rotate(300deg) scale(.18); filter: brightness(1.8); }
+}
+/* If an older visual effect adds a shake class, disable only that effect. */
+[class*="shake"], [class*="wobble"], [class*="vibrat"], [class*="jolt"] {
+  animation: none !important;
+}
+#gc-floating-hub .gc-hub-orb {
+  width: 60px !important;
+  height: 60px !important;
+  right: 19px !important;
+  bottom: 19px !important;
+  box-shadow: 0 8px 24px rgba(45,34,112,.38), inset 0 1px 7px rgba(255,255,255,.26) !important;
+}
+#gc-floating-hub .gc-hub-orb-glyph {
+  font-size: 27px !important;
+  color: #f3d78b !important;
+  text-shadow: 0 1px 7px rgba(245,205,103,.48), 0 2px 8px rgba(0,0,0,.45) !important;
+}
+#gc-floating-hub .gc-hub-orb-label { font-size: 7px !important; letter-spacing: 1.4px !important; }
+#gc-floating-hub .gc-hub-brand-mark {
+  width: 35px !important;
+  height: 35px !important;
+  font-size: 22px !important;
+  color: #f3d78b !important;
+}
+#gc-floating-hub .gc-hub-shortcuts { gap: 6px !important; padding: 8px 10px !important; }
+#gc-floating-hub .gc-hub-icon-button {
+  min-width: 32px !important;
+  height: 31px !important;
+  padding: 0 8px !important;
+  border-radius: 9px !important;
+  font-size: 13px !important;
+}
+#gc-floating-hub .gc-hub-header { min-height: 61px !important; padding: 10px 13px !important; }
+#gc-floating-hub .gc-hub-drawer { width: min(400px, calc(100vw - 28px)) !important; }
+@media (max-width: 760px) {
+  .gc-responsive-board {
+    width: min(94vw, 54vh, 580px) !important;
+    max-width: min(94vw, 54vh, 580px) !important;
+    max-height: 54vh !important;
+  }
+  .gc-responsive-board [data-square] { font-size: clamp(21px, 5.3vw, 36px) !important; }
+  #gc-floating-hub .gc-hub-orb { width: 54px !important; height: 54px !important; right: 13px !important; bottom: 13px !important; }
+  #gc-floating-hub .gc-hub-orb-glyph { font-size: 24px !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gc-responsive-board *, .gc-piece-art, .gc-piece-art.gc-capture-ghost { animation: none !important; transition: none !important; }
+}
