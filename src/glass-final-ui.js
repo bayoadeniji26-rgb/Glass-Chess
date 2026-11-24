@@ -27,6 +27,12 @@ import './glass-final-ui.css';
   let settings = loadSettings();
   let lastTheme = '';
 
+  function syncToolsButton() {
+    const active = focusMode || Boolean(document.fullscreenElement);
+    document.documentElement.classList.toggle('gc-tools-single-launcher', active);
+    document.body?.classList.toggle('gc-tools-single-launcher', active);
+  }
+
   function loadSettings() {
     try {
       const value = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
@@ -117,7 +123,6 @@ import './glass-final-ui.css';
           <option value="large">Large</option>
           <option value="max">Maximum</option>
         </select>
-        <button type="button" data-gc-tools aria-label="Open Glass Chess tools">Tools</button>
         <button type="button" data-gc-analysis-focus aria-pressed="false" title="Open a focused analysis workspace">Analysis focus</button>
         <button type="button" data-gc-stage-fullscreen title="Enter fullscreen" aria-label="Enter fullscreen">⛶</button>
       </div>`;
@@ -127,9 +132,6 @@ import './glass-final-ui.css';
     const sizeSelect = toolbar.querySelector('#gc-final-size');
     sizeSelect.value = settings.size;
 
-    toolbar.querySelector('[data-gc-tools]')?.addEventListener('click', () => {
-      document.querySelector('#gc-floating-hub .gc-hub-orb')?.click();
-    });
     sizeSelect.addEventListener('change', () => {
       settings.size = sizeSelect.value;
       saveSettings();
@@ -141,6 +143,7 @@ import './glass-final-ui.css';
       settings.focus = focusMode;
       document.documentElement.classList.toggle('gc-final-focus-mode', focusMode);
       document.body.classList.toggle('gc-final-focus-mode', focusMode);
+      syncToolsButton();
       const button = toolbar.querySelector('[data-gc-analysis-focus]');
       button.setAttribute('aria-pressed', String(focusMode));
       button.textContent = focusMode ? 'Exit focus' : 'Analysis focus';
@@ -461,102 +464,29 @@ import './glass-final-ui.css';
     }
   });
 
-  let focusToolsLauncherInstalled = false;
-
-  function installFocusToolsLauncher() {
-    if (!document.body) return;
-
-    let button = document.getElementById("gc-focus-tools-launcher");
-
-    if (!button) {
-      button = document.createElement("button");
-      button.id = "gc-focus-tools-launcher";
-      button.type = "button";
-      button.className = "gc-focus-tools-launcher";
-      button.innerHTML =
-        '<span aria-hidden="true">♛</span><span>Tools</span>';
-      button.setAttribute("aria-label", "Open Glass Chess tools");
-      document.body.appendChild(button);
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && focusMode) {
+      if (hubWasOpenOnEscape) {
+        hubWasOpenOnEscape = false;
+        return;
+      }
+      focusMode = false;
+      document.documentElement.classList.remove('gc-final-focus-mode');
+      document.body.classList.remove('gc-final-focus-mode');
+      syncToolsButton();
+      const button = toolbar?.querySelector('[data-gc-analysis-focus]');
+      if (button) { button.setAttribute('aria-pressed', 'false'); button.textContent = 'Analysis focus'; }
+      scheduleLayout();
     }
+  });
 
-    const sync = () => {
-      const active =
-        document.documentElement.classList.contains("gc-final-focus-mode") ||
-        document.body.classList.contains("gc-final-focus-mode") ||
-        Boolean(document.fullscreenElement);
-
-      button.classList.toggle("gc-focus-tools-visible", active);
-
-      const hub = document.getElementById("gc-floating-hub");
-      const open = Boolean(hub?.classList.contains("gc-hub-open"));
-
-      button.setAttribute("aria-expanded", String(open));
-      button.setAttribute(
-        "aria-label",
-        open ? "Close Glass Chess tools" : "Open Glass Chess tools"
-      );
-
-      button.querySelector("span:last-child").textContent =
-        open ? "Close tools" : "Tools";
-    };
-
-    if (!button.dataset.gcBound) {
-      button.dataset.gcBound = "true";
-
-      button.addEventListener("click", () => {
-        const orb = document.querySelector(
-          "#gc-floating-hub .gc-hub-orb"
-        );
-
-        if (orb) {
-          orb.click();
-          sync();
-          return;
-        }
-
-        const panel = document.querySelector(".analysis-panel");
-
-        if (panel) {
-          panel.scrollIntoView({
-            behavior: "smooth",
-            block: "start"
-          });
-        } else {
-          button.querySelector("span:last-child").textContent =
-            "Tools loading";
-        }
-      });
-    }
-
-    if (!focusToolsLauncherInstalled) {
-      focusToolsLauncherInstalled = true;
-
-      const observer = new MutationObserver(sync);
-
-      // Watch class changes only. Never watch child-list changes:
-      // sync() updates the Tools button and would trigger itself forever.
-      observer.observe(document.documentElement, {
-        attributes: true,
-        attributeFilter: ["class"],
-        subtree: true
-      });
-
-      observer.observe(document.body, {
-        attributes: true,
-        attributeFilter: ["class"]
-      });
-
-      document.addEventListener("fullscreenchange", sync);
-
-      window.setTimeout(sync, 100);
-      window.setTimeout(sync, 600);
-    }
-
-    sync();
-  }
+  document.addEventListener('fullscreenchange', () => {
+    syncToolsButton();
+    scheduleLayout();
+  });
 
   function boot() {
-    installFocusToolsLauncher();
+    syncToolsButton();
     const found = findBoard();
     if (!found) return false;
     board = found;
