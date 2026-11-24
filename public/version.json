@@ -1,11 +1,12 @@
 {
-  "version": "2026.11.24.1",
+  "version": "2026.11.24.2",
   "name": "Glass Chess UI Refresh",
   "updatedAt": "2026-11-24",
   "notes": [
     "New workspace interface",
     "Restored Tools drawer",
     "Custom background color palette",
-    "In-app update checks"
+    "In-app update checks",
+    "Release follow-up: update watcher and responsive layout refinements"
   ]
 }

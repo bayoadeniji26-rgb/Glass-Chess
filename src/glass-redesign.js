@@ -5,7 +5,7 @@ import './glass-redesign.css';
 
   // Bump this value whenever a new release is published. public/version.json
   // must be changed to the same value in that release.
-  const APP_VERSION = '2026.11.24.1';
+  const APP_VERSION = '2026.11.24.2';
   const VERSION_URL = '/version.json';
   let updateBanner = null;
   let updateOverlay = null;
@@ -144,7 +144,7 @@ import './glass-redesign.css';
   function boot() {
     keepToolsAccessible();
     const observer = new MutationObserver(() => keepToolsAccessible());
-    observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['style','class'] });
+    observer.observe(document.documentElement, { childList: true, subtree: true });
     window.setTimeout(() => observer.disconnect(), 12000);
     void checkForUpdates();
     window.setInterval(() => {
