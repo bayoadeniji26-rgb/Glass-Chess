@@ -202,17 +202,26 @@ function buildInterface() {
     </section>
     <section class="gc-view" data-view="custom">
       <div class="gc-card"><h4>Board themes</h4><div class="gc-board-themes" id="gc-theme-list"></div><p class="gc-muted">Changes the chessboard squares.</p></div>
-      <div class="gc-card gc-background-customizer"><h4>Workspace backgrounds</h4><div class="gc-background-grid" id="gc-background-list">
-        <button type="button" data-background="midnight"><span class="gc-background-swatch gc-bg-midnight"></span><strong>Midnight</strong></button>
-        <button type="button" data-background="sky"><span class="gc-background-swatch gc-bg-sky"></span><strong>Open Sky</strong></button>
-        <button type="button" data-background="aurora"><span class="gc-background-swatch gc-bg-aurora"></span><strong>Aurora</strong></button>
-        <button type="button" data-background="fruit"><span class="gc-background-swatch gc-bg-fruit"></span><strong>Colorful Fruit</strong></button>
-        <button type="button" data-background="sunset"><span class="gc-background-swatch gc-bg-sunset"></span><strong>Sunset</strong></button>
-        <button type="button" data-background="ocean"><span class="gc-background-swatch gc-bg-ocean"></span><strong>Deep Ocean</strong></button>
-        <button type="button" data-background="forest"><span class="gc-background-swatch gc-bg-forest"></span><strong>Forest</strong></button>
-        <button type="button" data-background="marble"><span class="gc-background-swatch gc-bg-marble"></span><strong>Marble</strong></button>
-      </div><p class="gc-muted">Changes the page background behind the board and panels. Your choice is saved on this device.</p></div>
-      <div class="gc-card gc-piece-customizer"><h4>Piece appearance</h4><label for="gc-piece-style">Piece design</label><select id="gc-piece-style"><option value="glass">Glass Classic · current look</option><option value="medieval">Medieval</option><option value="modern">Modern</option></select><div class="gc-piece-colors"><label for="gc-white-piece-color">White pieces<input id="gc-white-piece-color" type="color" value="#f7f2e9" aria-label="White piece color"></label><label for="gc-black-piece-color">Black pieces<input id="gc-black-piece-color" type="color" value="#263244" aria-label="Black piece color"></label></div><p class="gc-muted">Changes the pieces on the board, not the board squares. Your choices are saved on this device.</p></div>
+      <div class="gc-card gc-background-customizer"><h4>Workspace background color</h4>
+        <p class="gc-muted">Choose a ready-made color or pick any custom color. This changes the workspace behind the chessboard.</p>
+        <div class="gc-background-palette" id="gc-background-list" aria-label="Background color palette">
+          <button type="button" data-bg-color="#18202f" aria-label="Deep navy" title="Deep navy"><span style="background:#18202f"></span></button>
+          <button type="button" data-bg-color="#243b53" aria-label="Steel blue" title="Steel blue"><span style="background:#243b53"></span></button>
+          <button type="button" data-bg-color="#174b49" aria-label="Emerald teal" title="Emerald teal"><span style="background:#174b49"></span></button>
+          <button type="button" data-bg-color="#365a3b" aria-label="Forest green" title="Forest green"><span style="background:#365a3b"></span></button>
+          <button type="button" data-bg-color="#553879" aria-label="Royal violet" title="Royal violet"><span style="background:#553879"></span></button>
+          <button type="button" data-bg-color="#78364f" aria-label="Burgundy" title="Burgundy"><span style="background:#78364f"></span></button>
+          <button type="button" data-bg-color="#874b2e" aria-label="Warm copper" title="Warm copper"><span style="background:#874b2e"></span></button>
+          <button type="button" data-bg-color="#a36c43" aria-label="Amber" title="Amber"><span style="background:#a36c43"></span></button>
+          <button type="button" data-bg-color="#6d747e" aria-label="Stone gray" title="Stone gray"><span style="background:#6d747e"></span></button>
+          <button type="button" data-bg-color="#e4e8ee" aria-label="Soft silver" title="Soft silver"><span style="background:#e4e8ee"></span></button>
+        </div>
+        <label class="gc-background-picker-label" for="gc-background-color">Custom background color
+          <input id="gc-background-color" type="color" value="#18202f" aria-label="Choose custom workspace background color">
+        </label>
+        <p class="gc-muted">Your selection is saved automatically on this device.</p>
+      </div>
+      <div class="gc-card gc-piece-customizer"><h4>Piece appearance</h4><label for="gc-piece-style">Piece design</label><select id="gc-piece-style"><option value="glass">Glass Classic · Original</option><option value="medieval">Medieval</option><option value="modern">Modern</option></select><div class="gc-piece-colors"><label for="gc-white-piece-color">White pieces<input id="gc-white-piece-color" type="color" value="#f7f2e9" aria-label="White piece color"></label><label for="gc-black-piece-color">Black pieces<input id="gc-black-piece-color" type="color" value="#263244" aria-label="Black piece color"></label></div><p class="gc-muted">Changes the pieces on the board, not the board squares. Your choices are saved on this device.</p></div>
       <div class="gc-card"><div class="gc-row"><h4>Sound effects</h4><label><input id="gc-sound-toggle" type="checkbox" style="width:auto"> Enable move sounds</label></div><p class="gc-muted">Light local sound effects for legal moves and puzzle results.</p></div>
       <div class="gc-card"><h4>Data and privacy</h4><p class="gc-muted">Profile, rating, statistics, saved games, and preferences are stored in this browser using local storage. Nothing is uploaded to a server.</p><div class="gc-actions"><button id="gc-export-data">Export profile data</button><button id="gc-reset-data">Reset profile data</button></div></div>
     </section>
@@ -804,6 +813,7 @@ function bindEvents() {
 
   const appearance = api.appearance || {
     background: 'midnight',
+    backgroundColor: '#18202f',
     pieceStyle: 'glass',
     whitePieceColor: '#f7f2e9',
     blackPieceColor: '#263244'
@@ -825,19 +835,26 @@ function bindEvents() {
   $('gc-black-piece-color').addEventListener('input', savePieceAppearance);
 
   const backgroundList = $('gc-background-list');
+  const backgroundInput = $('gc-background-color');
+  const initialBackgroundColor = appearance.backgroundColor || '#18202f';
+  if (backgroundInput) backgroundInput.value = initialBackgroundColor;
   const syncBackgroundButtons = selected => {
-    backgroundList.querySelectorAll('[data-background]').forEach(button => {
-      button.classList.toggle('active', button.dataset.background === selected);
+    backgroundList.querySelectorAll('[data-bg-color]').forEach(button => {
+      button.classList.toggle('active', button.dataset.bgColor.toLowerCase() === selected.toLowerCase());
     });
   };
-  syncBackgroundButtons(appearance.background || 'midnight');
-  backgroundList.addEventListener('click', event => {
-    const button = event.target.closest('[data-background]');
-    if (!button) return;
-    const selected = button.dataset.background;
-    api.updateAppearance?.({ background: selected });
+  syncBackgroundButtons(initialBackgroundColor);
+  const setBackgroundColor = selected => {
+    if (!/^#[0-9a-f]{6}$/i.test(selected)) return;
+    api.updateAppearance?.({ backgroundColor: selected });
+    if (backgroundInput) backgroundInput.value = selected;
     syncBackgroundButtons(selected);
+  };
+  backgroundList.addEventListener('click', event => {
+    const button = event.target.closest('[data-bg-color]');
+    if (button) setBackgroundColor(button.dataset.bgColor);
   });
+  backgroundInput.addEventListener('input', () => setBackgroundColor(backgroundInput.value));
 
   $('gc-sound-toggle').addEventListener('change', event => { data.sound = event.target.checked; saveData(); if (data.sound) playTone(); });
   $('gc-export-data').addEventListener('click', exportProfile);

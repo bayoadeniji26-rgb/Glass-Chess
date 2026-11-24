@@ -97,6 +97,7 @@ let settings = {
   evaluation: true,
   theme: "midnight",
   background: "midnight",
+  backgroundColor: "#18202f",
   pieceStyle: "glass",
   whitePieceColor: "#f7f2e9",
   blackPieceColor: "#263244"
@@ -115,6 +116,7 @@ settings.theme = THEMES[settings.theme]
   ? settings.theme
   : (LEGACY_THEME_MAP[settings.theme] || "midnight");
 settings.background = PAGE_BACKGROUNDS[settings.background] ? settings.background : "midnight";
+settings.backgroundColor = /^#[0-9a-f]{6}$/i.test(settings.backgroundColor || "") ? settings.backgroundColor : "#18202f";
 settings.pieceStyle = ["glass", "medieval", "modern"].includes(settings.pieceStyle)
   ? settings.pieceStyle
   : "glass";
@@ -156,6 +158,18 @@ function applyPageBackground(background) {
   const selected = PAGE_BACKGROUNDS[background] ? background : "midnight";
   settings.background = selected;
   if (document.body) document.body.dataset.gcBackground = selected;
+  saveSettings();
+}
+
+function applyBackgroundColor(color) {
+  const selected = /^#[0-9a-f]{6}$/i.test(String(color || "")) ? String(color) : "#18202f";
+  settings.backgroundColor = selected;
+  document.documentElement.style.setProperty("--gc-page-background-color", selected);
+  if (document.body) {
+    const layered = `radial-gradient(ellipse at 18% 0%, rgba(255,255,255,.14), transparent 46%), radial-gradient(ellipse at 86% 100%, rgba(0,0,0,.30), transparent 48%), ${selected}`;
+    document.body.style.setProperty("background", layered, "important");
+    document.body.style.setProperty("background-attachment", "fixed", "important");
+  }
   saveSettings();
 }
 
@@ -1295,6 +1309,7 @@ function installGlassChessPremiumBridge() {
       return {
         theme: settings.theme,
         background: settings.background,
+        backgroundColor: settings.backgroundColor,
         pieceStyle: settings.pieceStyle,
         whitePieceColor: settings.whitePieceColor,
         blackPieceColor: settings.blackPieceColor
@@ -1305,6 +1320,9 @@ function installGlassChessPremiumBridge() {
         if (PAGE_BACKGROUNDS[patch.background]) {
           settings.background = patch.background;
           applyPageBackground(patch.background);
+        }
+        if (typeof patch.backgroundColor === "string" && /^#[0-9a-f]{6}$/i.test(patch.backgroundColor)) {
+          applyBackgroundColor(patch.backgroundColor);
         }
         if (["glass", "medieval", "modern"].includes(patch.pieceStyle)) {
           settings.pieceStyle = patch.pieceStyle;
@@ -1439,6 +1457,7 @@ function launch() {
 
   applyPieceAppearance();
   applyPageBackground(settings.background);
+  applyBackgroundColor(settings.backgroundColor);
   applyBoardTheme(settings.theme, false, false);
   render();
   void initialize();

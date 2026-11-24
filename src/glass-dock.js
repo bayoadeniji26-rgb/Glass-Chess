@@ -2,7 +2,10 @@ import "./glass-dock.css";
 
 (() => {
   const DOCK_ID = "gc-floating-hub";
+  // The current Tools content is mounted by premium.js as #gc-premium.
+  // Keep legacy selectors as fallbacks for older layouts.
   const panelSelectors = [
+    "#gc-premium",
     "#gc-online-plus",
     ".gc-online-plus-panel"
   ];
@@ -139,6 +142,11 @@ import "./glass-dock.css";
       orb.title = "Open Glass Hub";
     }
 
+    window.GlassChessTools = {
+      open: openHub,
+      close: closeHub,
+      toggle: () => dock.classList.contains("gc-hub-open") ? closeHub() : openHub()
+    };
     orb.addEventListener("click", () => dock.classList.contains("gc-hub-open") ? closeHub() : openHub());
     backdrop.addEventListener("click", closeHub);
     close.addEventListener("click", closeHub);
