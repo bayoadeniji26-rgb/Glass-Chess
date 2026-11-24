@@ -59,6 +59,17 @@ const PIECE_SVG = {
   }
 };
 
+const PAGE_BACKGROUNDS = {
+  midnight: "Midnight",
+  sky: "Open Sky",
+  aurora: "Aurora Lights",
+  fruit: "Colorful Fruit",
+  sunset: "Sunset",
+  ocean: "Deep Ocean",
+  forest: "Forest",
+  marble: "Marble"
+};
+
 const DEPTH = 10;
 
 let selected = null;
@@ -85,6 +96,7 @@ let settings = {
   autoFlip: false,
   evaluation: true,
   theme: "midnight",
+  background: "midnight",
   pieceStyle: "glass",
   whitePieceColor: "#f7f2e9",
   blackPieceColor: "#263244"
@@ -102,6 +114,7 @@ try {
 settings.theme = THEMES[settings.theme]
   ? settings.theme
   : (LEGACY_THEME_MAP[settings.theme] || "midnight");
+settings.background = PAGE_BACKGROUNDS[settings.background] ? settings.background : "midnight";
 settings.pieceStyle = ["glass", "medieval", "modern"].includes(settings.pieceStyle)
   ? settings.pieceStyle
   : "glass";
@@ -137,6 +150,13 @@ function applyPieceAppearance() {
   document.documentElement.style.setProperty("--gc-piece-white-color", settings.whitePieceColor);
   document.documentElement.style.setProperty("--gc-piece-black-color", settings.blackPieceColor);
   if (document.body) document.body.dataset.gcPieceStyle = settings.pieceStyle;
+}
+
+function applyPageBackground(background) {
+  const selected = PAGE_BACKGROUNDS[background] ? background : "midnight";
+  settings.background = selected;
+  if (document.body) document.body.dataset.gcBackground = selected;
+  saveSettings();
 }
 
 function applyBoardTheme(theme, syncPremium = true, shouldRender = true) {
@@ -726,26 +746,29 @@ function getEngineMove(uci) {
 // ============================================
 
 function updateEvaluation(info, side) {
-  if (!settings.evaluation) return;
+  if (!settings.evaluation || !info) return;
 
-  const cp = info.match(/\bscore cp (-?\d+)/);
-  const mate = info.match(/\bscore mate (-?\d+)/);
+  let type = "";
+  let rawValue = null;
 
-  if (mate) {
-    let value = Number(mate[1]);
+  if (typeof info === "string") {
+    const cp = info.match(/\bscore cp (-?\d+)/);
+    const mate = info.match(/\bscore mate (-?\d+)/);
+    if (mate) { type = "mate"; rawValue = Number(mate[1]); }
+    else if (cp) { type = "cp"; rawValue = Number(cp[1]); }
+  } else if (typeof info === "object" && info.score) {
+    type = String(info.score.type || "").toLowerCase();
+    rawValue = Number(info.score.value);
+  }
 
-    if (side === "b") value *= -1;
+  if (!Number.isFinite(rawValue)) return;
+  if (side === "b") rawValue *= -1;
 
-    $("evaluation").textContent = `M${value}`;
-  } else if (cp) {
-    let value = Number(cp[1]);
-
-    if (side === "b") value *= -1;
-
-    const score = (value / 100).toFixed(2);
-
-    $("evaluation").textContent =
-      value > 0 ? `+${score}` : score;
+  if (type === "mate") {
+    $("evaluation").textContent = `M${rawValue}`;
+  } else {
+    const score = (rawValue / 100).toFixed(2);
+    $("evaluation").textContent = rawValue > 0 ? `+${score}` : score;
   }
 }
 
@@ -1271,6 +1294,7 @@ function installGlassChessPremiumBridge() {
     get appearance() {
       return {
         theme: settings.theme,
+        background: settings.background,
         pieceStyle: settings.pieceStyle,
         whitePieceColor: settings.whitePieceColor,
         blackPieceColor: settings.blackPieceColor
@@ -1278,6 +1302,10 @@ function installGlassChessPremiumBridge() {
     },
     updateAppearance(patch = {}) {
       if (patch && typeof patch === "object") {
+        if (PAGE_BACKGROUNDS[patch.background]) {
+          settings.background = patch.background;
+          applyPageBackground(patch.background);
+        }
         if (["glass", "medieval", "modern"].includes(patch.pieceStyle)) {
           settings.pieceStyle = patch.pieceStyle;
         }
@@ -1301,9 +1329,15 @@ function installGlassChessPremiumBridge() {
     newGame() { return newGame(); },
     undo() { return undoMove(); },
     stopSearch() { return engine.stop(); },
-    search(fen, depth, onInfo) {
-      if (!engineReady) return Promise.reject(new Error('Stockfish is not ready yet.'));
-      return engine.search(fen, { depth: depth || 12, onInfo });
+    async search(fen, depth, onInfo) {
+      if (!engineReady) throw new Error("Stockfish is not ready yet.");
+      if (thinking) throw new Error("Stockfish is busy with another move or analysis.");
+      thinking = true;
+      try {
+        return await engine.search(fen, { depth: depth || 12, onInfo });
+      } finally {
+        thinking = false;
+      }
     },
     configureEngine(options = {}) { return engine.configure(options || {}); },
     setMode(mode, shouldAnalyze = true) {
@@ -1404,6 +1438,7 @@ function launch() {
   connectButtons();
 
   applyPieceAppearance();
+  applyPageBackground(settings.background);
   applyBoardTheme(settings.theme, false, false);
   render();
   void initialize();
