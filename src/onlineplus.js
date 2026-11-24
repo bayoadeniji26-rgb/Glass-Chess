@@ -585,6 +585,10 @@ function applyPieceSkin() {
 function decoratePieces() {
   const squares = document.querySelectorAll('[data-square], .square');
   for (const square of squares) {
+    // The primary renderer already owns its persisted glass/medieval/modern pieces.
+    // Do not let the Online + Club reward-skin observer wrap or reskin those nodes.
+    if (square.querySelector('.gc-piece')) continue;
+
     const walker = document.createTreeWalker(square, NodeFilter.SHOW_TEXT);
     const nodes = [];
     while (walker.nextNode()) {
