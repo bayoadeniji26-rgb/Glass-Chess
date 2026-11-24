@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "online": "node server.mjs",
-    "dev:network": "vite --host 0.0.0.0"
+    "dev:network": "vite --host 0.0.0.0",
+    "check:version": "node scripts/check-release-version.mjs"
   },
   "dependencies": {
     "chess.js": "^1.4.0",
