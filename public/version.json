@@ -1,13 +1,12 @@
 {
-  "version": "2026.11.24.8",
-  "name": "Glass Chess Motion & Update Integrity",
+  "version": "2026.11.24.9",
+  "name": "Glass Chess Checkmate Review & Motion Fixes",
   "updatedAt": "2026-11-24",
   "notes": [
-    "Dedicated, restrained checkmate king animation and accessible result panel",
-    "En-passant capture motion snapshots the actual captured pawn square",
-    "Generation-safe cancellation for Stockfish searches awaiting worker startup",
-    "Board motion cleanup, reduced-motion handling and audio resource disposal",
-    "Visual and motion inspection harness for rules, geometry, contrast, controls and timing",
-    "Truthful release checks with service-worker-aware refresh and network-first app assets"
+    "Terminal checkmating moves are classified as Checkmate instead of Best",
+    "Completed checkmates show MATE and the actual final mating move",
+    "Visual inspector normalizes boolean results and includes a status regression check",
+    "Piece travel motion is smoother and slower while respecting reduced-motion settings",
+    "Mate-zero engine scores no longer acquire an incorrect positive sign"
   ]
 }

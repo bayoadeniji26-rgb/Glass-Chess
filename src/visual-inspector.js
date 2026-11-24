@@ -62,6 +62,22 @@ import './visual-inspector.css';
       }
     },
     {
+      name: 'The supplied 14-move game ends with Qxa1 checkmate',
+      run() {
+        const chess=new Chess();
+        ['g4','d5','h3','e5','a3','Nc6','b4','h5','d3','hxg4','f3','Qh4+','Kd2','Nf6',
+          'e3','g3','Qe2','Be6','Rh2','gxh2','Bg2','hxg1=Q','Kc3','Qxc1','Nd2','d4+','exd4','Qxa1#']
+          .forEach(move=>chess.move(move));
+        return chess.isCheckmate()&&chess.history().at(-1)==='Qxa1#';
+      }
+    },
+    {
+      name: 'Boolean inspection results are normalized to named statuses',
+      run() {
+        return result('pass probe',true).status==='pass'&&result('fail probe',false).status==='fail';
+      }
+    },
+    {
       name: 'Stalemate is distinct from checkmate',
       run() {
         const chess=new Chess('7k/5Q2/6K1/8/8/8/8/8 b - - 0 1');
@@ -93,7 +109,11 @@ import './visual-inspector.css';
     }
   ];
 
-  function result(name,status,detail=''){return{name,status,detail:String(detail||'')};}
+  function result(name,status,detail=''){
+    const candidate=typeof status==='boolean'?(status?'pass':'fail'):String(status||'warn').toLowerCase();
+    const normalized=['pass','fail','warn'].includes(candidate)?candidate:'warn';
+    return{name,status:normalized,detail:String(detail||'')};
+  }
   function timeMs(value){
     const first=String(value||'0s').split(',')[0].trim();
     if(first.endsWith('ms'))return Number.parseFloat(first)||0;

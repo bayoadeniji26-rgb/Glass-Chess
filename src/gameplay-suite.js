@@ -118,7 +118,7 @@ function scoreFromInfo(info) {
   if (!score) return null;
   const value = Number(score.value);
   if (!Number.isFinite(value)) return null;
-  return score.type === 'mate' ? Math.sign(value || 1) * 100 : value / 100;
+  return String(score.type || '').toLowerCase() === 'mate' ? Math.sign(value) * 100 : value / 100;
 }
 function gameStartFromPgn(pgn) {
   const match = String(pgn).match(/\[FEN\s+"([^"]+)"\]/i);
@@ -545,7 +545,7 @@ function miniReviewBoard(item, suggestion) {
 function updateClassifications(results) {
   reviewData=results;
   renderMoveHistory();
-  const counts={Brilliant:0,Great:0,Best:0,Inaccuracy:0,Mistake:0,Blunder:0};
+  const counts={Checkmate:0,Brilliant:0,Great:0,Best:0,Inaccuracy:0,Mistake:0,Blunder:0};
   results.forEach(item=>{if(counts[item.label]!=null)counts[item.label]++;});
   const host=document.getElementById('gcl-classifications');
   if(!host)return;
@@ -555,15 +555,19 @@ function updateClassifications(results) {
     const actualPiece=REVIEW_PIECES[item.move.color+item.move.piece]||'';
     const played=actualPiece+' '+item.move.from+'–'+item.move.to;
     const recommended=suggestion
-      ? '<span class="gcl-review-suggest" title="'+esc('Stockfish recommendation: '+suggestion.piece+' '+suggestion.from+' to '+suggestion.to+' ('+suggestion.san+'). Hover to read the move; open to preview the resulting position.')+'"><b>Suggested:</b> '+esc(suggestion.piece)+' '+esc(suggestion.from)+'–'+esc(suggestion.to)+' <small>('+esc(suggestion.san)+')</small></span>'
+      ? '<span class="gcl-review-suggest" title="'+esc('Stockfish recommendation: '+suggestion.piece+' '+suggestion.from+' to '+suggestion.to+' ('+suggestion.san+'). Hover to read the move; open to preview the resulting position.')+'"><b>'+(item.label==='Checkmate'?'Mating move:':'Suggested:')+'</b> '+esc(suggestion.piece)+' '+esc(suggestion.from)+'–'+esc(suggestion.to)+' <small>('+esc(suggestion.san)+')</small></span>'
       : '<span class="gcl-review-suggest">Suggested move unavailable</span>';
     const differs=suggestion&&String(item.best).toLowerCase()!==uci(item.move);
-    return '<details class="gcl-review-move"><summary><span class="gcl-review-move-main"><b>'+esc(played)+'</b><small>Played · '+esc(item.label)+'</small></span>'+recommended+'</summary>'+(differs?miniReviewBoard(item,suggestion):'<p class="gcl-muted">This was Stockfish’s top move. No alternate move preview is needed.</p>')+'</details>';
+    const previewMarkup=item.label==='Checkmate'
+      ? '<p class="gcl-muted">Checkmate — this move ends the game. No reply position is possible.</p>'
+      : differs ? miniReviewBoard(item,suggestion) : '<p class="gcl-muted">This was Stockfish’s top move. No alternate move preview is needed.</p>';
+    return '<details class="gcl-review-move"><summary><span class="gcl-review-move-main"><b>'+esc(played)+'</b><small>Played · '+esc(item.label)+'</small></span>'+recommended+'</summary>'+previewMarkup+'</details>';
   }).join('');
   host.innerHTML='<div class="gcl-counts">'+countMarkup+'</div><div class="gcl-review-move-list">'+moveMarkup+'</div>';
 }
 
-function classifyLoss(loss, playedBest, playedMove) {
+function classifyLoss(loss, playedBest, playedMove, isCheckmate = false) {
+  if (isCheckmate) return 'Checkmate';
   if (playedBest) {
     return playedMove?.promotion && playedMove.promotion!=='q' ? 'Brilliant' : 'Best';
   }
@@ -596,14 +600,19 @@ async function analyzeGame() {
       if(token!==reviewToken||generation!==api.generation||snapshotFen!==api.fen){aborted=true;break;}
       const before=await api.search(positions[i],8);
       if(token!==reviewToken||generation!==api.generation||snapshotFen!==api.fen||before.cancelled){aborted=true;break;}
-      const after=await api.search(positions[i+1],8);
-      if(token!==reviewToken||generation!==api.generation||snapshotFen!==api.fen||after.cancelled){aborted=true;break;}
+      const endingPosition=new Chess(positions[i+1]);
+      const isCheckmate=endingPosition.isCheckmate();
+      let after=null;
+      if(!isCheckmate){
+        after=await api.search(positions[i+1],8);
+        if(token!==reviewToken||generation!==api.generation||snapshotFen!==api.fen||after.cancelled){aborted=true;break;}
+      }
       const pre=scoreFromInfo(before);
-      const post=scoreFromInfo(after);
-      const loss=pre==null||post==null?0:Math.max(0,pre+post);
+      const post=after?scoreFromInfo(after):null;
+      const loss=isCheckmate?0:pre==null||post==null?0:Math.max(0,pre+post);
       const playedBest=String(before.bestMove||'').toLowerCase()===uci(moves[i]);
-      const label=classifyLoss(loss,playedBest,moves[i]);
-      const accuracy=Math.max(0,Math.min(100,100-loss*25));
+      const label=classifyLoss(loss,playedBest,moves[i],isCheckmate);
+      const accuracy=isCheckmate?100:Math.max(0,Math.min(100,100-loss*25));
       totalAccuracy+=accuracy;rated++;
       sideAccuracy[moves[i].color].total+=accuracy;
       sideAccuracy[moves[i].color].count++;
@@ -640,8 +649,8 @@ async function analyzeGame() {
 }
 function renderSummary(results,accuracy,sideAccuracy={w:{total:0,count:0},b:{total:0,count:0}}) {
   const host=document.getElementById('gcl-summary');
-  const labels=['Brilliant','Great','Best','Inaccuracy','Mistake','Blunder'];
-  const counts={Brilliant:0,Great:0,Best:0,Inaccuracy:0,Mistake:0,Blunder:0};
+  const labels=['Checkmate','Brilliant','Great','Best','Inaccuracy','Mistake','Blunder'];
+  const counts={Checkmate:0,Brilliant:0,Great:0,Best:0,Inaccuracy:0,Mistake:0,Blunder:0};
   const bySide={w:{...counts},b:{...counts}};
   results.forEach(item=>{if(counts[item.label]!=null){counts[item.label]++;bySide[item.move.color][item.label]++;}});
   const pct=side=>sideAccuracy[side].count?Math.round(sideAccuracy[side].total/sideAccuracy[side].count)+'%':'—';

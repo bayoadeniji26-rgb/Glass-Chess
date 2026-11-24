@@ -1,7 +1,7 @@
 import './board-effects.css';
 
 export const BOARD_MOTION = Object.freeze({
-  move: 190, capture: 165, promotion: 480, check: 960, checkmate: 1380, flip: 300
+  move: 340, capture: 230, promotion: 480, check: 960, checkmate: 1380, flip: 300
 });
 
 export function createBoardEffects(board, isSoundEnabled = () => true, isAnimationEnabled = () => true) {
@@ -170,7 +170,7 @@ export function createBoardEffects(board, isSoundEnabled = () => true, isAnimati
       runAnimation(ghost, [
         { transform: 'translate3d(0,0,0) scale(1)', opacity: 1 },
         { transform: 'translate3d(' + dx + 'px,' + dy + 'px,0) scale(1.015)', opacity: 1 }
-      ], { duration: motion.type === 'castle-rook' ? BOARD_MOTION.move + 25 : BOARD_MOTION.move, easing: 'cubic-bezier(.2,.72,.22,1)', fill: 'forwards' }, cleanup);
+      ], { duration: motion.type === 'castle-rook' ? BOARD_MOTION.move + 40 : BOARD_MOTION.move, easing: 'cubic-bezier(.22,.61,.36,1)', fill: 'forwards' }, cleanup);
     }
   }
 

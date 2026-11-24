@@ -522,6 +522,9 @@ function updateCaptured() {
 // ============================================
 
 function updateGameStatus() {
+  const bestMoveHeading = $("best-move")?.previousElementSibling;
+  if (bestMoveHeading?.classList.contains("eyebrow")) bestMoveHeading.textContent = "BEST MOVE";
+
   if (gameTermination?.type === "timeout_draw") {
     $("coach-title").textContent = "Draw on time";
     $("coach-text").textContent = "The flagged side ran out of time, but the opponent did not have sufficient material to checkmate.";
@@ -541,6 +544,13 @@ function updateGameStatus() {
   }
 
   if (game.isCheckmate()) {
+    const finalMove = game.history({ verbose: true }).at(-1);
+    const bestMoveHeading = $("best-move")?.previousElementSibling;
+    if (bestMoveHeading?.classList.contains("eyebrow")) bestMoveHeading.textContent = "CHECKMATE MOVE";
+    $("evaluation").textContent = "MATE";
+    $("best-move").textContent = finalMove
+      ? `Checkmate · ${finalMove.san} (${finalMove.from} → ${finalMove.to})`
+      : "Checkmate";
     $("coach-title").textContent = "Checkmate!";
     $("coach-text").textContent =
       `${game.turn() === "w" ? "Black" : "White"} wins!`;
@@ -584,6 +594,7 @@ function updateLabels() {
 
 function render() {
   const orientation = boardIsFlipped();
+  if (game.isCheckmate()) analysisBestMove = null;
   renderBoard();
   announceCheckmate();
   if (lastRenderedOrientation !== null && orientation !== lastRenderedOrientation) boardEffects.animateFlip();

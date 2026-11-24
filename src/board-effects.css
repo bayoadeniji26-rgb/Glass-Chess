@@ -9,7 +9,7 @@
 #board [data-square]:active { filter: none; }
 #board .gc-piece {
   transform: translate3d(0,0,0);
-  transition: transform 165ms cubic-bezier(.2,.8,.2,1), filter 165ms ease, opacity 140ms ease;
+  transition: transform 230ms cubic-bezier(.22,.61,.36,1), filter 220ms ease, opacity 200ms ease;
 }
 #board .square.selected {
   background-color: inherit !important;
