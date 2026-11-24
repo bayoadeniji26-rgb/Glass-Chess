@@ -1,0 +1,205 @@
+/* Glass Chess fixed play workspace */
+html, body {
+  width: 100%;
+  height: 100%;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  overscroll-behavior: none;
+}
+body { position: fixed; inset: 0; }
+.app {
+  width: 100%;
+  max-width: none !important;
+  height: 100dvh;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 16px 8px !important;
+  display: grid;
+  grid-template-rows: 54px minmax(0, 1fr);
+  overflow: hidden !important;
+}
+.topbar {
+  height: 54px !important;
+  min-height: 54px;
+  margin: 0 !important;
+  gap: 14px;
+  border-bottom-color: rgba(255,255,255,.09);
+}
+.topbar .brand { white-space: nowrap; font-size: 13px; }
+.topbar .brand-icon { font-size: 21px; }
+.engine-status { white-space: nowrap; }
+#gc-workspace-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+}
+#gc-workspace-actions button {
+  min-height: 32px;
+  padding: 0 12px;
+  color: #eaf0ff;
+  background: rgba(255,255,255,.065);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+#gc-workspace-actions button:hover,
+#gc-workspace-actions button[aria-expanded="true"] {
+  color: #f4d99d;
+  border-color: rgba(232,199,126,.48);
+  background: rgba(232,199,126,.12);
+}
+#new-game { min-height: 34px; padding: 0 13px; white-space: nowrap; }
+.layout {
+  display: flex !important;
+  width: 100%;
+  height: 100%;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  align-items: stretch !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+}
+.board-section {
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  margin: 0 auto !important;
+  overflow: visible !important;
+}
+.gc-final-board-stage {
+  width: 100% !important;
+  min-height: 0 !important;
+  padding: 3px 4px 5px !important;
+  gap: 4px !important;
+}
+.gc-final-board-stage > .player-label {
+  min-height: 25px !important;
+  padding: 1px 3px !important;
+  margin: 0 !important;
+}
+.gc-final-board-stage > .board-frame {
+  flex: 0 0 auto !important;
+  margin: 0 !important;
+}
+.gc-final-board-stage > .board-controls {
+  margin: 2px 0 0 !important;
+  flex: 0 0 auto !important;
+  gap: 6px !important;
+}
+.gc-final-board-stage > .board-controls button {
+  min-height: 32px !important;
+  padding: 5px 12px !important;
+}
+#gc-final-toolbar {
+  min-height: 37px !important;
+  padding: 3px 8px !important;
+}
+#gc-final-toolbar .gc-final-crown { width: 27px; height: 27px; flex-basis: 27px; }
+#gc-final-toolbar .gc-final-brand-copy small { display: none; }
+.gc-final-board-stage .gc-promotion {
+  margin: 3px 0 0 !important;
+  padding: 7px !important;
+  gap: 6px !important;
+}
+footer { display: none !important; }
+
+/* Play and analysis are separate slide-out panels, not one mega toolbox. */
+.gc-workspace-drawer {
+  position: fixed !important;
+  top: 66px !important;
+  bottom: 12px !important;
+  z-index: 2147482500 !important;
+  width: min(360px, calc(100vw - 28px)) !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 18px !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  border: 1px solid rgba(208,220,250,.18) !important;
+  border-radius: 18px !important;
+  background: rgba(17,23,36,.98) !important;
+  box-shadow: 0 24px 80px rgba(0,0,0,.55) !important;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: transform .22s ease, opacity .18s ease, visibility .18s ease;
+}
+.gc-workspace-left { left: 12px !important; transform: translateX(calc(-100% - 24px)); }
+.gc-workspace-right { right: 12px !important; transform: translateX(calc(100% + 24px)); }
+.gc-workspace-drawer.gc-drawer-visible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+.gc-workspace-drawer-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  position: sticky;
+  top: -18px;
+  z-index: 2;
+  margin: -18px -18px 16px;
+  padding: 13px 16px;
+  color: #f4d99d;
+  background: rgba(17,23,36,.98);
+  border-bottom: 1px solid rgba(255,255,255,.1);
+  font-weight: 750;
+  letter-spacing: .04em;
+}
+.gc-workspace-close {
+  width: 31px;
+  height: 31px;
+  border-radius: 9px;
+  border: 1px solid rgba(255,255,255,.14);
+  color: #f4f5fa;
+  background: rgba(255,255,255,.07);
+  font-size: 22px;
+  cursor: pointer;
+}
+#gc-workspace-scrim {
+  display: none;
+  position: fixed;
+  inset: 54px 0 0;
+  z-index: 2147482400;
+  border: 0;
+  background: rgba(2,5,12,.55);
+  backdrop-filter: blur(3px);
+}
+#gc-workspace-scrim.gc-scrim-visible { display: block; }
+body.gc-workspace-drawer-open { overflow: hidden !important; }
+@media (max-width: 760px) {
+  .app { padding: 0 6px 5px !important; grid-template-rows: 48px minmax(0,1fr); }
+  .topbar { height: 48px !important; min-height: 48px; gap: 6px; }
+  .topbar .brand { font-size: 10px; letter-spacing: 1px; }
+  .topbar .brand-icon { margin-right: 3px; font-size: 17px; }
+  .engine-status { display: none; }
+  #gc-workspace-actions { gap: 3px; }
+  #gc-workspace-actions button { min-height: 29px; padding: 0 8px; font-size: 10px; }
+  #new-game { min-height: 29px; padding: 0 8px; font-size: 10px; }
+  .gc-workspace-drawer { top: 56px !important; bottom: 8px !important; width: min(340px, calc(100vw - 16px)) !important; padding: 14px !important; }
+  .gc-workspace-drawer-heading { top: -14px; margin: -14px -14px 12px; padding: 11px 13px; }
+  #gc-workspace-scrim { inset: 48px 0 0; }
+  .gc-final-board-stage { gap: 3px !important; padding: 2px 2px 4px !important; }
+  .gc-final-board-stage > .player-label { min-height: 21px !important; }
+  .gc-final-board-stage > .board-controls button { min-height: 29px !important; padding: 4px 9px !important; font-size: 11px; }
+  #gc-final-toolbar { width: min(var(--gc-final-board-size, 90vw), calc(100vw - 12px)) !important; }
+  #gc-final-toolbar .gc-final-actions { gap: 3px; }
+  #gc-final-toolbar select, #gc-final-toolbar button { min-height: 29px; padding: 0 7px; font-size: 10px; }
+}
+@media (max-height: 700px) {
+  .app { grid-template-rows: 44px minmax(0,1fr); }
+  .topbar { height: 44px !important; min-height: 44px; }
+  .gc-final-board-stage { gap: 2px !important; }
+  .gc-final-board-stage > .player-label { min-height: 19px !important; }
+  .gc-final-board-stage > .board-controls button { min-height: 27px !important; }
+  #gc-final-toolbar { min-height: 32px !important; }
+  #gc-workspace-scrim { inset: 44px 0 0; }
+}
