@@ -450,34 +450,21 @@ import './glass-final-ui.css';
   }, true);
 
   document.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && focusMode) {
-      if (hubWasOpenOnEscape) {
-        hubWasOpenOnEscape = false;
-        return;
-      }
-      focusMode = false;
-      document.documentElement.classList.remove('gc-final-focus-mode');
-      document.body.classList.remove('gc-final-focus-mode');
-      const button = toolbar?.querySelector('[data-gc-analysis-focus]');
-      if (button) { button.setAttribute('aria-pressed', 'false'); button.textContent = 'Analysis focus'; }
-      scheduleLayout();
+    if (event.key !== 'Escape' || !focusMode) return;
+    if (hubWasOpenOnEscape) {
+      hubWasOpenOnEscape = false;
+      return;
     }
-  });
-
-  document.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && focusMode) {
-      if (hubWasOpenOnEscape) {
-        hubWasOpenOnEscape = false;
-        return;
-      }
-      focusMode = false;
-      document.documentElement.classList.remove('gc-final-focus-mode');
-      document.body.classList.remove('gc-final-focus-mode');
-      syncToolsButton();
-      const button = toolbar?.querySelector('[data-gc-analysis-focus]');
-      if (button) { button.setAttribute('aria-pressed', 'false'); button.textContent = 'Analysis focus'; }
-      scheduleLayout();
+    focusMode = false;
+    document.documentElement.classList.remove('gc-final-focus-mode');
+    document.body.classList.remove('gc-final-focus-mode');
+    syncToolsButton();
+    const button = toolbar?.querySelector('[data-gc-analysis-focus]');
+    if (button) {
+      button.setAttribute('aria-pressed', 'false');
+      button.textContent = 'Analysis focus';
     }
+    scheduleLayout();
   });
 
   document.addEventListener('fullscreenchange', () => {
