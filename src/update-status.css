@@ -1,0 +1,9 @@
+.gc-update-stage{display:inline-flex;align-items:center;min-height:27px;padding:0 10px;border:1px solid rgba(185,165,255,.22);border-radius:999px;color:#cfc4ff;background:rgba(185,165,255,.07);font-size:9px;font-weight:800;letter-spacing:.12em}
+.gc-update-dialog{width:min(420px,100%);padding:27px;border:1px solid rgba(203,192,255,.22);border-radius:20px;background:linear-gradient(145deg,rgba(17,25,43,.98),rgba(31,30,54,.98));color:#f4f6ff;box-shadow:0 24px 90px rgba(0,0,0,.48)}
+.gc-update-dialog h2{margin:0 0 8px;font-size:22px}
+.gc-update-dialog p:not(.gc-update-kicker){min-height:36px;margin:0 0 16px;color:#aab6cc;font-size:12px;line-height:1.5}
+.gc-update-dialog-mark{width:54px;height:54px;display:grid;place-items:center;margin:0 auto 13px;border:1px solid rgba(203,192,255,.25);border-radius:17px;background:rgba(185,165,255,.09);font-size:30px;color:#e9cf93}
+.gc-update-close{margin-top:19px;padding:8px 16px;border:1px solid rgba(255,255,255,.14);border-radius:9px;color:#eef2ff;background:rgba(255,255,255,.07);cursor:pointer}
+.gc-update-close[hidden]{display:none}
+.gc-update-banner{max-width:calc(100vw - 24px)}
+@media(prefers-reduced-motion:reduce){.gc-update-banner,.gc-update-overlay,.gc-update-dialog{transition:none!important;animation:none!important}}

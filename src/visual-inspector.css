@@ -1,0 +1,13 @@
+#gc-visual-inspector{margin-top:14px;padding-top:12px;border-top:1px solid var(--border,rgba(255,255,255,.13));color:var(--text,#e9eef8)}
+#gc-visual-inspector summary{cursor:pointer;font-size:12px;font-weight:800;letter-spacing:.02em}
+#gc-visual-inspector .gc-vi-intro,#gc-visual-inspector .gc-vi-footnote{font-size:10px;line-height:1.5;color:var(--muted,#aab6cc)}
+#gc-visual-inspector button{min-height:36px;padding:0 12px;border:1px solid rgba(185,165,255,.3);border-radius:9px;color:#e8e3fb;background:rgba(185,165,255,.09);font:inherit;font-size:11px;font-weight:750;cursor:pointer}
+#gc-visual-inspector button:disabled{opacity:.55;cursor:wait}
+#gc-visual-inspector .gc-vi-summary{padding:8px 10px;border-radius:8px;background:rgba(127,127,127,.09);font-size:11px;font-weight:800}
+#gc-visual-inspector .gc-vi-results{display:grid;gap:5px;max-height:420px;overflow:auto}
+#gc-visual-inspector .gc-vi-result{display:grid;gap:3px;padding:7px 8px;border:1px solid rgba(255,255,255,.09);border-radius:8px;background:rgba(255,255,255,.025)}
+#gc-visual-inspector .gc-vi-result strong{font-size:9px;letter-spacing:.03em}
+#gc-visual-inspector .gc-vi-result small{font-size:9px;line-height:1.4;color:var(--muted,#aab6cc);overflow-wrap:anywhere}
+#gc-visual-inspector .gc-vi-pass strong{color:#9ce0bd}
+#gc-visual-inspector .gc-vi-warn strong{color:#e8cb87}
+#gc-visual-inspector .gc-vi-fail strong{color:#ff9ea8}
