@@ -1,3 +1,4 @@
+
 import { io } from 'socket.io-client';
 
 const STORE_KEY = 'glass-chess-online-plus-v1';
@@ -674,14 +675,20 @@ function bindUI() {
     if (legacySound) { legacySound.checked = state.sound; legacySound.dispatchEvent(new Event('change', { bubbles: true })); }
     saveState(); applyPieceSkin(); toast('Sound and animation settings saved.');
   });
+
   const params = new URLSearchParams(window.location.search);
   const room = params.get('room');
   const server = params.get('server');
   const serverInput = root.querySelector('#gc-plus-server-url');
-  if (server) serverInput.value = server;
-  else if (!['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)) {
-    serverInput.value = `${window.location.protocol}//${window.location.hostname}:3001`;
+
+  if (server) {
+    serverInput.value = server;
+  } else if (['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)) {
+    serverInput.value = 'http://localhost:3001';
+  } else {
+    serverInput.value = 'https://glass-chess-sqk0.onrender.com';
   }
+
   if (room) root.querySelector('#gc-plus-room-code').value = room.toUpperCase();
 }
 
@@ -763,4 +770,3 @@ export function mountOnlinePlus(chessApi, premiumRoot) {
   }
   console.log('Glass Chess Online + Club loaded.');
 }
-
