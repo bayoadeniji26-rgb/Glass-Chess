@@ -23,11 +23,40 @@ const PROFILES = {
 };
 
 const THEMES = {
-  classic: ["#f0d9b5", "#b58863"],
-  emerald: ["#eeeed2", "#769656"],
-  slate: ["#dce2eb", "#718096"],
-  ocean: ["#dceaf0", "#56849b"],
-  violet: ["#eee4f7", "#9272a8"]
+  midnight: ["#d9dfeb", "#52647f"],
+  forest: ["#e8e1c9", "#63866c"],
+  marble: ["#eee9e2", "#9c9a99"],
+  ocean: ["#d9edf2", "#39778c"],
+  aurora: ["#e9e8f7", "#5965a2"],
+  royal: ["#efe2c9", "#604777"],
+  sunset: ["#f7dfc8", "#b85f50"],
+  carbon: ["#d5d9df", "#3a4657"]
+};
+
+const LEGACY_THEME_MAP = {
+  classic: "midnight",
+  emerald: "forest",
+  slate: "carbon",
+  violet: "aurora"
+};
+
+const PIECE_SVG = {
+  medieval: {
+    p: `<path d="M20 84h60l-5 10H25zM33 82c2-8 11-13 11-23 0-5-5-9-5-15 0-10 5-18 11-21 7 3 12 11 12 21 0 6-5 10-5 15 0 10 9 15 11 23z"/><circle cx="50" cy="14" r="10"/><path d="M29 88h42M42 57h16" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2.5"/>`,
+    r: `<path d="M23 15h12v11h10V15h10v11h10V15h12v27H23zM29 42h42l-5 40H34zM20 82h60l-5 12H25z"/><path d="M31 48v27M50 48v27M69 48v27" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2.5"/>`,
+    n: `<path d="M20 84h60l-5 10H25zM28 82c4-14 8-25 4-36l-5-12 15-17 20 7 14 19-5 39z"/><path d="M43 25c-1 10 6 14 15 16l8 12-9 6-11-12-11-2 6-12z"/><circle cx="48" cy="36" r="2.5" fill="var(--gc-piece-highlight)" stroke="none"/><path d="M36 72h30" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2.5"/>`,
+    b: `<path d="M20 84h60l-5 10H25zM33 82c2-12 8-17 9-27-8-6-10-17-3-27l11-15 11 15c7 10 5 21-3 27 1 10 7 15 9 27z"/><path d="M50 20l-6 17 7 8-6 9" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="3"/><path d="M30 88h40" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2.5"/>`,
+    q: `<path d="M20 84h60l-5 10H25zM29 82l-7-40 17 14 11-34 11 34 17-14-7 40z"/><circle cx="22" cy="37" r="6"/><circle cx="39" cy="54" r="5"/><circle cx="50" cy="18" r="6"/><circle cx="61" cy="54" r="5"/><circle cx="78" cy="37" r="6"/><path d="M33 72h34" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2.5"/>`,
+    k: `<path d="M20 84h60l-5 10H25zM32 82c2-13 8-17 8-29h20c0 12 6 16 8 29z"/><path d="M46 12h8v12h12v8H54v12h-8V32H34v-8h12z" /><path d="M30 88h40" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2.5"/>`
+  },
+  modern: {
+    p: `<path d="M22 84h56l-5 9H27zM34 80c2-13 8-16 8-27h16c0 11 6 14 8 27z"/><circle cx="50" cy="19" r="12"/><path d="M35 85h30" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="3"/>`,
+    r: `<path d="M24 13h13v13h8V13h10v13h8V13h13v30H24zM31 43h38v38H31zM21 81h58v12H21z"/><path d="M40 48v28M60 48v28" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="3"/>`,
+    n: `<path d="M22 84h56l-5 9H27zM29 81c5-11 5-24 1-35l17-26 25 13 7 23-12 25z"/><path d="M47 25l-3 19 19 8 3 13-20-5-12-12" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="51" cy="35" r="3" fill="var(--gc-piece-highlight)" stroke="none"/>`,
+    b: `<path d="M22 84h56l-5 9H27zM34 80c3-11 8-15 8-25-9-10-5-25 8-38 13 13 17 28 8 38 0 10 5 14 8 25z"/><path d="M50 22l-7 20 8 7-7 18" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="4" stroke-linecap="round"/>`,
+    q: `<path d="M22 84h56l-5 9H27zM29 80l-7-39 18 16 10-31 10 31 18-16-7 39z"/><circle cx="22" cy="37" r="5"/><circle cx="50" cy="20" r="5"/><circle cx="78" cy="37" r="5"/><path d="M34 70h32" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="3"/>`,
+    k: `<path d="M22 84h56l-5 9H27zM32 80c2-12 7-16 7-27h22c0 11 5 15 7 27z"/><path d="M46 10h8v14h14v8H54v14h-8V32H32v-8h14z"/><path d="M34 70h32" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="3"/>`
+  }
 };
 
 const DEPTH = 10;
@@ -55,7 +84,10 @@ let settings = {
   sounds: true,
   autoFlip: false,
   evaluation: true,
-  theme: "classic"
+  theme: "midnight",
+  pieceStyle: "glass",
+  whitePieceColor: "#f7f2e9",
+  blackPieceColor: "#263244"
 };
 
 try {
@@ -66,6 +98,19 @@ try {
 } catch {
   // Use default settings if saved settings are unavailable.
 }
+
+settings.theme = THEMES[settings.theme]
+  ? settings.theme
+  : (LEGACY_THEME_MAP[settings.theme] || "midnight");
+settings.pieceStyle = ["glass", "medieval", "modern"].includes(settings.pieceStyle)
+  ? settings.pieceStyle
+  : "glass";
+settings.whitePieceColor = /^#[0-9a-f]{6}$/i.test(settings.whitePieceColor || "")
+  ? settings.whitePieceColor
+  : "#f7f2e9";
+settings.blackPieceColor = /^#[0-9a-f]{6}$/i.test(settings.blackPieceColor || "")
+  ? settings.blackPieceColor
+  : "#263244";
 
 // ============================================
 // ELEMENTS AND STATUS
@@ -85,6 +130,32 @@ function saveSettings() {
     );
   } catch {
     console.warn("Settings could not be saved.");
+  }
+}
+
+function applyPieceAppearance() {
+  document.documentElement.style.setProperty("--gc-piece-white-color", settings.whitePieceColor);
+  document.documentElement.style.setProperty("--gc-piece-black-color", settings.blackPieceColor);
+  if (document.body) document.body.dataset.gcPieceStyle = settings.pieceStyle;
+}
+
+function applyBoardTheme(theme, syncPremium = true, shouldRender = true) {
+  const selectedTheme = THEMES[theme] ? theme : "midnight";
+  settings.theme = selectedTheme;
+  saveSettings();
+
+  if (document.body) {
+    Object.keys(THEMES).forEach(name => {
+      document.body.classList.toggle(`gc-theme-${name}`, name === selectedTheme);
+    });
+  }
+
+  const selector = $("gc-theme");
+  if (selector && selector.value !== selectedTheme) selector.value = selectedTheme;
+
+  if (shouldRender) render();
+  if (syncPremium && window.GlassChessPremium?.setTheme) {
+    window.GlassChessPremium.setTheme(selectedTheme);
   }
 }
 
@@ -148,11 +219,14 @@ function createExtraControls() {
       </label>
 
       <select id="gc-theme" class="gc-theme-select">
-        <option value="classic">Classic Wood</option>
-        <option value="emerald">Emerald</option>
-        <option value="slate">Slate</option>
+        <option value="midnight">Midnight</option>
+        <option value="forest">Forest</option>
+        <option value="marble">Marble</option>
         <option value="ocean">Ocean</option>
-        <option value="violet">Violet</option>
+        <option value="aurora">Aurora</option>
+        <option value="royal">Royal</option>
+        <option value="sunset">Sunset</option>
+        <option value="carbon">Carbon</option>
       </select>
     `;
 
@@ -238,12 +312,7 @@ function setupSettings() {
 
   if (theme) {
     theme.value = settings.theme;
-
-    theme.addEventListener("change", () => {
-      settings.theme = theme.value;
-      saveSettings();
-      render();
-    });
+    theme.addEventListener("change", () => applyBoardTheme(theme.value));
   }
 }
 
@@ -318,12 +387,20 @@ function renderBoard() {
 
       if (piece) {
         const span = document.createElement("span");
+        const sideClass = piece.color === "w" ? "piece-white" : "piece-black";
+        const pieceColor = piece.color === "w"
+          ? settings.whitePieceColor
+          : settings.blackPieceColor;
 
-        span.className =
-          `gc-piece ${piece.color === "w" ? "piece-white" : 
-"piece-black"}`;
+        span.className = `gc-piece ${sideClass} gc-piece-${settings.pieceStyle}`;
+        span.style.setProperty("--gc-piece-color", pieceColor);
 
-        span.textContent = PIECES[piece.color + piece.type];
+        if (settings.pieceStyle === "glass") {
+          span.textContent = PIECES[piece.color + piece.type];
+        } else {
+          const art = PIECE_SVG[settings.pieceStyle]?.[piece.type] || PIECE_SVG.modern[piece.type];
+          span.innerHTML = `<svg class="gc-piece-art" viewBox="0 0 100 100" aria-hidden="true" focusable="false"><g class="gc-svg-piece">${art}</g></svg>`;
+        }
 
         element.appendChild(span);
       }
@@ -1191,6 +1268,35 @@ function installGlassChessPremiumBridge() {
     get checkmate() { return game.isCheckmate(); },
     get draw() { return game.isDraw(); },
     get turn() { return game.turn(); },
+    get appearance() {
+      return {
+        theme: settings.theme,
+        pieceStyle: settings.pieceStyle,
+        whitePieceColor: settings.whitePieceColor,
+        blackPieceColor: settings.blackPieceColor
+      };
+    },
+    updateAppearance(patch = {}) {
+      if (patch && typeof patch === "object") {
+        if (["glass", "medieval", "modern"].includes(patch.pieceStyle)) {
+          settings.pieceStyle = patch.pieceStyle;
+        }
+        if (typeof patch.whitePieceColor === "string" && /^#[0-9a-f]{6}$/i.test(patch.whitePieceColor)) {
+          settings.whitePieceColor = patch.whitePieceColor;
+        }
+        if (typeof patch.blackPieceColor === "string" && /^#[0-9a-f]{6}$/i.test(patch.blackPieceColor)) {
+          settings.blackPieceColor = patch.blackPieceColor;
+        }
+        if (THEMES[patch.theme]) {
+          settings.theme = patch.theme;
+          applyBoardTheme(patch.theme, false, false);
+        }
+      }
+      applyPieceAppearance();
+      saveSettings();
+      render();
+      return this.appearance;
+    },
     render() { render(); },
     newGame() { return newGame(); },
     undo() { return undoMove(); },
@@ -1297,6 +1403,8 @@ function launch() {
   createAnalysisStudio();
   connectButtons();
 
+  applyPieceAppearance();
+  applyBoardTheme(settings.theme, false, false);
   render();
   void initialize();
 }
