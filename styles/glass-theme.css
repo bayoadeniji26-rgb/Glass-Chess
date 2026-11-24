@@ -170,7 +170,7 @@ select {
   text-shadow: 0 1px 1px #fff5;
 }
 
-.square.selected { background: #d4b65c; }
+.square.selected { background: inherit; box-shadow: inset 0 0 0 3px rgba(238,215,166,.92); }
 .square.legal::after {
   content: "";
   width: 24%;
