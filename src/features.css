@@ -120,11 +120,11 @@
   stroke-width: 1.8;
 }
 
-.gc-piece-white {
+.piece-white {
   --gc-piece-highlight: rgba(255,255,255,.86);
 }
 
-.gc-piece-black {
+.piece-black {
   --gc-piece-highlight: rgba(0,0,0,.42);
 }
 
