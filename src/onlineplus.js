@@ -11,6 +11,13 @@ const SKINS = [
   { id: 'crimson', name: 'Crimson', unlock: 450, icon: '♜', desc: 'Pearl white against a ruby finish.' },
   { id: 'frost', name: 'Frost', unlock: 700, icon: '♗', desc: 'Icy platinum and blue highlights.' }
 ];
+const SKIN_COLORS = {
+  royal: { white: "#f3e2b5", black: "#1a2639" },
+  obsidian: { white: "#dbe5f5", black: "#151c2a" },
+  neon: { white: "#aefaff", black: "#8c5bdf" },
+  crimson: { white: "#f4f2ed", black: "#7a2038" },
+  frost: { white: "#eaf5ff", black: "#547999" }
+};
 const AVATARS = ['♟', '♞', '♜', '♛', '♚', '⚡', '🐉', '🦊', '🦅', '🐺'];
 const BANNERS = [
   { id: 'aurora', label: 'Aurora', css: 'linear-gradient(120deg,#152a4f,#315e79 48%,#986bb3)' },
@@ -64,7 +71,7 @@ function todayKey() {
 
 function defaultState() {
   return {
-    name: 'Player', avatar: '♞', banner: 'aurora', xp: 0, pieceSkin: 'royal',
+    name: 'Player', avatar: '♞', banner: 'aurora', xp: 0, pieceSkin: 'custom', pieceSkinVersion: 2,
     personality: 'balanced', animations: true, sound: true, friends: [], achievements: [],
     missionDay: todayKey(), missionProgress: { moves: 0, puzzle: 0, review: 0 }, missionClaimed: [],
     lastChallenge: '',
@@ -73,8 +80,14 @@ function defaultState() {
 
 function loadState() {
   try {
-    const saved = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
+    const saved = JSON.parse(localStorage.getItem(STORE_KEY) || '{}') || {};
     const value = { ...defaultState(), ...saved };
+    // Older builds applied a default Royal skin after the board loaded. Treat that old
+    // default as custom so it cannot unexpectedly replace the user's saved appearance.
+    if (saved.pieceSkinVersion !== 2) {
+      value.pieceSkin = 'custom';
+      value.pieceSkinVersion = 2;
+    }
     if (!Array.isArray(value.friends)) value.friends = [];
     if (!Array.isArray(value.achievements)) value.achievements = [];
     if (!Array.isArray(value.missionClaimed)) value.missionClaimed = [];
@@ -227,6 +240,17 @@ function injectStyles() {
     body.gc-piece-crimson .gc-piece-glyph[data-side="black"]{color:#651e35;-webkit-text-stroke:1px #f4b8bd;text-shadow:0 2px 0 #34111e,0 5px 7px #000;filter:drop-shadow(0 0 4px rgba(212,74,105,.48))}
     body.gc-piece-frost .gc-piece-glyph[data-side="white"]{color:#f6ffff;-webkit-text-stroke:1px #8dd9ed;text-shadow:0 0 4px #e7fbff,0 4px 5px #456d84;filter:drop-shadow(0 4px 4px #172a3c)}
     body.gc-piece-frost .gc-piece-glyph[data-side="black"]{color:#263c54;-webkit-text-stroke:1px #a3e0f4;text-shadow:0 1px 0 #8abbd0,0 5px 7px #081522;filter:drop-shadow(0 0 5px rgba(112,207,238,.42))}
+    /* Reward finishes target the current board renderer as well as legacy glyphs. */
+    body.gc-piece-royal .gc-piece.piece-white{color:#f3e2b5!important;filter:drop-shadow(0 2px 1px #5b503e) drop-shadow(0 5px 4px rgba(0,0,0,.34))}
+    body.gc-piece-royal .gc-piece.piece-black{color:#1a2639!important;filter:drop-shadow(0 2px 1px #000) drop-shadow(0 5px 4px rgba(0,0,0,.55))}
+    body.gc-piece-obsidian .gc-piece.piece-white{color:#dbe5f5!important;filter:drop-shadow(0 4px 4px #283347)}
+    body.gc-piece-obsidian .gc-piece.piece-black{color:#151c2a!important;filter:drop-shadow(0 0 5px rgba(130,170,220,.25))}
+    body.gc-piece-neon .gc-piece.piece-white{color:#aefaff!important;filter:drop-shadow(0 0 5px #24cde4) drop-shadow(0 0 13px #24cde4)}
+    body.gc-piece-neon .gc-piece.piece-black{color:#8c5bdf!important;filter:drop-shadow(0 0 5px #763cff) drop-shadow(0 0 14px #763cff)}
+    body.gc-piece-crimson .gc-piece.piece-white{color:#f4f2ed!important;filter:drop-shadow(0 3px 3px #6b202e)}
+    body.gc-piece-crimson .gc-piece.piece-black{color:#7a2038!important;filter:drop-shadow(0 0 5px rgba(255,92,115,.35))}
+    body.gc-piece-frost .gc-piece.piece-white{color:#eaf5ff!important;filter:drop-shadow(0 0 5px rgba(183,228,255,.5))}
+    body.gc-piece-frost .gc-piece.piece-black{color:#547999!important;filter:drop-shadow(0 0 7px rgba(154,217,255,.48))}
     @media(max-width:640px){#gc-premium .gc-plus-grid{grid-template-columns:1fr}#gc-premium .gc-plus-skins{grid-template-columns:1fr 1fr}#gc-premium .gc-plus-profile-body{align-items:flex-start}}
     @media(prefers-reduced-motion:reduce){#gc-plus-victory .confetti i{animation:none!important}.gc-piece-glyph{animation:none!important;transition:none!important}}
   `;
@@ -270,7 +294,7 @@ function mountTab() {
     <div class="gc-card"><div class="gc-row"><h4>Daily missions</h4><span class="gc-pill" id="gc-plus-mission-date">Today</span></div><div id="gc-plus-missions"></div><div class="gc-plus-small">Complete missions to earn XP and unlock new chess-piece designs.</div></div>
     <div class="gc-card"><div class="gc-row"><h4>Game of the day</h4><span class="gc-pill">Daily challenge</span></div><div class="gc-stat" id="gc-plus-daily-title" style="font-size:18px">Find the forced mate</div><p class="gc-muted" id="gc-plus-daily-copy">White to move. Find the move that ends the game immediately.</p><div class="gc-plus-actions"><button class="primary" id="gc-plus-daily-start">Start today's challenge</button></div><div class="gc-plus-status" id="gc-plus-daily-status">One tactical challenge, refreshed each day.</div></div>
     <div class="gc-card"><div class="gc-row"><h4>Achievements</h4><span class="gc-pill" id="gc-plus-achievement-count">0 / ${ACHIEVEMENTS.length}</span></div><div id="gc-plus-achievements"></div></div>
-    <div class="gc-card"><div class="gc-row"><h4>Unlockable chess-piece designs</h4><span class="gc-pill" id="gc-plus-skin-xp">0 XP</span></div><div id="gc-plus-skins" class="gc-plus-skins"></div><p class="gc-plus-small">Piece designs use stylized light and dark chess glyphs with gradients, metallic edges, shadows and move animations. Earn XP to unlock more sets.</p></div>
+    <div class="gc-card"><div class="gc-row"><h4>Unlockable piece finishes</h4><span class="gc-pill" id="gc-plus-skin-xp">0 XP</span></div><div id="gc-plus-skins" class="gc-plus-skins"></div><p class="gc-plus-small" id="gc-plus-skin-current">Choose a finish to recolor your selected Glass, Medieval or Modern pieces. Manual color choices take priority.</p></div>
     <div class="gc-card"><div class="gc-row"><h4>Engine personality presets</h4><span class="gc-pill">Stockfish</span></div><label class="gc-plus-field">Playing style<select id="gc-plus-personality">${Object.entries(PERSONALITIES).map(([id,p]) => `<option value="${id}">${p.label}</option>`).join('')}</select></label><div class="gc-plus-status" id="gc-plus-personality-note"></div><div class="gc-plus-actions"><button class="primary" id="gc-plus-personality-apply">Apply personality</button></div><p class="gc-plus-small">These presets tune Stockfish skill level and search depth. Stockfish remains the same engine; these are not separate trained personalities.</p></div>
     <div class="gc-card"><div class="gc-row"><h4>Sound & animation studio</h4><span class="gc-pill">Preferences</span></div><label style="display:flex;gap:8px;align-items:center;margin:9px 0;font-size:12px"><input id="gc-plus-sound" type="checkbox" style="width:auto"> Sound effects and victory chimes</label><label style="display:flex;gap:8px;align-items:center;margin:9px 0;font-size:12px"><input id="gc-plus-animations" type="checkbox" style="width:auto"> Piece motion and victory animations</label><div class="gc-plus-actions"><button id="gc-plus-settings-save">Save studio settings</button></div><p class="gc-plus-small">You can also switch off motion for a calmer board experience.</p></div>
     <div id="gc-plus-toast" role="status" aria-live="polite"></div>
@@ -337,12 +361,18 @@ function renderSkins() {
     const unlocked = state.xp >= skin.unlock;
     return `<button class="gc-plus-skin ${state.pieceSkin === skin.id ? 'active' : ''}" data-skin="${skin.id}" ${unlocked ? '' : 'disabled'}><span class="sample">${skin.icon} ♞</span><strong>${esc(skin.name)}</strong><div class="gc-plus-small">${unlocked ? esc(skin.desc) : `Unlock at ${skin.unlock} XP`}</div></button>`;
   }).join('');
+  const current = SKINS.find(item => item.id === state.pieceSkin);
+  root.querySelector('#gc-plus-skin-current').textContent = current
+    ? `${current.name} finish is active on the board. Select another finish or change a piece color to use a custom appearance.`
+    : 'Custom piece colors are active. Your Glass, Medieval or Modern design stays selected.';
   root.querySelectorAll('[data-skin]').forEach(button => button.addEventListener('click', () => {
     const skin = SKINS.find(item => item.id === button.dataset.skin);
     if (!skin || state.xp < skin.unlock) return;
     state.pieceSkin = skin.id;
-    saveState(); applyPieceSkin(); renderSkins();
-    toast(`${skin.name} piece set equipped.`);
+    saveState();
+    applyPieceSkin(true);
+    renderSkins();
+    toast(`${skin.name} piece finish equipped.`);
   }));
 }
 
@@ -575,11 +605,34 @@ function showVictory(message) {
   playChime('victory');
 }
 
-function applyPieceSkin() {
+function applyPieceSkin(applyPreset = false) {
   document.body.classList.remove(...SKINS.map(skin => `gc-piece-${skin.id}`));
-  document.body.classList.add(`gc-piece-${state.pieceSkin}`);
+  const selected = SKINS.find(skin => skin.id === state.pieceSkin);
+  if (selected) document.body.classList.add(`gc-piece-${selected.id}`);
   document.body.classList.toggle('gc-no-piece-motion', !state.animations);
+
+  // Apply colors only when selected. On reload, the main renderer's saved
+  // colors stay authoritative, so its style never flashes and resets.
+  if (applyPreset && selected) {
+    const colors = SKIN_COLORS[selected.id];
+    api.updateAppearance?.({
+      whitePieceColor: colors.white,
+      blackPieceColor: colors.black
+    });
+    const whitePicker = root.querySelector('#gc-white-piece-color');
+    const blackPicker = root.querySelector('#gc-black-piece-color');
+    if (whitePicker) whitePicker.value = colors.white;
+    if (blackPicker) blackPicker.value = colors.black;
+  }
   decoratePieces();
+}
+
+function useCustomPieceAppearance() {
+  if (state.pieceSkin === 'custom') return;
+  state.pieceSkin = 'custom';
+  saveState();
+  document.body.classList.remove(...SKINS.map(skin => `gc-piece-${skin.id}`));
+  renderSkins();
 }
 
 function decoratePieces() {
@@ -724,6 +777,7 @@ export function mountOnlinePlus(chessApi, premiumRoot) {
   installPieceObserver();
   window.GlassChessOnlinePlus = {
     isSyncing() { return online.syncing; },
+    onManualAppearanceChange() { useCustomPieceAppearance(); },
     onReset() { finishedFen = ''; },
     handleMove(move, beforeFen, afterFen) {
       if (online.syncing) return;
