@@ -22,6 +22,10 @@ const io = new Server(httpServer, {
 
 const cleanName = value => String(value || 'Player').replace(/[<>\u0000-\u001f]/g, '').trim().slice(0, 20) || 'Player';
 const cleanCode = value => String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+const cleanPlayerId = value => {
+  const id = String(value || '').trim().toLowerCase();
+  return /^[a-f0-9-]{32,36}$/.test(id) ? id : '';
+};
 const publicRoom = room => ({
   code: room.code,
   players: {
@@ -86,11 +90,13 @@ function removeSocketFromRoom(socket) {
 io.on('connection', socket => {
   socket.on('room:create', (payload = {}, done = () => {}) => {
     removeSocketFromRoom(socket);
+    const playerId = cleanPlayerId(payload.playerId);
+    if (!playerId) return done({ ok: false, error: 'A valid local player identity is required. Refresh the page and try again.' });
     const code = codeAvailable();
     const room = {
       code,
       ownerId: socket.id,
-      players: { w: { id: socket.id, name: cleanName(payload.name) }, b: null },
+      players: { w: { id: socket.id, playerId, name: cleanName(payload.name) }, b: null },
       spectators: new Map(),
       game: new Chess(),
       resigned: null
@@ -109,9 +115,14 @@ io.on('connection', socket => {
     if (!room) return done({ ok: false, error: 'Room not found. Check the code.' });
     if (room.players.w?.id === socket.id) return done({ ok: true, code, role: 'w', state: publicRoom(room) });
     if (room.players.b?.id === socket.id) return done({ ok: true, code, role: 'b', state: publicRoom(room) });
+    const playerId = cleanPlayerId(payload.playerId);
+    if (!playerId) return done({ ok: false, error: 'A valid local player identity is required. Refresh the page and try again.' });
+    if (room.players.w?.playerId === playerId || room.players.b?.playerId === playerId) {
+      return done({ ok: false, error: 'This browser is already assigned to the other seat. Open the invite on a different device or browser profile.' });
+    }
     if (room.players.b) return done({ ok: false, error: 'That room already has two players. Join as a spectator instead.' });
     removeSocketFromRoom(socket);
-    room.players.b = { id: socket.id, name: cleanName(payload.name) };
+    room.players.b = { id: socket.id, playerId, name: cleanName(payload.name) };
     socket.join(code);
     socket.data.roomCode = code;
     socket.data.role = 'b';
@@ -136,6 +147,12 @@ io.on('connection', socket => {
     const room = rooms.get(cleanCode(payload.code || socket.data.roomCode));
     if (!room || socket.data.roomCode !== room.code) return done({ ok: false, error: 'You are not in that room.' });
     if (room.resigned || room.game.isGameOver()) return done({ ok: false, error: 'This game has ended.' });
+    if (Number.isInteger(payload.expectedPly) && payload.expectedPly !== room.game.history().length) {
+      return done({ ok: false, error: 'The position changed. Sync the board before trying again.' });
+    }
+    if (typeof payload.expectedFen === 'string' && payload.expectedFen && payload.expectedFen !== room.game.fen()) {
+      return done({ ok: false, error: 'Your board is out of date. Sync the current position before moving.' });
+    }
     const side = ['w', 'b'].find(candidate => room.players[candidate]?.id === socket.id);
     if (!side) return done({ ok: false, error: 'Spectators cannot move pieces.' });
     if (room.game.turn() !== side) return done({ ok: false, error: 'It is not your turn.' });

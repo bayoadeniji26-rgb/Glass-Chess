@@ -878,8 +878,12 @@ export function mount(chessApi) {
   buildInterface();
   bindEvents();
   import('./onlineplus.js')
-    .then(({ mountOnlinePlus }) => mountOnlinePlus(api, root))
-    .catch(error => console.error('Glass Chess Online + Club could not start:', error));
+    .then(async ({ mountOnlinePlus }) => {
+      mountOnlinePlus(api, root);
+      const { mountAdvancedLab } = await import('./advanced-lab.js');
+      mountAdvancedLab(api, root);
+    })
+    .catch(error => console.error('Glass Chess Online + Advanced Lab could not start:', error));
   renderProfile();
   renderThemes();
   renderClock();

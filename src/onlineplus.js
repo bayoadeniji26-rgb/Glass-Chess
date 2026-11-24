@@ -2,6 +2,25 @@
 import { io } from 'socket.io-client';
 
 const STORE_KEY = 'glass-chess-online-plus-v1';
+const CLIENT_ID_KEY = 'glass-chess-online-client-id';
+function getClientIdentity() {
+  try {
+    let id = localStorage.getItem(CLIENT_ID_KEY);
+    if (!/^[a-f0-9-]{32,36}$/i.test(id || '')) {
+      id = window.crypto?.randomUUID?.();
+      if (!id) {
+        const bytes = new Uint8Array(16);
+        window.crypto.getRandomValues(bytes);
+        id = Array.from(bytes, value => value.toString(16).padStart(2, '0')).join('');
+      }
+      localStorage.setItem(CLIENT_ID_KEY, id);
+    }
+    return id;
+  } catch {
+    return 'session-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+  }
+}
+const CLIENT_ID = getClientIdentity();
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 const GLYPHS = new Set(['♔','♕','♖','♗','♘','♙','♚','♛','♜','♝','♞','♟']);
 const SKINS = [
@@ -410,12 +429,14 @@ function showRoomState(snapshot) {
   online.syncing = true;
   try {
     api.rebuild(START_FEN, snapshot.history || []);
+    if (api.fen !== snapshot.fen) throw new Error('The server FEN did not match its move history.');
     window.GlassChessPremium?.onLoadedGame?.(snapshot.history || [], snapshot.fen);
   } catch (error) {
     root.querySelector('#gc-plus-room-status').textContent = `Could not sync this game: ${error.message}`;
   }
   api.setReplayLock(online.role === 'spectator' || Boolean(snapshot.gameOver || snapshot.resigned));
   if (online.role === 'w' || online.role === 'b') api.setOnlineSide(online.role);
+  api.setOnlineMatchActive?.(true);
   const white = snapshot.players?.w?.name || 'Waiting for White';
   const black = snapshot.players?.b?.name || 'Waiting for Black';
   root.querySelector('#gc-plus-room-status').textContent = `${online.role === 'spectator' ? 'Spectating' : `Playing as ${online.role === 'w' ? 'White' : 'Black'}`} · ${white} vs ${black} · ${snapshot.result}`;
@@ -485,7 +506,7 @@ async function createRoom() {
   try {
     if (!socket?.connected) makeSocket();
     await waitForSocket();
-    const result = await emitAck('room:create', { name: state.name });
+    const result = await emitAck('room:create', { name: state.name, playerId: CLIENT_ID });
     online.previousMode = api.mode;
     online.previousColor = api.playerColor;
     applyRoomJoin(result);
@@ -511,7 +532,7 @@ async function joinRoom(spectate = false) {
     online.previousMode = api.mode;
     online.previousColor = api.playerColor;
     const code = root.querySelector('#gc-plus-room-code').value.trim().toUpperCase();
-    const result = await emitAck(spectate ? 'room:spectate' : 'room:join', { code, name: state.name });
+    const result = await emitAck(spectate ? 'room:spectate' : 'room:join', { code, name: state.name, playerId: CLIENT_ID });
     applyRoomJoin(result);
     if (spectate) toast(`Watching room ${result.code}.`);
     else toast(`Joined room ${result.code}.`);
@@ -529,9 +550,16 @@ function handleLocalMove(move) {
     root.querySelector('#gc-plus-room-status').textContent = online.role === 'spectator' ? 'Spectators cannot move pieces.' : 'That is not your color. The online game has been restored.';
     return false;
   }
-  socket.emit('game:move', { code: online.code, move: { from: move.from, to: move.to, promotion: move.promotion } }, result => {
-    if (!result?.ok) {
-      root.querySelector('#gc-plus-room-status').textContent = result?.error || 'Move rejected by server.';
+  socket.timeout(6000).emit('game:move', {
+    code: online.code,
+    expectedPly: online.lastState?.history?.length ?? -1,
+    expectedFen: online.lastState?.fen || '',
+    move: { from: move.from, to: move.to, promotion: move.promotion }
+  }, (timeoutError, result) => {
+    if (timeoutError || !result?.ok) {
+      root.querySelector('#gc-plus-room-status').textContent =
+        timeoutError ? 'The server did not confirm that move. Waiting for the authoritative position.' :
+        (result?.error || 'Move rejected by server.');
       if (online.lastState) showRoomState(online.lastState);
     }
   });
@@ -543,6 +571,7 @@ async function leaveRoom() {
   try { if (socket?.connected) await emitAck('room:leave'); } catch {}
   online.code = ''; online.role = ''; online.side = ''; online.lastState = null;
   api.setReplayLock(false);
+  api.setOnlineMatchActive?.(false);
   api.setMode(online.previousMode || 'computer');
   if (online.previousColor) api.setOnlineSide(online.previousColor === 'black' ? 'b' : 'w');
   root.querySelector('#gc-plus-room-status').textContent = 'You left the room.';
@@ -778,6 +807,27 @@ export function mountOnlinePlus(chessApi, premiumRoot) {
   applyPieceSkin();
   installPieceObserver();
   window.GlassChessOnlinePlus = {
+    isOnline() { return Boolean(online.code); },
+    canMove(side = api.turn) {
+      return Boolean(
+        online.code &&
+        socket?.connected &&
+        (online.role === 'w' || online.role === 'b') &&
+        online.side === side &&
+        online.lastState &&
+        online.lastState.turn === side &&
+        !online.lastState.gameOver &&
+        !online.lastState.resigned
+      );
+    },
+    showMoveDenied() {
+      const status = root.querySelector('#gc-plus-room-status');
+      if (status) status.textContent = online.role === 'spectator'
+        ? 'Spectators cannot move pieces.'
+        : !socket?.connected
+          ? 'You are disconnected. Reconnect before moving.'
+          : 'It is not your turn. Only your assigned color can move.';
+    },
     isSyncing() { return online.syncing; },
     onManualAppearanceChange() { useCustomPieceAppearance(); },
     onReset() { finishedFen = ''; },

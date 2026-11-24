@@ -203,6 +203,8 @@ function getHumanSide() {
 }
 
 function isHumanTurn() {
+  const online = window.GlassChessOnlinePlus;
+  if (online?.isOnline?.()) return online.canMove?.(game.turn()) === true;
   return gameMode === "local" || gameMode === "analysis" || game.turn() === getHumanSide();
 }
 
@@ -361,7 +363,7 @@ function setupSettings() {
 // ============================================
 
 function boardIsFlipped() {
-  if (settings.autoFlip && gameMode === "local") {
+  if (settings.autoFlip && gameMode === "local" && !window.GlassChessOnlinePlus?.isOnline?.()) {
     return game.turn() === "b";
   }
 
@@ -556,6 +558,7 @@ function render() {
 
   $("evaluation").hidden = !settings.evaluation;
   window.GlassChessGameplaySuite?.refresh?.();
+  window.GlassChessAdvancedLab?.refresh?.();
 }
 
 // ============================================
@@ -570,6 +573,11 @@ function clearPromotion() {
 }
 
 function choosePromotion(from, to, choices) {
+  const autoPromotion = window.GlassChessAdvancedLab?.getAutoPromotion?.();
+  if (autoPromotion && autoPromotion !== 'ask') {
+    const preferred = choices.find(choice => choice.promotion === autoPromotion);
+    if (preferred) { commitMove({ from, to, promotion: preferred.promotion }); return; }
+  }
   const panel = $("gc-promotion");
   const color = game.turn();
 
@@ -639,6 +647,11 @@ function finishMoveFeedback(move, motionSnapshot) {
 function commitMove(input) {
   if (premiumReplayLock) return;
   if (thinking || resigned || game.isGameOver()) return;
+  const online = window.GlassChessOnlinePlus;
+  if (online?.isOnline?.() && online.canMove?.(game.turn()) !== true) {
+    online.showMoveDenied?.();
+    return;
+  }
 
   try {
     const move = game.move(input);
@@ -1456,6 +1469,11 @@ function installGlassChessPremiumBridge() {
 
   const originalMove = game.move.bind(game);
   game.move = function (...args) {
+    if (!suppressGameCallbacks && window.GlassChessOnlinePlus?.isOnline?.() &&
+        window.GlassChessOnlinePlus?.canMove?.(game.turn()) !== true) {
+      window.GlassChessOnlinePlus?.showMoveDenied?.();
+      throw new Error("This online seat cannot move for the side to move.");
+    }
     const beforeFen = game.fen();
     const move = originalMove(...args);
     if (move && !suppressGameCallbacks) {
@@ -1463,6 +1481,7 @@ function installGlassChessPremiumBridge() {
         window.GlassChessPremium.onMove(move, beforeFen, game.fen());
       }
       window.GlassChessGameplaySuite?.onMove?.(move, beforeFen, game.fen());
+      window.GlassChessAdvancedLab?.onMove?.(move, beforeFen, game.fen());
     }
     return move;
   };
@@ -1474,6 +1493,7 @@ function installGlassChessPremiumBridge() {
       window.GlassChessPremium.onReset(game.fen());
     }
     window.GlassChessGameplaySuite?.onReset?.(game.fen());
+    window.GlassChessAdvancedLab?.onReset?.(game.fen());
     return result;
   };
 
@@ -1496,6 +1516,9 @@ function installGlassChessPremiumBridge() {
 }
 
 function launch() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(error => console.warn('Offline cache registration failed:', error));
+  }
   installGlassChessPremiumBridge();
   createExtraControls();
   setupColorOptions();
