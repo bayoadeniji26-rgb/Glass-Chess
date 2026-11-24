@@ -101,8 +101,11 @@ function isGameOver() {
 }
 
 async function ensureEngineReady() {
-  await engine.start();
-  engineReady = Boolean(engine.ready);
+  try {
+    await engine.start();
+  } finally {
+    engineReady = Boolean(engine.ready);
+  }
   return engineReady;
 }
 
