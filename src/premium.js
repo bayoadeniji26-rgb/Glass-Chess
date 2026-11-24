@@ -178,6 +178,7 @@ function buildInterface() {
     </section>
     <section class="gc-view" data-view="custom">
       <div class="gc-card"><h4>Board themes</h4><div class="gc-board-themes" id="gc-theme-list"></div><p class="gc-muted">Themes update compatible board-square classes and the premium workspace. Your current selection is remembered.</p></div>
+      <div class="gc-card gc-piece-customizer"><h4>Piece appearance</h4><label for="gc-piece-style">Piece design</label><select id="gc-piece-style"><option value="glass">Glass Classic · current look</option><option value="medieval">Medieval</option><option value="modern">Modern</option></select><div class="gc-piece-colors"><label for="gc-white-piece-color">White pieces<input id="gc-white-piece-color" type="color" value="#f7f2e9" aria-label="White piece color"></label><label for="gc-black-piece-color">Black pieces<input id="gc-black-piece-color" type="color" value="#263244" aria-label="Black piece color"></label></div><p class="gc-muted">Changes the pieces on the board, not the board squares. Your choices are saved on this device.</p></div>
       <div class="gc-card"><div class="gc-row"><h4>Sound effects</h4><label><input id="gc-sound-toggle" type="checkbox" style="width:auto"> Enable move sounds</label></div><p class="gc-muted">Light local sound effects for legal moves and puzzle results.</p></div>
       <div class="gc-card"><h4>Data and privacy</h4><p class="gc-muted">Profile, rating, statistics, saved games, and preferences are stored in this browser using local storage. Nothing is uploaded to a server.</p><div class="gc-actions"><button id="gc-export-data">Export profile data</button><button id="gc-reset-data">Reset profile data</button></div></div>
     </section>
@@ -267,6 +268,7 @@ function playTone(kind = 'move') {
 function applyTheme(name) {
   const theme = THEMES[name] ? name : 'midnight';
   Object.keys(THEMES).forEach(key => document.body.classList.toggle(`gc-theme-${key}`, key === theme));
+  api.updateAppearance?.({ theme });
   data.theme = theme;
   saveData();
   root.querySelectorAll('[data-theme]').forEach(button => button.classList.toggle('active', button.dataset.theme === theme));
@@ -676,6 +678,25 @@ function bindEvents() {
   $('gc-replay-forward').addEventListener('click', () => replayTo(Number($('gc-replay-range').value) + 1));
   $('gc-replay-exit').addEventListener('click', exitReplay);
   $('gc-theme-list').addEventListener('click', event => { const button = event.target.closest('[data-theme]'); if (button) applyTheme(button.dataset.theme); });
+
+  const appearance = api.appearance || {
+    pieceStyle: 'glass',
+    whitePieceColor: '#f7f2e9',
+    blackPieceColor: '#263244'
+  };
+  $('gc-piece-style').value = appearance.pieceStyle;
+  $('gc-white-piece-color').value = appearance.whitePieceColor;
+  $('gc-black-piece-color').value = appearance.blackPieceColor;
+
+  const savePieceAppearance = () => api.updateAppearance?.({
+    pieceStyle: $('gc-piece-style').value,
+    whitePieceColor: $('gc-white-piece-color').value,
+    blackPieceColor: $('gc-black-piece-color').value
+  });
+  $('gc-piece-style').addEventListener('change', savePieceAppearance);
+  $('gc-white-piece-color').addEventListener('input', savePieceAppearance);
+  $('gc-black-piece-color').addEventListener('input', savePieceAppearance);
+
   $('gc-sound-toggle').addEventListener('change', event => { data.sound = event.target.checked; saveData(); if (data.sound) playTone(); });
   $('gc-export-data').addEventListener('click', exportProfile);
   $('gc-reset-data').addEventListener('click', resetProfile);
@@ -709,7 +730,8 @@ export function mount(chessApi) {
     onReset,
     onUndo,
     onLoadedGame,
-    isReplaying: () => replaying
+    isReplaying: () => replaying,
+    setTheme: applyTheme
   };
   // If the engine finishes initializing after this panel appears, update its status.
   const statusTimer = setInterval(() => {
