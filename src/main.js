@@ -390,6 +390,7 @@ function renderBoard() {
 
       element.className = `square ${light ? "light" : "dark"}`;
       element.style.backgroundColor = light ? colors[0] : colors[1];
+      element.style.boxShadow = "";
       element.dataset.square = square;
 
       if (selected === square) {

@@ -80,6 +80,13 @@
   color: var(--gc-piece-color, #f7f2e9);
   user-select: none;
   pointer-events: none;
+  transform: translate3d(0, 0, 0);
+  transition: transform 165ms cubic-bezier(.2,.8,.2,1), filter 165ms ease, opacity 140ms ease;
+}
+
+.square.selected .gc-piece,
+.square:focus-visible .gc-piece {
+  transform: translate3d(0, -2px, 0) scale(1.025);
 }
 
 .gc-piece-glass {
@@ -147,7 +154,7 @@
   overflow: hidden;
   cursor: pointer;
   aspect-ratio: 1;
-  transition: filter 0.12s ease;
+  transition: background-color 220ms ease, filter 130ms ease, box-shadow 180ms ease;
 }
 
 .square:hover {
@@ -449,3 +456,5 @@ body[data-gc-background="marble"] {
   .gc-background-swatch { width: 34px; height: 30px; flex-basis: 34px; }
   .gc-background-grid button strong { font-size: 10px; }
 }
+
+@media (prefers-reduced-motion: reduce) { .square, .gc-piece { transition-duration: .01ms !important; animation-duration: .01ms !important; } }

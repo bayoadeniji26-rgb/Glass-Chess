@@ -762,6 +762,8 @@ export function mountOnlinePlus(chessApi, premiumRoot) {
   api = chessApi;
   root = premiumRoot;
   state = loadState();
+  state.sound = Boolean(api.soundsEnabled);
+  saveState();
   injectStyles();
   mountTab();
   const marker = document.createElement('span'); marker.id = 'gc-plus-online-mounted'; marker.hidden = true; root.appendChild(marker);

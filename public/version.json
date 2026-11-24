@@ -1,5 +1,5 @@
 {
-  "version": "2026.11.24.3",
+  "version": "2026.11.24.4",
   "name": "Glass Chess UI Refresh",
   "updatedAt": "2026-11-24",
   "notes": [
@@ -8,6 +8,7 @@
     "Custom background color palette",
     "In-app update checks",
     "Release follow-up: update watcher and responsive layout refinements",
-    "Final spacing adjustment for the redesigned header"
+    "Final spacing adjustment for the redesigned header",
+    "Smooth piece movement and capture animations, king-in-check alerts, board flip transitions, and Web Audio effects"
   ]
 }

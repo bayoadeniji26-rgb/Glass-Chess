@@ -245,6 +245,7 @@ function renderProfile() {
   $('gc-draws').textContent = String(data.draws);
   $('gc-losses').textContent = String(data.losses);
   $('gc-puzzle-count').textContent = `${data.puzzlesSolved} solved · ${data.puzzleStreak} streak`;
+  data.sound = Boolean(api.soundsEnabled);
   $('gc-sound-toggle').checked = data.sound;
   $('gc-time-control').value = data.timeControl;
   renderSavedGames();
@@ -428,7 +429,6 @@ function onMove(move, beforeFen, afterFen) {
     renderClock();
   }
   renderOpening();
-  playTone(move.captured ? 'success' : 'move');
   if (puzzle?.active) handlePuzzleMove(move, afterFen);
   if (api.gameOver) { recordFinishedGame(); stopClock(); window.GlassChessOnlinePlus?.onGameFinished?.(); }
   setTimeout(() => applyTheme(data.theme), 0);
@@ -856,7 +856,12 @@ function bindEvents() {
   });
   backgroundInput.addEventListener('input', () => setBackgroundColor(backgroundInput.value));
 
-  $('gc-sound-toggle').addEventListener('change', event => { data.sound = event.target.checked; saveData(); if (data.sound) playTone(); });
+  $('gc-sound-toggle').addEventListener('change', event => {
+    data.sound = event.target.checked;
+    api.setSoundEnabled?.(data.sound);
+    saveData();
+    if (data.sound) playTone();
+  });
   $('gc-export-data').addEventListener('click', exportProfile);
   $('gc-reset-data').addEventListener('click', resetProfile);
 }
@@ -890,7 +895,13 @@ export function mount(chessApi) {
     onUndo,
     onLoadedGame,
     isReplaying: () => replaying,
-    setTheme: applyTheme
+    setTheme: applyTheme,
+    setSoundEnabled(enabled) {
+      data.sound = Boolean(enabled);
+      const control = $('gc-sound-toggle');
+      if (control) control.checked = data.sound;
+      saveData();
+    }
   };
   // Only update the initial loading label. Never overwrite Live Engine Lab's own analysis status.
   const statusTimer = setInterval(() => {

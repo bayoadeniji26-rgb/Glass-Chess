@@ -99,7 +99,7 @@ import './glass-final-ui.css';
       // a1 is dark and h1 is light; the board's theme stays correct after every redraw.
       const color = (file + rank) % 2 === 1 ? colors.dark : colors.light;
       square.style.setProperty('background-color', color, 'important');
-      square.style.setProperty('background', color, 'important');
+      square.style.removeProperty('background');
       square.dataset.gcFinalTheme = name;
     }
     lastTheme = name;
