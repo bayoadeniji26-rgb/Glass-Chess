@@ -533,7 +533,7 @@ function miniReviewBoard(item, suggestion) {
   const squares=[];
   for(let rank=8;rank>=1;rank--)for(const file of 'abcdefgh'){
     const square=file+rank,piece=position.get(square);
-    const classes=['gcl-mini-square',((rank+(file.charCodeAt(0)-97))%2===0?'dark':'light')];
+    const classes=['gcl-mini-square',((rank+(file.charCodeAt(0)-97))%2===0?'light':'dark')];
     if(square===suggestion.from)classes.push('gcl-mini-from');
     if(square===suggestion.to)classes.push('gcl-mini-to');
     const glyph=piece?(REVIEW_PIECES[piece.color+piece.type]||''):'';
