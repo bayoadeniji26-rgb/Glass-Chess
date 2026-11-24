@@ -305,3 +305,147 @@
     font-size: 12px;
   }
 }
+
+
+/* Workspace background presets — separate from the chessboard square theme. */
+body[data-gc-background="midnight"] {
+  background:
+    radial-gradient(ellipse at 50% 0%, #34343b 0%, transparent 55%),
+    #171a20 !important;
+}
+body[data-gc-background="sky"] {
+  background:
+    radial-gradient(ellipse at 18% 20%, rgba(255,255,255,.84) 0 5%, transparent 24%),
+    radial-gradient(ellipse at 75% 28%, rgba(255,255,255,.56) 0 7%, transparent 28%),
+    radial-gradient(ellipse at 44% 82%, rgba(255,255,255,.28) 0 7%, transparent 32%),
+    linear-gradient(180deg, #56a9e8 0%, #a7d8f5 55%, #eaf5fb 100%) !important;
+}
+body[data-gc-background="aurora"] {
+  background:
+    radial-gradient(ellipse at 15% 20%, rgba(43,224,183,.38), transparent 38%),
+    radial-gradient(ellipse at 78% 16%, rgba(111,114,255,.46), transparent 42%),
+    radial-gradient(ellipse at 55% 88%, rgba(235,98,187,.32), transparent 45%),
+    linear-gradient(135deg, #071728, #172347 55%, #111326) !important;
+}
+body[data-gc-background="fruit"] {
+  background:
+    radial-gradient(circle at 13% 24%, #ff6b78 0 5.2%, #c73559 5.5%, transparent 7.3%),
+    radial-gradient(circle at 30% 74%, #ffd45b 0 5.4%, #ed8b2b 5.7%, transparent 7.5%),
+    radial-gradient(circle at 76% 18%, #9fdf63 0 6.2%, #398e49 6.5%, transparent 8.3%),
+    radial-gradient(circle at 88% 72%, #b991eb 0 6%, #6542a8 6.3%, transparent 8.2%),
+    radial-gradient(circle at 55% 48%, #ff92b2 0 5.2%, #d93f78 5.5%, transparent 7.2%),
+    radial-gradient(circle at 42% 13%, #ff9a4b 0 4.4%, #c85c27 4.7%, transparent 6.4%),
+    linear-gradient(135deg, #241d3a, #49324e 48%, #1c3b49) !important;
+}
+body[data-gc-background="sunset"] {
+  background:
+    radial-gradient(ellipse at 50% 4%, rgba(255,237,179,.85), transparent 28%),
+    linear-gradient(180deg, #f7a36b 0%, #c85d75 45%, #44345c 100%) !important;
+}
+body[data-gc-background="ocean"] {
+  background:
+    radial-gradient(ellipse at 22% 15%, rgba(82,211,223,.3), transparent 35%),
+    radial-gradient(ellipse at 85% 78%, rgba(32,117,179,.4), transparent 42%),
+    linear-gradient(145deg, #061b32, #0b4560 55%, #10233d) !important;
+}
+body[data-gc-background="forest"] {
+  background:
+    radial-gradient(ellipse at 20% 15%, rgba(158,193,111,.25), transparent 38%),
+    radial-gradient(ellipse at 85% 80%, rgba(38,111,75,.36), transparent 42%),
+    linear-gradient(145deg, #10251d, #1c4836 55%, #101b1b) !important;
+}
+body[data-gc-background="marble"] {
+  background:
+    linear-gradient(115deg, transparent 0 38%, rgba(255,255,255,.11) 39%, transparent 41% 62%, rgba(255,255,255,.09) 63%, transparent 66%),
+    radial-gradient(ellipse at 22% 18%, #6d747e, transparent 43%),
+    linear-gradient(145deg, #202731, #656c76 48%, #343943) !important;
+}
+
+.gc-background-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  margin-top: 10px;
+}
+.gc-background-grid button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  padding: 8px;
+  text-align: left;
+  border: 1px solid var(--border, rgba(255,255,255,.14));
+  border-radius: 10px;
+  color: inherit;
+  background: rgba(127,127,127,.07);
+  cursor: pointer;
+}
+.gc-background-grid button.active {
+  border-color: var(--gc-accent, #83b8ff);
+  box-shadow: 0 0 0 1px var(--gc-accent, #83b8ff) inset;
+  background: rgba(127,127,127,.16);
+}
+.gc-background-grid button strong { font-size: 11px; }
+.gc-background-swatch {
+  display: block;
+  width: 44px;
+  height: 34px;
+  flex: 0 0 44px;
+  border-radius: 7px;
+  border: 1px solid rgba(255,255,255,.25);
+}
+.gc-bg-midnight { background: linear-gradient(135deg,#34343b,#171a20); }
+.gc-bg-sky { background: linear-gradient(180deg,#56a9e8,#eaf5fb); }
+.gc-bg-aurora { background: linear-gradient(135deg,#071728,#2bd9ad,#746dff,#e65eaf); }
+.gc-bg-fruit { background: radial-gradient(circle at 20% 25%,#ff6b78 0 15%,transparent 16%),radial-gradient(circle at 70% 70%,#a4db60 0 18%,transparent 19%),radial-gradient(circle at 78% 20%,#ffd45b 0 14%,transparent 15%),#30213e; }
+.gc-bg-sunset { background: linear-gradient(180deg,#f7a36b,#c85d75,#44345c); }
+.gc-bg-ocean { background: linear-gradient(145deg,#061b32,#0b7891,#10233d); }
+.gc-bg-forest { background: linear-gradient(145deg,#10251d,#1c6848,#101b1b); }
+.gc-bg-marble { background: linear-gradient(145deg,#202731,#9299a3,#343943); }
+
+.gc-live-engine-card .gc-live-score-row { align-items: baseline; margin-top: 8px; }
+.gc-live-engine-card #gc-live-eval { font-size: 27px; font-weight: 850; font-variant-numeric: tabular-nums; }
+.gc-live-engine-card .gc-engine-progress {
+  min-height: 20px;
+  margin: 10px 0;
+  color: var(--muted, #a4a6ad);
+  font-size: 11px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+.gc-live-result {
+  margin: 10px 0;
+  padding: 10px 11px;
+  border: 1px solid var(--border, rgba(255,255,255,.1));
+  border-radius: 10px;
+  background: rgba(127,127,127,.06);
+}
+.gc-live-result > strong {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--accent, #c9a77c);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .09em;
+}
+#gc-live-best, #gc-live-pv {
+  overflow-wrap: anywhere;
+  line-height: 1.55;
+  font-size: 12px;
+}
+.gc-live-depth-label {
+  display: block;
+  margin: 12px 0 6px;
+}
+#gc-live-stop:disabled,
+#gc-live-analyze:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+  transform: none;
+}
+@media (max-width: 520px) {
+  .gc-background-grid { gap: 6px; }
+  .gc-background-grid button { padding: 6px; gap: 6px; }
+  .gc-background-swatch { width: 34px; height: 30px; flex-basis: 34px; }
+  .gc-background-grid button strong { font-size: 10px; }
+}
