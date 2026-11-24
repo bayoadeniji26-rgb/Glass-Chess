@@ -323,14 +323,14 @@ import './visual-inspector.css';
   }
 
   function mount(){
-    const options=document.getElementById('gc-options');
+    const options=document.getElementById('gc-premium')||document.querySelector('.analysis-panel');
     if(!options||document.getElementById(PANEL_ID))return;
     const panel=document.createElement('details');panel.id=PANEL_ID;
     panel.innerHTML=`
       <summary>Visual & motion inspector</summary>
       <p class="gc-vi-intro">Run deterministic chess-state walkthroughs and measure live board geometry, piece alignment, contrast, controls, transitions and release status.</p>
       <button type="button" id="gc-visual-inspector-run">Run inspection</button>
-      <div id="gc-visual-inspector-report" role="status" aria-live="polite">Ready. Run at desktop, tablet and mobile widths to compare the live layout.</div>`;
+      <div id="gc-visual-inspector-report" role="status" aria-live="polite">Ready. Open this panel in the Glass Chess workspace; resize to desktop, tablet and mobile widths to compare the live layout.</div>`;
     options.appendChild(panel);
     panel.querySelector('#gc-visual-inspector-run').addEventListener('click',async event=>{
       const button=event.currentTarget;button.disabled=true;button.textContent='Inspecting…';

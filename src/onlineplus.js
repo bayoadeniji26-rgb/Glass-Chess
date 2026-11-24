@@ -84,6 +84,7 @@ let dailyChallenge = { active: false, solution: '', notation: '', solved: false,
 let finishedFen = '';
 let pieceObserver = null;
 let victoryKey = '';
+let victoryPresentationTimer = null;
 let previousVictoryFocus = null;
 let socketBound = false;
 
@@ -639,50 +640,69 @@ function showVictory(message) {
     return;
   }
 
-  const key = String(api?.fen || '') + '|' + String(message);
+  const positionFen = String(api?.fen || '');
+  const key = positionFen + '|' + String(message);
   const existing = document.getElementById('gc-plus-victory');
   if (existing && victoryKey === key) return;
+  if (victoryKey === key && victoryPresentationTimer !== null) return;
+  if (victoryPresentationTimer !== null) window.clearTimeout(victoryPresentationTimer);
+  victoryPresentationTimer = null;
   existing?.remove();
   victoryKey = key;
-  previousVictoryFocus = document.activeElement;
 
-  const overlay = document.createElement('div');
-  overlay.id = 'gc-plus-victory';
-  overlay.className = checkmate ? 'is-checkmate' : 'is-complete';
-  overlay.setAttribute('role', 'dialog');
-  overlay.setAttribute('aria-modal', 'true');
-  overlay.setAttribute('aria-labelledby', 'gc-plus-victory-title');
-  overlay.setAttribute('aria-describedby', 'gc-plus-victory-message');
-  overlay.tabIndex = -1;
-  overlay.innerHTML = `
-    <section class="card">
-      <span class="gc-victory-mark" aria-hidden="true">${checkmate ? '♛' : '♔'}</span>
-      <p class="gc-victory-kicker">GLASS CHESS · RESULT</p>
-      <h2 id="gc-plus-victory-title">${checkmate ? 'CHECKMATE' : 'GAME COMPLETE'}</h2>
-      <p id="gc-plus-victory-message">${esc(message)}</p>
-      <button type="button" id="gc-plus-victory-close">Back to board</button>
-    </section>`;
-
-  const close = () => {
-    overlay.remove();
-    if (victoryKey === key) victoryKey = '';
-    if (previousVictoryFocus?.isConnected) previousVictoryFocus.focus();
-    previousVictoryFocus = null;
-  };
-  overlay.querySelector('#gc-plus-victory-close').addEventListener('click', close);
-  overlay.addEventListener('keydown', event => {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      close();
-    } else if (event.key === 'Tab') {
-      // There is one action on this result surface; keep keyboard focus inside it.
-      event.preventDefault();
-      overlay.querySelector('#gc-plus-victory-close')?.focus();
+  const present = () => {
+    victoryPresentationTimer = null;
+    // A result can be queued just before the board is reset or a different PGN is loaded.
+    if (victoryKey !== key || String(api?.fen || '') !== positionFen) {
+      if (victoryKey === key) victoryKey = '';
+      return;
     }
-  });
-  document.body.appendChild(overlay);
-  requestAnimationFrame(() => overlay.querySelector('#gc-plus-victory-close')?.focus({ preventScroll: true }));
-  playChime('victory');
+
+    previousVictoryFocus = document.activeElement;
+    const overlay = document.createElement('div');
+    overlay.id = 'gc-plus-victory';
+    overlay.className = checkmate ? 'is-checkmate' : 'is-complete';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-labelledby', 'gc-plus-victory-title');
+    overlay.setAttribute('aria-describedby', 'gc-plus-victory-message');
+    overlay.tabIndex = -1;
+    overlay.innerHTML = `
+      <section class="card">
+        <span class="gc-victory-mark" aria-hidden="true">${checkmate ? '♛' : '♔'}</span>
+        <p class="gc-victory-kicker">GLASS CHESS · RESULT</p>
+        <h2 id="gc-plus-victory-title">${checkmate ? 'CHECKMATE' : 'GAME COMPLETE'}</h2>
+        <p id="gc-plus-victory-message">${esc(message)}</p>
+        <button type="button" id="gc-plus-victory-close">Back to board</button>
+      </section>`;
+
+    const close = () => {
+      overlay.remove();
+      if (victoryKey === key) victoryKey = '';
+      if (previousVictoryFocus?.isConnected) previousVictoryFocus.focus();
+      previousVictoryFocus = null;
+    };
+    overlay.querySelector('#gc-plus-victory-close').addEventListener('click', close);
+    overlay.addEventListener('keydown', event => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        close();
+      } else if (event.key === 'Tab') {
+        event.preventDefault();
+        overlay.querySelector('#gc-plus-victory-close')?.focus();
+      }
+    });
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.querySelector('#gc-plus-victory-close')?.focus({ preventScroll: true }));
+    // The king's checkmate ring gets its full 1.5 s on-board moment before the result arrives.
+    if (!checkmate) playChime('victory');
+  };
+
+  if (checkmate && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    victoryPresentationTimer = window.setTimeout(present, 1500);
+  } else {
+    present();
+  }
 }
 
 function applyPieceSkin(applyPreset = false) {
