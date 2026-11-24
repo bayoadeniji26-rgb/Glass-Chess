@@ -509,13 +509,58 @@ function branchFromHere(mode) {
 function playFromHere(){branchFromHere('computer');}
 function exploreFromHere(){branchFromHere('analysis');}
 
+const REVIEW_PIECES = {
+  wp:'♙',wn:'♘',wb:'♗',wr:'♖',wq:'♕',wk:'♔',
+  bp:'♟',bn:'♞',bb:'♝',br:'♜',bq:'♛',bk:'♚'
+};
+function reviewMoveData(item) {
+  try {
+    const position=new Chess(item.before);
+    const uciMove=String(item.best||'').toLowerCase();
+    if(uciMove.length<4)return null;
+    const from=uciMove.slice(0,2),to=uciMove.slice(2,4);
+    const piece=position.get(from);
+    if(!piece)return null;
+    const move=position.move({from,to,promotion:uciMove[4]||'q'});
+    if(!move)return null;
+    return {from,to,piece:REVIEW_PIECES[piece.color+piece.type]||'♟',san:move.san,after:position.fen()};
+  } catch { return null; }
+}
+function miniReviewBoard(item, suggestion) {
+  if(!suggestion)return '';
+  let position;
+  try { position=new Chess(suggestion.after); } catch { return ''; }
+  const squares=[];
+  for(let rank=8;rank>=1;rank--)for(const file of 'abcdefgh'){
+    const square=file+rank,piece=position.get(square);
+    const classes=['gcl-mini-square',((rank+(file.charCodeAt(0)-97))%2===0?'dark':'light')];
+    if(square===suggestion.from)classes.push('gcl-mini-from');
+    if(square===suggestion.to)classes.push('gcl-mini-to');
+    const glyph=piece?(REVIEW_PIECES[piece.color+piece.type]||''):'';
+    const tip=piece?((piece.color==='w'?'White ':'Black ')+({p:'pawn',n:'knight',b:'bishop',r:'rook',q:'queen',k:'king'}[piece.type])+' on '+square):square;
+    squares.push('<span class="'+classes.join(' ')+'" title="'+esc(tip)+'">'+glyph+'</span>');
+  }
+  return '<div class="gcl-mini-board-wrap"><div class="gcl-mini-board" role="img" aria-label="Position after suggested move '+esc(suggestion.san)+'">'+squares.join('')+'</div><small>Preview after '+esc(suggestion.piece+' '+suggestion.from+'–'+suggestion.to)+'. Highlighted squares show the move.</small></div>';
+}
 function updateClassifications(results) {
   reviewData=results;
   renderMoveHistory();
   const counts={Brilliant:0,Great:0,Best:0,Inaccuracy:0,Mistake:0,Blunder:0};
   results.forEach(item=>{if(counts[item.label]!=null)counts[item.label]++;});
   const host=document.getElementById('gcl-classifications');
-  if(host)host.innerHTML=Object.entries(counts).map(([name,count])=>'<span class="gcl-count"><b>'+count+'</b><small>'+name+'</small></span>').join('');
+  if(!host)return;
+  const countMarkup=Object.entries(counts).map(([name,count])=>'<span class="gcl-count"><b>'+count+'</b><small>'+name+'</small></span>').join('');
+  const moveMarkup=results.map(item=>{
+    const suggestion=reviewMoveData(item);
+    const actualPiece=REVIEW_PIECES[item.move.color+item.move.piece]||'';
+    const played=actualPiece+' '+item.move.from+'–'+item.move.to;
+    const recommended=suggestion
+      ? '<span class="gcl-review-suggest" title="'+esc('Stockfish recommendation: '+suggestion.piece+' '+suggestion.from+' to '+suggestion.to+' ('+suggestion.san+'). Hover to read the move; open to preview the resulting position.')+'"><b>Suggested:</b> '+esc(suggestion.piece)+' '+esc(suggestion.from)+'–'+esc(suggestion.to)+' <small>('+esc(suggestion.san)+')</small></span>'
+      : '<span class="gcl-review-suggest">Suggested move unavailable</span>';
+    const differs=suggestion&&String(item.best).toLowerCase()!==uci(item.move);
+    return '<details class="gcl-review-move"><summary><span class="gcl-review-move-main"><b>'+esc(actualPiece)+' '+esc(played)+'</b><small>Played · '+esc(item.label)+'</small></span>'+recommended+'</summary>'+(differs?miniReviewBoard(item,suggestion):'<p class="gcl-muted">This was Stockfish’s top move. No alternate move preview is needed.</p>')+'</details>';
+  }).join('');
+  host.innerHTML='<div class="gcl-counts">'+countMarkup+'</div><div class="gcl-review-move-list">'+moveMarkup+'</div>';
 }
 
 function classifyLoss(loss, playedBest, playedMove) {
