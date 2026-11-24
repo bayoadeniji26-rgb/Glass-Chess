@@ -44,6 +44,8 @@ let clock = { white: 300, black: 300, increment: 0, active: false, side: 'w', la
 let lastRecordedResult = '';
 let reviewResults = [];
 let audioContext = null;
+let liveAnalysisToken = 0;
+let liveAnalysisRunning = false;
 
 function loadData() {
   try {
@@ -80,7 +82,16 @@ function uciFromMove(move) {
 }
 
 function scoreFromInfo(info) {
-  if (!info || typeof info !== 'object') return null;
+  if (!info) return null;
+
+  if (typeof info === 'string') {
+    const mate = info.match(/\bscore\s+mate\s+(-?\d+)/);
+    const cp = info.match(/\bscore\s+cp\s+(-?\d+)/);
+    if (mate) return Math.sign(Number(mate[1]) || 1) * 10000;
+    if (cp) return Number(cp[1]) / 100;
+    return null;
+  }
+
   const score = info.score ?? info.evaluation ?? info.eval ?? info.centipawns;
   if (score && typeof score === 'object') {
     const type = String(score.type || score.kind || '').toLowerCase();
@@ -90,15 +101,9 @@ function scoreFromInfo(info) {
     if (type === 'cp' || score.cp != null) return value / 100;
     return Math.abs(value) > 10 ? value / 100 : value;
   }
-  if (typeof score === 'string') {
-    const match = score.match(/([+-]?\d+(?:\.\d+)?)/);
-    if (!match) return null;
-    const value = Number(match[1]);
-    if (/mate/i.test(score)) return Math.sign(value || 1) * 10000;
-    if (/\bcp\b/i.test(score)) return value / 100;
-    return Math.abs(value) > 10 ? value / 100 : value;
+  if (typeof score === 'number' && Number.isFinite(score)) {
+    return Math.abs(score) > 10 ? score / 100 : score;
   }
-  if (typeof score === 'number' && Number.isFinite(score)) return Math.abs(score) > 10 ? score / 100 : score;
   return null;
 }
 
@@ -163,7 +168,26 @@ function buildInterface() {
         <div class="gc-card"><div class="gc-stat" id="gc-losses">0</div><div class="gc-stat-label">Losses</div></div>
       </div>
       <div class="gc-card"><div class="gc-row"><h4>Chess clock</h4><span class="gc-pill" id="gc-clock-state">Paused</span></div><div class="gc-grid"><div><div class="gc-stat-label">White</div><div class="gc-clock" id="gc-white-clock">05:00</div></div><div><div class="gc-stat-label">Black</div><div class="gc-clock" id="gc-black-clock">05:00</div></div></div><label class="gc-muted" for="gc-time-control">Time control</label><select id="gc-time-control"><option value="1+0">Bullet · 1+0</option><option value="3+2">Blitz · 3+2</option><option value="5+0" selected>Blitz · 5+0</option><option value="10+0">Rapid · 10+0</option><option value="15+10">Rapid · 15+10</option><option value="30+0">Classical · 30+0</option></select><div class="gc-actions"><button class="primary" id="gc-clock-start">Start / Restart</button><button id="gc-clock-pause">Pause</button></div><p class="gc-muted">Clock runs locally and switches sides after each legal move. It does not automatically force a timeout result.</p></div>
-      <div class="gc-card"><div class="gc-row"><h4>Live engine lab</h4><span class="gc-pill" id="gc-engine-status">Checking Stockfish…</span></div><div class="gc-row"><strong id="gc-live-eval">—</strong><span class="gc-muted" id="gc-live-depth">No analysis yet</span></div><div class="gc-evalbar"><span id="gc-eval-white" style="width:50%"></span><i></i></div><div id="gc-live-best" class="gc-muted">Analyze the current position to get a best-move suggestion and principal variation.</div><div class="gc-actions"><button class="primary" id="gc-live-analyze">Analyze current position</button><button id="gc-open-analysis">Open Analysis Studio</button></div></div>
+      <div class="gc-card gc-live-engine-card">
+        <div class="gc-row"><h4>Live Engine Lab</h4><span class="gc-pill" id="gc-engine-status">Connecting to Stockfish…</span></div>
+        <div class="gc-row gc-live-score-row"><strong id="gc-live-eval">—</strong><span class="gc-muted" id="gc-live-depth">Ready for analysis</span></div>
+        <div class="gc-evalbar"><span id="gc-eval-white" style="width:50%"></span><i></i></div>
+        <p id="gc-live-progress" class="gc-engine-progress">Stockfish is starting…</p>
+        <div class="gc-live-result"><strong>Best move</strong><div id="gc-live-best" class="gc-muted">Analyze the current position to get a best-move recommendation.</div></div>
+        <div class="gc-live-result"><strong>Principal variation</strong><div id="gc-live-pv" class="gc-muted">The engine’s suggested continuation will appear here.</div></div>
+        <label class="gc-live-depth-label" for="gc-live-depth-select">Analysis depth</label>
+        <select id="gc-live-depth-select">
+          <option value="10">Quick · Depth 10</option>
+          <option value="14" selected>Balanced · Depth 14</option>
+          <option value="18">Deep · Depth 18</option>
+          <option value="22">Very deep · Depth 22</option>
+        </select>
+        <div class="gc-actions">
+          <button class="primary" id="gc-live-analyze">Analyze current position</button>
+          <button id="gc-live-stop" disabled>Stop</button>
+          <button id="gc-open-analysis">Open Analysis Studio</button>
+        </div>
+      </div>
       <div class="gc-card"><h4>Opening explorer</h4><div id="gc-opening-name" class="gc-stat" style="font-size:17px">Unclassified position</div><div id="gc-opening-family" class="gc-muted">Play a few moves to identify the opening.</div><div id="gc-opening-suggestions" class="gc-actions"></div></div>
       <div class="gc-card"><div class="gc-row"><h4>Game files</h4><span class="gc-muted">Stored in this browser</span></div><div class="gc-actions"><button id="gc-save-game">Save current game</button><button id="gc-export-pgn">Export PGN</button></div><label class="gc-muted" for="gc-saved-games">Saved games</label><select id="gc-saved-games"><option value="">Choose a saved game</option></select><div class="gc-actions"><button id="gc-load-saved">Load selected</button><button id="gc-delete-saved">Delete selected</button></div><div id="gc-save-status" class="gc-muted">Your saved games stay on this device.</div></div>
     </section>
@@ -177,7 +201,17 @@ function buildInterface() {
       <div class="gc-card"><h4>Replay navigator</h4><div class="gc-row"><span class="gc-muted" id="gc-replay-label">Live position</span><span class="gc-muted" id="gc-replay-count">0 / 0</span></div><input class="gc-range" id="gc-replay-range" type="range" min="0" max="0" value="0"><div class="gc-actions"><button id="gc-replay-start">Start</button><button id="gc-replay-back">Previous</button><button id="gc-replay-forward">Next</button><button id="gc-replay-exit">Exit replay</button></div></div>
     </section>
     <section class="gc-view" data-view="custom">
-      <div class="gc-card"><h4>Board themes</h4><div class="gc-board-themes" id="gc-theme-list"></div><p class="gc-muted">Themes update compatible board-square classes and the premium workspace. Your current selection is remembered.</p></div>
+      <div class="gc-card"><h4>Board themes</h4><div class="gc-board-themes" id="gc-theme-list"></div><p class="gc-muted">Changes the chessboard squares.</p></div>
+      <div class="gc-card gc-background-customizer"><h4>Workspace backgrounds</h4><div class="gc-background-grid" id="gc-background-list">
+        <button type="button" data-background="midnight"><span class="gc-background-swatch gc-bg-midnight"></span><strong>Midnight</strong></button>
+        <button type="button" data-background="sky"><span class="gc-background-swatch gc-bg-sky"></span><strong>Open Sky</strong></button>
+        <button type="button" data-background="aurora"><span class="gc-background-swatch gc-bg-aurora"></span><strong>Aurora</strong></button>
+        <button type="button" data-background="fruit"><span class="gc-background-swatch gc-bg-fruit"></span><strong>Colorful Fruit</strong></button>
+        <button type="button" data-background="sunset"><span class="gc-background-swatch gc-bg-sunset"></span><strong>Sunset</strong></button>
+        <button type="button" data-background="ocean"><span class="gc-background-swatch gc-bg-ocean"></span><strong>Deep Ocean</strong></button>
+        <button type="button" data-background="forest"><span class="gc-background-swatch gc-bg-forest"></span><strong>Forest</strong></button>
+        <button type="button" data-background="marble"><span class="gc-background-swatch gc-bg-marble"></span><strong>Marble</strong></button>
+      </div><p class="gc-muted">Changes the page background behind the board and panels. Your choice is saved on this device.</p></div>
       <div class="gc-card gc-piece-customizer"><h4>Piece appearance</h4><label for="gc-piece-style">Piece design</label><select id="gc-piece-style"><option value="glass">Glass Classic · current look</option><option value="medieval">Medieval</option><option value="modern">Modern</option></select><div class="gc-piece-colors"><label for="gc-white-piece-color">White pieces<input id="gc-white-piece-color" type="color" value="#f7f2e9" aria-label="White piece color"></label><label for="gc-black-piece-color">Black pieces<input id="gc-black-piece-color" type="color" value="#263244" aria-label="Black piece color"></label></div><p class="gc-muted">Changes the pieces on the board, not the board squares. Your choices are saved on this device.</p></div>
       <div class="gc-card"><div class="gc-row"><h4>Sound effects</h4><label><input id="gc-sound-toggle" type="checkbox" style="width:auto"> Enable move sounds</label></div><p class="gc-muted">Light local sound effects for legal moves and puzzle results.</p></div>
       <div class="gc-card"><h4>Data and privacy</h4><p class="gc-muted">Profile, rating, statistics, saved games, and preferences are stored in this browser using local storage. Nothing is uploaded to a server.</p><div class="gc-actions"><button id="gc-export-data">Export profile data</button><button id="gc-reset-data">Reset profile data</button></div></div>
@@ -530,36 +564,121 @@ function showPuzzleHint() {
   $('gc-puzzle-hint').textContent = 'Hint shown';
 }
 
-function updateLiveEvaluation(score, depth, best) {
-  $('gc-live-eval').textContent = evalLabel(score);
-  $('gc-live-depth').textContent = depth ? `Depth ${depth}` : 'Engine evaluation';
-  const whitePercent = Number.isFinite(score) ? Math.max(4, Math.min(96, 50 + score * 9)) : 50;
+function updateLiveEvaluation(score, info, sideToMove, bestMove = "") {
+  const whiteScore = sideToMove === "b" && Number.isFinite(score) ? -score : score;
+  $('gc-live-eval').textContent = evalLabel(whiteScore);
+  $('gc-live-depth').textContent = info?.depth ? `Depth ${info.depth}` : "Engine evaluation";
+  const whitePercent = Number.isFinite(whiteScore)
+    ? Math.max(4, Math.min(96, 50 + whiteScore * 9))
+    : 50;
   $('gc-eval-white').style.width = `${whitePercent}%`;
-  $('gc-live-best').textContent = best ? `Recommended move: ${best.slice(0, 2)} → ${best.slice(2, 4)}${best.length > 4 ? ` = ${best[4].toUpperCase()}` : ''}` : 'No best move returned.';
+
+  if (bestMove) {
+    const promotion = bestMove.length > 4 ? ` = ${bestMove[4].toUpperCase()}` : "";
+    $('gc-live-best').textContent = `${bestMove.slice(0, 2)} → ${bestMove.slice(2, 4)}${promotion}`;
+  }
+  if (Array.isArray(info?.pv) && info.pv.length) {
+    $('gc-live-pv').textContent = info.pv.slice(0, 12).join(" ");
+  }
+}
+
+function formatEngineProgress(info) {
+  if (!info) return "Waiting for Stockfish…";
+  const parts = [];
+  if (info.depth) parts.push(`Depth ${info.depth}`);
+  if (info.seldepth) parts.push(`selective ${info.seldepth}`);
+  if (Number.isFinite(info.nodes)) parts.push(`${info.nodes.toLocaleString()} nodes`);
+  if (Number.isFinite(info.nps)) parts.push(`${info.nps.toLocaleString()} NPS`);
+  if (Number.isFinite(info.time)) parts.push(`${(info.time / 1000).toFixed(1)}s`);
+  return parts.join(" · ") || "Stockfish is calculating…";
+}
+
+async function stopLiveAnalysis() {
+  if (!liveAnalysisRunning) return;
+  liveAnalysisToken += 1;
+  $('gc-engine-status').textContent = "Stopping…";
+  $('gc-live-progress').textContent = "Stopping the current Stockfish search…";
+  try { await api.stopSearch(); } catch (error) { console.warn("Could not stop Live Engine Lab:", error); }
+  liveAnalysisRunning = false;
+  $('gc-live-analyze').disabled = !api.engineReady;
+  $('gc-live-stop').disabled = true;
+  $('gc-engine-status').textContent = "Analysis stopped";
+  $('gc-live-progress').textContent = "Ready for another position analysis.";
 }
 
 async function analyzeCurrent() {
-  if (!api.engineReady) { $('gc-engine-status').textContent = 'Stockfish not ready'; return; }
-  if (api.thinking) { $('gc-engine-status').textContent = 'Engine is busy'; return; }
-  $('gc-engine-status').textContent = 'Analyzing…';
+  if (liveAnalysisRunning) return;
+  if (!api.engineReady) {
+    $('gc-engine-status').textContent = "Stockfish is not ready";
+    $('gc-live-progress').textContent = "The engine has not finished loading. Check the engine status at the top of the board.";
+    return;
+  }
+  if (api.thinking) {
+    $('gc-engine-status').textContent = "Engine busy";
+    $('gc-live-progress').textContent = "Stockfish is handling another move or analysis. Try again when it finishes.";
+    return;
+  }
+
+  const token = ++liveAnalysisToken;
   const fen = api.fen;
+  const sideToMove = api.turn;
+  const depth = Number($('gc-live-depth-select').value) || 14;
   let latest = null;
+
+  liveAnalysisRunning = true;
+  $('gc-live-analyze').disabled = true;
+  $('gc-live-stop').disabled = false;
+  $('gc-engine-status').textContent = `Analyzing · Depth ${depth}`;
+  $('gc-live-progress').textContent = "Preparing the current board position…";
+  $('gc-live-depth').textContent = `Depth 0 / ${depth}`;
+  $('gc-live-eval').textContent = "—";
+  $('gc-eval-white').style.width = "50%";
+  $('gc-live-best').textContent = "Stockfish is searching for the strongest move…";
+  $('gc-live-pv').textContent = "Waiting for the principal variation…";
+
   try {
-    const result = await api.search(fen, 14, info => {
+    const result = await api.search(fen, depth, info => {
+      if (token !== liveAnalysisToken || api.fen !== fen) return;
       latest = info;
       const score = scoreFromInfo(info);
-      if (score != null) updateLiveEvaluation(score, info.depth, null);
+      if (score != null) updateLiveEvaluation(score, info, sideToMove);
+      $('gc-live-progress').textContent = formatEngineProgress(info);
+      $('gc-engine-status').textContent = info?.depth
+        ? `Analyzing · Depth ${info.depth}/${depth}`
+        : "Analyzing…";
     });
-    if (api.fen !== fen) return;
-    const best = String(result?.bestMove || '');
-    const score = scoreFromInfo(latest) ?? scoreFromInfo(result);
-    updateLiveEvaluation(score, result?.depth ?? latest?.depth, best);
-    $('gc-engine-status').textContent = 'Analysis complete';
-    const pv = Array.isArray(result?.pv) ? result.pv.slice(0, 8).join(' ') : (latest?.pv || '');
-    if (pv) $('gc-live-best').textContent += ` · Line: ${pv}`;
+
+    if (token !== liveAnalysisToken) return;
+    if (api.fen !== fen) {
+      $('gc-engine-status').textContent = "Position changed";
+      $('gc-live-progress').textContent = "The board changed while Stockfish was analyzing. Run the analysis again for the new position.";
+      return;
+    }
+    if (result?.cancelled) {
+      $('gc-engine-status').textContent = "Analysis stopped";
+      return;
+    }
+
+    const best = String(result?.bestMove || "");
+    const score = scoreFromInfo(result) ?? scoreFromInfo(latest);
+    updateLiveEvaluation(score, result || latest, sideToMove, best);
+    $('gc-live-progress').textContent = formatEngineProgress(result || latest);
+    $('gc-engine-status').textContent = "Analysis complete";
+    if (!best || best === "(none)") {
+      $('gc-live-best').textContent = "No legal move is available in this position.";
+    }
   } catch (error) {
-    $('gc-engine-status').textContent = 'Analysis error';
-    $('gc-live-best').textContent = error.message;
+    if (token === liveAnalysisToken) {
+      $('gc-engine-status').textContent = "Analysis error";
+      $('gc-live-progress').textContent = "Stockfish could not complete this request.";
+      $('gc-live-best').textContent = error?.message || "Unknown engine error.";
+    }
+  } finally {
+    if (token === liveAnalysisToken) {
+      liveAnalysisRunning = false;
+      $('gc-live-analyze').disabled = !api.engineReady;
+      $('gc-live-stop').disabled = true;
+    }
   }
 }
 
@@ -654,6 +773,10 @@ function bindEvents() {
   $('gc-clock-start').addEventListener('click', startClock);
   $('gc-clock-pause').addEventListener('click', stopClock);
   $('gc-live-analyze').addEventListener('click', analyzeCurrent);
+  $('gc-live-stop').addEventListener('click', stopLiveAnalysis);
+  $('gc-live-depth-select').addEventListener('change', () => {
+    if (liveAnalysisRunning) void stopLiveAnalysis();
+  });
   $('gc-open-analysis').addEventListener('click', () => { api.setMode('analysis'); switchTab('home'); });
   $('gc-create-puzzle').addEventListener('click', createPuzzle);
   $('gc-puzzle-hint').addEventListener('click', showPuzzleHint);
@@ -680,6 +803,7 @@ function bindEvents() {
   $('gc-theme-list').addEventListener('click', event => { const button = event.target.closest('[data-theme]'); if (button) applyTheme(button.dataset.theme); });
 
   const appearance = api.appearance || {
+    background: 'midnight',
     pieceStyle: 'glass',
     whitePieceColor: '#f7f2e9',
     blackPieceColor: '#263244'
@@ -696,6 +820,21 @@ function bindEvents() {
   $('gc-piece-style').addEventListener('change', savePieceAppearance);
   $('gc-white-piece-color').addEventListener('input', savePieceAppearance);
   $('gc-black-piece-color').addEventListener('input', savePieceAppearance);
+
+  const backgroundList = $('gc-background-list');
+  const syncBackgroundButtons = selected => {
+    backgroundList.querySelectorAll('[data-background]').forEach(button => {
+      button.classList.toggle('active', button.dataset.background === selected);
+    });
+  };
+  syncBackgroundButtons(appearance.background || 'midnight');
+  backgroundList.addEventListener('click', event => {
+    const button = event.target.closest('[data-background]');
+    if (!button) return;
+    const selected = button.dataset.background;
+    api.updateAppearance?.({ background: selected });
+    syncBackgroundButtons(selected);
+  });
 
   $('gc-sound-toggle').addEventListener('change', event => { data.sound = event.target.checked; saveData(); if (data.sound) playTone(); });
   $('gc-export-data').addEventListener('click', exportProfile);
@@ -733,10 +872,25 @@ export function mount(chessApi) {
     isReplaying: () => replaying,
     setTheme: applyTheme
   };
-  // If the engine finishes initializing after this panel appears, update its status.
+  // Only update the initial loading label. Never overwrite Live Engine Lab's own analysis status.
   const statusTimer = setInterval(() => {
     if (!document.getElementById('gc-premium')) { clearInterval(statusTimer); return; }
-    if (api.engineReady) $('gc-engine-status').textContent = 'Stockfish ready';
-  }, 700);
+    if (api.engineReady) {
+      if (/connecting|loading|checking|starting/i.test($('gc-engine-status').textContent)) {
+        $('gc-engine-status').textContent = 'Stockfish ready';
+        $('gc-live-progress').textContent = 'Engine ready. Select a depth and analyze the current position.';
+        $('gc-live-analyze').disabled = false;
+      }
+      clearInterval(statusTimer);
+      return;
+    }
+    const boardStatus = document.getElementById('engine-status')?.textContent || '';
+    if (/failed|error/i.test(boardStatus)) {
+      $('gc-engine-status').textContent = 'Engine unavailable';
+      $('gc-live-progress').textContent = 'Stockfish could not start. Check the engine connection at the top of the board.';
+      $('gc-live-analyze').disabled = true;
+      clearInterval(statusTimer);
+    }
+  }, 300);
   console.log('Glass Chess Premium Suite loaded.');
 }
