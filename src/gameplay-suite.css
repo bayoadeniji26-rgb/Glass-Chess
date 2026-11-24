@@ -133,3 +133,26 @@
   #gc-premium .gcl-side-accuracy-grid { grid-template-columns:1fr 1fr; }
   #gc-premium .gcl-review-destination-badge { font-size:7px; padding:2px 4px; }
 }
+
+
+/* Clear, hoverable move explanations and isolated suggested-position previews. */
+#gc-premium .gcl-counts{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+#gc-premium .gcl-review-move-list{display:grid;gap:6px;margin-top:8px}
+#gc-premium .gcl-review-move{border:1px solid rgba(211,222,248,.12);border-radius:9px;background:rgba(255,255,255,.025);overflow:hidden}
+#gc-premium .gcl-review-move>summary{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px;cursor:pointer;list-style:none}
+#gc-premium .gcl-review-move>summary::-webkit-details-marker{display:none}
+#gc-premium .gcl-review-move-main{display:grid;gap:3px;min-width:0}
+#gc-premium .gcl-review-move-main b{font-size:12px;color:#edf2ff}
+#gc-premium .gcl-review-move-main small{font-size:9px;color:#aab8ce}
+#gc-premium .gcl-review-suggest{display:block;text-align:right;color:#b9d9ff;font-size:11px;white-space:nowrap}
+#gc-premium .gcl-review-suggest b{font-size:9px;color:#aab8ce;font-weight:600}
+#gc-premium .gcl-review-suggest small{font-size:9px;opacity:.75}
+#gc-premium .gcl-mini-board-wrap{width:min(100%,250px);margin:8px auto 10px;text-align:center}
+#gc-premium .gcl-mini-board{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));aspect-ratio:1;border:3px solid rgba(255,255,255,.16);border-radius:7px;overflow:hidden}
+#gc-premium .gcl-mini-square{display:grid;place-items:center;aspect-ratio:1;font-size:clamp(13px,3vw,23px);line-height:1;position:relative}
+#gc-premium .gcl-mini-square.light{background:#dce3ed;color:#202938}
+#gc-premium .gcl-mini-square.dark{background:#677b97;color:#f5f2e9}
+#gc-premium .gcl-mini-square.gcl-mini-from{box-shadow:inset 0 0 0 999px rgba(233,207,147,.48)}
+#gc-premium .gcl-mini-square.gcl-mini-to{box-shadow:inset 0 0 0 999px rgba(92,218,164,.55);outline:2px solid rgba(92,218,164,.95);outline-offset:-2px}
+#gc-premium .gcl-mini-board-wrap>small{display:block;margin-top:6px;color:#aab8ce;font-size:9px;line-height:1.4}
+@media(max-width:520px){#gc-premium .gcl-review-move>summary{align-items:flex-start;flex-direction:column;gap:5px}#gc-premium .gcl-review-suggest{text-align:left}}
