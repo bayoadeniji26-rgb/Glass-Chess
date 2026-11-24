@@ -1,6 +1,7 @@
 import { Chess } from "chess.js";
 import { engine } from "./engine.js";
 import "./features.css";
+import { createBoardEffects } from "./board-effects.js";
 
 // ============================================
 // GLASS CHESS — MAIN GAME
@@ -132,6 +133,8 @@ settings.blackPieceColor = /^#[0-9a-f]{6}$/i.test(settings.blackPieceColor || ""
 // ============================================
 
 const board = $("board");
+const boardEffects = createBoardEffects(board, () => settings.sounds);
+let lastRenderedOrientation = null;
 
 function setEngineStatus(message) {
   $("engine-status").textContent = message;
@@ -338,6 +341,7 @@ function setupSettings() {
     control.addEventListener("change", () => {
       settings[key] = control.checked;
       saveSettings();
+      if (key === "sounds") window.GlassChessPremium?.setSoundEnabled?.(control.checked);
       render();
     });
   }
@@ -367,106 +371,81 @@ function boardIsFlipped() {
 // ============================================
 
 function renderBoard() {
-  if (!board) {
-    throw new Error('Chessboard element not found: #board');
-  }
+  if (!board) throw new Error('Chessboard element not found: #board');
 
-  board.innerHTML = "";
-
+  // Reuse keyed square elements instead of replacing all 64 nodes. This preserves
+  // background-color transitions and minimizes DOM allocation on every move.
+  const existingSquares = new Map(
+    Array.from(board.querySelectorAll('[data-square]')).map(element => [element.dataset.square, element])
+  );
   const reverse = boardIsFlipped();
   const files = reverse ? "hgfedcba" : "abcdefgh";
   const ranks = reverse ? "12345678" : "87654321";
-  const colors = THEMES[settings.theme] || THEMES.classic;
+  const colors = THEMES[settings.theme] || THEMES.midnight;
 
   for (const rank of ranks) {
     for (const file of files) {
       const square = file + rank;
       const piece = game.get(square);
+      let element = existingSquares.get(square);
+      if (element) existingSquares.delete(square);
+      else element = document.createElement("div");
 
-      const element = document.createElement("div");
-
-      const light =
-        ("abcdefgh".indexOf(file) + Number(rank)) % 2 === 0;
-
-      element.className = `square ${light ? "light" : "dark"}`;
+      const light = ("abcdefgh".indexOf(file) + Number(rank)) % 2 === 0;
+      element.className = "square " + (light ? "light" : "dark");
       element.style.backgroundColor = light ? colors[0] : colors[1];
       element.style.boxShadow = "";
       element.dataset.square = square;
+      element.replaceChildren();
 
-      if (selected === square) {
-        element.classList.add("selected");
-      }
-
+      if (selected === square) element.classList.add("selected");
       if (gameMode === "analysis" && analysisBestMove) {
-        if (analysisBestMove.from === square) {
-          element.style.boxShadow = "inset 0 0 0 4px #e0a82e";
-        }
-        if (analysisBestMove.to === square) {
-          element.style.boxShadow = "inset 0 0 0 5px #28a879";
-        }
+        if (analysisBestMove.from === square) element.style.boxShadow = "inset 0 0 0 4px #e0a82e";
+        if (analysisBestMove.to === square) element.style.boxShadow = "inset 0 0 0 5px #28a879";
       }
-
       const possibleMove = legalMoves.find(move => move.to === square);
-
-      if (settings.legalMoves && possibleMove) {
-        element.classList.add(piece ? "capture" : "legal");
-      }
-
-      if (
-        settings.lastMove &&
-        lastMove &&
-        (lastMove.from === square || lastMove.to === square)
-      ) {
+      if (settings.legalMoves && possibleMove) element.classList.add(piece ? "capture" : "legal");
+      if (settings.lastMove && lastMove && (lastMove.from === square || lastMove.to === square)) {
         element.classList.add("gc-last-move");
       }
 
       if (piece) {
         const span = document.createElement("span");
         const sideClass = piece.color === "w" ? "piece-white" : "piece-black";
-        const pieceColor = piece.color === "w"
-          ? settings.whitePieceColor
-          : settings.blackPieceColor;
-
-        span.className = `gc-piece ${sideClass} gc-piece-${settings.pieceStyle}`;
+        const pieceColor = piece.color === "w" ? settings.whitePieceColor : settings.blackPieceColor;
+        span.className = "gc-piece " + sideClass + " gc-piece-" + settings.pieceStyle;
         span.style.setProperty("--gc-piece-color", pieceColor);
-
         if (settings.pieceStyle === "glass") {
           span.textContent = PIECES[piece.color + piece.type];
         } else {
           const art = PIECE_SVG[settings.pieceStyle]?.[piece.type] || PIECE_SVG.modern[piece.type];
-          span.innerHTML = `<svg class="gc-piece-art" viewBox="0 0 100 100" aria-hidden="true" focusable="false"><g class="gc-svg-piece">${art}</g></svg>`;
+          span.innerHTML = '<svg class="gc-piece-art" viewBox="0 0 100 100" aria-hidden="true" focusable="false"><g class="gc-svg-piece">' + art + '</g></svg>';
         }
-
         element.appendChild(span);
       }
 
       if (settings.coordinates) {
         if (file === files[0]) {
           const label = document.createElement("span");
-
           label.className = "gc-coordinate gc-rank";
           label.textContent = rank;
-
           element.appendChild(label);
         }
-
         if (rank === ranks[ranks.length - 1]) {
           const label = document.createElement("span");
-
           label.className = "gc-coordinate gc-file";
           label.textContent = file;
-
           element.appendChild(label);
         }
       }
 
       element.setAttribute("role", "button");
       element.setAttribute("aria-label", square);
-      element.addEventListener("click", () => handleSquare(square));
-
+      element.onclick = () => handleSquare(square);
       board.appendChild(element);
     }
   }
+  for (const staleSquare of existingSquares.values()) staleSquare.remove();
 }
 
 // ============================================
@@ -564,45 +543,16 @@ function updateLabels() {
 }
 
 function render() {
+  const orientation = boardIsFlipped();
   renderBoard();
+  if (lastRenderedOrientation !== null && orientation !== lastRenderedOrientation) boardEffects.animateFlip();
+  lastRenderedOrientation = orientation;
   updateHistory();
   updateCaptured();
   updateGameStatus();
   updateLabels();
 
   $("evaluation").hidden = !settings.evaluation;
-}
-
-// ============================================
-// MOVE SOUND
-// ============================================
-
-function playSound(capture = false) {
-  if (!settings.sounds) return;
-
-  try {
-    const AudioContextClass =
-      window.AudioContext || window.webkitAudioContext;
-
-    if (!AudioContextClass) return;
-
-    const context = new AudioContextClass();
-    const oscillator = context.createOscillator();
-    const gain = context.createGain();
-
-    oscillator.frequency.value = capture ? 520 : 390;
-    gain.gain.value = 0.04;
-
-    oscillator.connect(gain);
-    gain.connect(context.destination);
-
-    oscillator.start();
-    oscillator.stop(context.currentTime + 0.1);
-
-    oscillator.onended = () => context.close();
-  } catch {
-    // Sound is optional.
-  }
 }
 
 // ============================================
@@ -661,6 +611,28 @@ function choosePromotion(from, to, choices) {
 // PLAYING MOVES
 // ============================================
 
+function findKingSquare(color) {
+  for (let rank = 1; rank <= 8; rank += 1) {
+    for (const file of "abcdefgh") {
+      const square = file + rank;
+      const piece = game.get(square);
+      if (piece && piece.type === "k" && piece.color === color) return square;
+    }
+  }
+  return null;
+}
+
+function finishMoveFeedback(move, motionSnapshot) {
+  boardEffects.animateMove(motionSnapshot, move);
+  if (move.promotion) boardEffects.animatePromotion(move.to);
+  if (game.isCheck()) {
+    boardEffects.animateCheck(findKingSquare(game.turn()));
+    boardEffects.playSound("check");
+  } else {
+    boardEffects.playSound(move.captured ? "capture" : (move.promotion ? "promotion" : "move"));
+  }
+}
+
 function commitMove(input) {
   if (premiumReplayLock) return;
   if (thinking || resigned || game.isGameOver()) return;
@@ -669,6 +641,7 @@ function commitMove(input) {
     const move = game.move(input);
 
     if (!move) return;
+    const motionSnapshot = boardEffects.captureMove(move);
 
     lastMove = {
       from: move.from,
@@ -678,8 +651,8 @@ function commitMove(input) {
     selected = null;
     legalMoves = [];
 
-    playSound(Boolean(move.captured));
     render();
+    finishMoveFeedback(move, motionSnapshot);
 
     if (
       gameMode === "computer" &&
@@ -811,6 +784,8 @@ async function computerMove() {
   $("best-move").textContent = "Calculating...";
 
   render();
+  let playedMove = null;
+  let moveMotionSnapshot = null;
 
   try {
     const result = await engine.search(game.fen(), {
@@ -826,12 +801,14 @@ async function computerMove() {
       throw new Error("Stockfish returned an invalid move.");
     }
 
+    moveMotionSnapshot = boardEffects.captureMove(move);
     const played = game.move({
       from: move.from,
       to: move.to,
       promotion: move.promotion
     });
 
+    playedMove = played;
     lastMove = {
       from: played.from,
       to: played.to
@@ -840,7 +817,6 @@ async function computerMove() {
     $("best-move").textContent =
       `${played.san} (${played.from} → ${played.to})`;
 
-    playSound(Boolean(played.captured));
     setEngineStatus("Stockfish 19 ready");
   } catch (error) {
     if (token === gameToken) {
@@ -855,6 +831,7 @@ async function computerMove() {
     if (token === gameToken) {
       thinking = false;
       render();
+      if (playedMove) finishMoveFeedback(playedMove, moveMotionSnapshot);
     }
   }
 }
@@ -1306,6 +1283,14 @@ function installGlassChessPremiumBridge() {
     get checkmate() { return game.isCheckmate(); },
     get draw() { return game.isDraw(); },
     get turn() { return game.turn(); },
+    get soundsEnabled() { return Boolean(settings.sounds); },
+    setSoundEnabled(enabled) {
+      settings.sounds = Boolean(enabled);
+      saveSettings();
+      const control = $("gc-sounds");
+      if (control) control.checked = settings.sounds;
+      return settings.sounds;
+    },
     get appearance() {
       return {
         theme: settings.theme,
@@ -1383,11 +1368,20 @@ function installGlassChessPremiumBridge() {
       render();
     },
     rebuild(initialFen, moves) {
+      const previousHistory = game.history({ verbose: true });
+      const extendsByOne = Array.isArray(moves) && moves.length === previousHistory.length + 1 &&
+        previousHistory.every((oldMove, index) =>
+          oldMove.from === moves[index].from && oldMove.to === moves[index].to &&
+          (oldMove.promotion || undefined) === (moves[index].promotion || undefined)
+        );
+      const latestMove = extendsByOne ? moves[moves.length - 1] : null;
+      const motionSnapshot = latestMove ? boardEffects.captureMove(latestMove) : null;
       game.load(initialFen);
       for (const move of moves) {
         game.move({ from: move.from, to: move.to, promotion: move.promotion });
       }
       render();
+      if (latestMove && motionSnapshot) finishMoveFeedback(latestMove, motionSnapshot);
     },
     calculatePositions(initialFen, moveList) {
       const savedMoves = game.history({ verbose: true });
