@@ -12,6 +12,7 @@ export function createBoardEffects(board, isSoundEnabled = () => true, isAnimati
   const timerHandles = new Set();
   const animations = new Set();
   const ghosts = new Set();
+  const transientCleanups = new Set();
   const reducedMotion = () => Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
   const motionAllowed = () => !disposed && !reducedMotion() && Boolean(isAnimationEnabled());
 
@@ -21,8 +22,7 @@ export function createBoardEffects(board, isSoundEnabled = () => true, isAnimati
   }
 
   function pieceSnapshot(squareName) {
-    const square = getSquare(squareName);
-    const piece = square?.querySelector('.gc-piece');
+    const piece = getSquare(squareName)?.querySelector('.gc-piece');
     if (!piece) return null;
     const rect = piece.getBoundingClientRect();
     return { clone: piece.cloneNode(true), rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height } };
@@ -35,28 +35,26 @@ export function createBoardEffects(board, isSoundEnabled = () => true, isAnimati
     if (mover) motions.push({ ...mover, type: 'move', from: move.from, to: move.to });
 
     if (move.captured) {
-      // En passant removes the pawn from the square behind the destination.
       const captureSquare = move.flags?.includes('e') ? move.to[0] + move.from[1] : move.to;
       const captured = pieceSnapshot(captureSquare);
       if (captured) motions.push({ ...captured, type: 'capture', from: captureSquare, to: move.to });
     }
 
-    // Castling moves the rook as well as the king.
     const fromFile = move.from.charCodeAt(0), toFile = move.to.charCodeAt(0);
     if (move.piece === 'k' && Math.abs(toFile - fromFile) === 2) {
       const rank = move.from[1], kingSide = toFile > fromFile;
-      const rookFrom = (kingSide ? 'h' : 'a') + rank, rookTo = (kingSide ? 'f' : 'd') + rank;
-      const rook = pieceSnapshot(rookFrom);
-      if (rook) motions.push({ ...rook, type: 'castle-rook', from: rookFrom, to: rookTo });
+      const rook = pieceSnapshot((kingSide ? 'h' : 'a') + rank);
+      if (rook) motions.push({ ...rook, type: 'castle-rook', from: (kingSide ? 'h' : 'a') + rank, to: (kingSide ? 'f' : 'd') + rank });
     }
     return motions.length ? { motions } : null;
   }
 
   function clearTimer(element, className) {
-    const byClass = timers.get(element), timer = byClass?.get(className);
+    const timer = timers.get(element)?.get(className);
     if (timer === undefined) return;
     window.clearTimeout(timer);
     timerHandles.delete(timer);
+    const byClass = timers.get(element);
     byClass.delete(className);
     if (!byClass.size) timers.delete(element);
   }
@@ -79,10 +77,10 @@ export function createBoardEffects(board, isSoundEnabled = () => true, isAnimati
   function makeGhost(snapshot, type) {
     const ghost = document.createElement('div');
     ghost.className = 'gc-motion-ghost gc-motion-ghost-' + type;
-    ghost.style.left = snapshot.rect.left + 'px';
-    ghost.style.top = snapshot.rect.top + 'px';
-    ghost.style.width = snapshot.rect.width + 'px';
-    ghost.style.height = snapshot.rect.height + 'px';
+    Object.assign(ghost.style, {
+      left: snapshot.rect.left + 'px', top: snapshot.rect.top + 'px',
+      width: snapshot.rect.width + 'px', height: snapshot.rect.height + 'px'
+    });
     ghost.appendChild(snapshot.clone);
     document.body.appendChild(ghost);
     ghosts.add(ghost);
@@ -116,8 +114,21 @@ export function createBoardEffects(board, isSoundEnabled = () => true, isAnimati
     }
   }
 
+  function cancelTransientMotion() {
+    for (const cleanup of [...transientCleanups]) cleanup();
+    for (const animation of [...animations]) {
+      try { animation.cancel(); } catch {}
+    }
+    animations.clear();
+    for (const ghost of ghosts) ghost.remove();
+    ghosts.clear();
+  }
+
   function animateMove(snapshot) {
     if (!motionAllowed() || !snapshot?.motions?.length) return;
+    // A new move supersedes unfinished piece travel; old ghosts must never stack.
+    cancelTransientMotion();
+
     for (const motion of snapshot.motions) {
       const ghost = makeGhost(motion, motion.type);
       const isCapture = motion.type === 'capture';
@@ -129,7 +140,11 @@ export function createBoardEffects(board, isSoundEnabled = () => true, isAnimati
           destinationPiece.style.visibility = 'hidden';
         }
       }
+      let cleaned = false;
       const cleanup = () => {
+        if (cleaned) return;
+        cleaned = true;
+        transientCleanups.delete(cleanup);
         ghost.remove();
         ghosts.delete(ghost);
         if (destinationPiece) {
@@ -137,22 +152,25 @@ export function createBoardEffects(board, isSoundEnabled = () => true, isAnimati
           else destinationPiece.style.removeProperty('visibility');
         }
       };
+      transientCleanups.add(cleanup);
+
       if (isCapture) {
         runAnimation(ghost, [
           { transform: 'translate3d(0,0,0) scale(1)', opacity: 1 },
-          { transform: 'translate3d(3px,-3px,0) scale(.78)', opacity: 0 }
+          { transform: 'translate3d(2px,-2px,0) scale(.82)', opacity: 0 }
         ], { duration: BOARD_MOTION.capture, easing: 'cubic-bezier(.3,0,.7,1)', fill: 'forwards' }, cleanup);
         continue;
       }
+
       const targetSquare = getSquare(motion.to);
-      const targetPiece = targetSquare?.querySelector('.gc-piece') || null;
-      const targetRect = targetPiece ? targetPiece.getBoundingClientRect() : targetSquare?.getBoundingClientRect();
+      const targetRect = targetSquare?.getBoundingClientRect();
       if (!targetRect) { cleanup(); continue; }
-      const dx = targetRect.left - motion.rect.left, dy = targetRect.top - motion.rect.top;
+      const dx = targetRect.left + targetRect.width / 2 - (motion.rect.left + motion.rect.width / 2);
+      const dy = targetRect.top + targetRect.height / 2 - (motion.rect.top + motion.rect.height / 2);
       runAnimation(ghost, [
-        { transform: 'translate3d(0,0,0)', opacity: 1 },
-        { transform: 'translate3d(' + dx + 'px,' + dy + 'px,0)', opacity: 1 }
-      ], { duration: BOARD_MOTION.move, easing: 'cubic-bezier(.18,.72,.22,1)', fill: 'forwards' }, cleanup);
+        { transform: 'translate3d(0,0,0) scale(1)', opacity: 1 },
+        { transform: 'translate3d(' + dx + 'px,' + dy + 'px,0) scale(1.015)', opacity: 1 }
+      ], { duration: motion.type === 'castle-rook' ? BOARD_MOTION.move + 25 : BOARD_MOTION.move, easing: 'cubic-bezier(.2,.72,.22,1)', fill: 'forwards' }, cleanup);
     }
   }
 
@@ -168,6 +186,7 @@ export function createBoardEffects(board, isSoundEnabled = () => true, isAnimati
   function animateCheck(kingSquare) {
     const square = getSquare(kingSquare);
     if (!square || !motionAllowed()) return;
+    clearTimer(square, 'gc-king-in-check');
     square.classList.remove('gc-king-in-check');
     void square.offsetWidth;
     square.classList.add('gc-king-in-check');
@@ -177,8 +196,9 @@ export function createBoardEffects(board, isSoundEnabled = () => true, isAnimati
   function animateCheckmate(kingSquare) {
     const square = getSquare(kingSquare);
     if (!square || !motionAllowed()) return;
+    clearTimer(square, 'gc-king-in-check');
     clearTimer(square, 'gc-king-in-checkmate');
-    square.classList.remove('gc-king-in-checkmate', 'gc-king-in-check');
+    square.classList.remove('gc-king-in-check', 'gc-king-in-checkmate');
     void square.offsetWidth;
     square.classList.add('gc-king-in-checkmate');
     scheduleClassRemoval(square, 'gc-king-in-checkmate', BOARD_MOTION.checkmate + 120);
@@ -188,7 +208,7 @@ export function createBoardEffects(board, isSoundEnabled = () => true, isAnimati
     if (!board || !motionAllowed() || typeof board.animate !== 'function') return;
     runAnimation(board, [
       { transform: 'perspective(900px) rotateY(0deg) scale(1)', opacity: 1 },
-      { transform: 'perspective(900px) rotateY(3deg) scale(.992)', opacity: .94 },
+      { transform: 'perspective(900px) rotateY(2deg) scale(.995)', opacity: .97 },
       { transform: 'perspective(900px) rotateY(0deg) scale(1)', opacity: 1 }
     ], { duration: BOARD_MOTION.flip, easing: 'cubic-bezier(.2,.75,.25,1)' });
   }
@@ -199,19 +219,16 @@ export function createBoardEffects(board, isSoundEnabled = () => true, isAnimati
     if (!AudioContextClass) return;
     try {
       audioContext ||= new AudioContextClass();
-      if (audioContext.state === 'suspended') {
-        const resume = audioContext.resume();
-        if (resume?.catch) resume.catch(() => {});
-      }
+      if (audioContext.state === 'suspended') audioContext.resume()?.catch?.(() => {});
       const now = audioContext.currentTime, wallNow = performance.now();
-      if (wallNow - lastSoundAt < 24) return;
+      if (wallNow - lastSoundAt < 35) return;
       lastSoundAt = wallNow;
       const presets = {
-        move: [{frequency:410,offset:0,duration:.065,volume:.026,wave:'triangle'},{frequency:760,offset:.008,duration:.04,volume:.009,wave:'sine'}],
-        capture: [{frequency:285,offset:0,duration:.095,volume:.035,wave:'triangle'},{frequency:590,offset:.015,duration:.06,volume:.014,wave:'sine'}],
-        check: [{frequency:760,offset:0,duration:.12,volume:.022,wave:'sine'},{frequency:1046,offset:.105,duration:.16,volume:.018,wave:'sine'}],
-        checkmate: [{frequency:523.25,offset:0,duration:.15,volume:.019,wave:'sine'},{frequency:659.25,offset:.12,duration:.18,volume:.018,wave:'sine'},{frequency:783.99,offset:.26,duration:.28,volume:.02,wave:'sine'}],
-        promotion: [{frequency:523,offset:0,duration:.09,volume:.021,wave:'sine'},{frequency:784,offset:.08,duration:.10,volume:.019,wave:'sine'},{frequency:988,offset:.16,duration:.14,volume:.018,wave:'sine'}]
+        move: [{frequency:392,offset:0,duration:.055,volume:.019,wave:'sine'},{frequency:587.33,offset:.012,duration:.045,volume:.008,wave:'sine'}],
+        capture: [{frequency:293.66,offset:0,duration:.075,volume:.022,wave:'triangle'},{frequency:440,offset:.018,duration:.055,volume:.009,wave:'sine'}],
+        check: [{frequency:659.25,offset:0,duration:.10,volume:.018,wave:'sine'},{frequency:880,offset:.09,duration:.13,volume:.014,wave:'sine'}],
+        checkmate: [{frequency:392,offset:0,duration:.16,volume:.018,wave:'sine'},{frequency:493.88,offset:.13,duration:.18,volume:.016,wave:'sine'},{frequency:587.33,offset:.27,duration:.26,volume:.018,wave:'sine'}],
+        promotion: [{frequency:493.88,offset:0,duration:.08,volume:.016,wave:'sine'},{frequency:659.25,offset:.08,duration:.10,volume:.015,wave:'sine'},{frequency:783.99,offset:.16,duration:.13,volume:.016,wave:'sine'}]
       };
       for (const note of presets[kind] || presets.move) {
         const start = now + note.offset, oscillator = audioContext.createOscillator(), gain = audioContext.createGain();
@@ -225,17 +242,15 @@ export function createBoardEffects(board, isSoundEnabled = () => true, isAnimati
         oscillator.start(start);
         oscillator.stop(start + note.duration + .015);
       }
-    } catch { /* Audio is optional and must never interrupt a chess move. */ }
+    } catch { /* Sound is optional; a failed audio device must never block chess. */ }
   }
 
   function getDiagnostics() {
     return {
-      activeTimers: timerHandles.size,
-      activeAnimations: animations.size,
-      activeGhosts: ghosts.size,
+      activeTimers: timerHandles.size, activeAnimations: animations.size,
+      activeGhosts: ghosts.size, activeMotionCleanups: transientCleanups.size,
       audioContextState: audioContext?.state || 'not-created',
-      reducedMotion: reducedMotion(),
-      animationsEnabled: Boolean(isAnimationEnabled())
+      reducedMotion: reducedMotion(), animationsEnabled: Boolean(isAnimationEnabled())
     };
   }
 
@@ -245,6 +260,7 @@ export function createBoardEffects(board, isSoundEnabled = () => true, isAnimati
     for (const timer of timerHandles) window.clearTimeout(timer);
     timerHandles.clear();
     timers.clear();
+    cancelTransientMotion();
     for (const animation of animations) { try { animation.cancel(); } catch {} }
     animations.clear();
     for (const ghost of ghosts) ghost.remove();
