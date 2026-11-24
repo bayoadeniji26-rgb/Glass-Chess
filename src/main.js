@@ -794,7 +794,7 @@ async function computerMove() {
 
   try {
     const result = await engine.search(game.fen(), {
-      depth: DEPTH,
+      depth: window.GlassChessGameplaySuite?.getEngineDepth?.() ?? DEPTH,
       onInfo: info => updateEvaluation(info, side)
     });
 

@@ -1230,6 +1230,7 @@ export function mountGameplaySuite(chessApi,premiumRoot) {
     isRetryActive(){return retryActive;},
     shouldSkipAutoAnalysis(){return retryActive||Boolean(activePuzzle);},
     getEngineOptions(){const p=PERSONAS[loadPrefs().persona||'maximum']||PERSONAS.maximum;return {skillLevel:p.skillLevel,multiPV:p.multiPV};},
+    getEngineDepth(){return activeDrill?18:10;},
     destroy:unmount
   };
   if(preMoveEnabled)paintPreMove();
