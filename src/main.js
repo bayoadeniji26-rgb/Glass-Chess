@@ -95,6 +95,16 @@ let allowEngineMove = false;
 const moveFeedback = new WeakMap();
 let resigned = false;
 let winner = "";
+let moveClassifications = new Map();
+let skipNextMoveAnimation = false;
+let suppressNextBoardClick = false;
+let activeBoardDrag = null;
+const MOVE_QUALITY = {
+  Brilliant: { key: "brilliant", symbol: "!!" }, Great: { key: "great", symbol: "!" },
+  Best: { key: "best", symbol: "★" }, Inaccuracy: { key: "inaccuracy", symbol: "?!" },
+  Mistake: { key: "mistake", symbol: "?" }, Blunder: { key: "blunder", symbol: "??" },
+  Checkmate: { key: "checkmate", symbol: "#" }
+};
 
 function isGameOver() {
   return game.isGameOver() || Boolean(gameTermination);
@@ -410,6 +420,7 @@ function renderBoard() {
   const files = reverse ? "hgfedcba" : "abcdefgh";
   const ranks = reverse ? "12345678" : "87654321";
   const colors = THEMES[settings.theme] || THEMES.midnight;
+  const currentReview = moveClassifications.get(game.history().length);
 
   for (const rank of ranks) {
     for (const file of files) {
@@ -467,6 +478,14 @@ function renderBoard() {
         }
       }
 
+      if (currentReview && currentReview.to === square) {
+        const badge = document.createElement("span");
+        badge.className = "gc-move-quality-badge gc-quality-" + currentReview.key;
+        badge.textContent = currentReview.symbol;
+        badge.title = currentReview.label;
+        badge.setAttribute("aria-label", currentReview.label + " move");
+        element.appendChild(badge);
+      }
       element.setAttribute("role", "button");
       element.setAttribute("aria-label", square);
       element.onclick = () => handleSquare(square);
@@ -620,11 +639,11 @@ function clearPromotion() {
   panel.hidden = true;
 }
 
-function choosePromotion(from, to, choices) {
+function choosePromotion(from, to, choices, { skipAnimation = false } = {}) {
   const autoPromotion = window.GlassChessAdvancedLab?.getAutoPromotion?.();
   if (autoPromotion && autoPromotion !== 'ask') {
     const preferred = choices.find(choice => choice.promotion === autoPromotion);
-    if (preferred) { commitMove({ from, to, promotion: preferred.promotion }); return; }
+    if (preferred) { commitMove({ from, to, promotion: preferred.promotion }, { skipAnimation }); return; }
   }
   const panel = $("gc-promotion");
   const color = game.turn();
@@ -651,7 +670,7 @@ function choosePromotion(from, to, choices) {
         from,
         to,
         promotion: choice.promotion
-      });
+      }, { skipAnimation });
     });
 
     panel.appendChild(button);
@@ -694,8 +713,10 @@ function announceCheckmate() {
 }
 
 function finishMoveFeedback(move, motionSnapshot) {
-  boardEffects.animateMove(motionSnapshot, move);
-  if (move.promotion) boardEffects.animatePromotion(move.to);
+  const travel = boardEffects.animateMove(motionSnapshot, move);
+  if (move.promotion) Promise.resolve(travel).then(() => {
+    if (game.get(move.to)?.type === move.promotion) boardEffects.animatePromotion(move.to);
+  });
   if (game.isCheckmate()) return;
   if (game.isCheck()) {
     boardEffects.animateCheck(findKingSquare(game.turn()));
@@ -705,7 +726,7 @@ function finishMoveFeedback(move, motionSnapshot) {
   }
 }
 
-function commitMove(input) {
+function commitMove(input, options = {}) {
   if (premiumReplayLock) return;
   if (thinking || resigned || isGameOver()) return;
   const online = window.GlassChessOnlinePlus;
@@ -719,8 +740,10 @@ function commitMove(input) {
   }
 
   try {
-    const move = game.move(input);
-
+    let move;
+    skipNextMoveAnimation = Boolean(options?.skipAnimation);
+    try { move = game.move(input); }
+    finally { skipNextMoveAnimation = false; }
     if (!move) return;
     const feedback = moveFeedback.get(move);
     if (feedback) moveFeedback.delete(move);
@@ -733,7 +756,7 @@ function commitMove(input) {
       render();
       return;
     }
-    const motionSnapshot = feedback?.motionSnapshot || boardEffects.captureMove(move);
+    const motionSnapshot = feedback ? feedback.motionSnapshot : boardEffects.captureMove(move);
 
     lastMove = {
       from: move.from,
@@ -763,6 +786,7 @@ function commitMove(input) {
 }
 
 function handleSquare(square) {
+  if (suppressNextBoardClick) { suppressNextBoardClick = false; return; }
   if (thinking || resigned || isGameOver()) return;
   if (!isHumanTurn()) return;
 
@@ -923,7 +947,7 @@ async function computerMove() {
       $("best-move").textContent = "Training move rejected. Try another move.";
       return;
     }
-    if (feedback?.motionSnapshot) moveMotionSnapshot = feedback.motionSnapshot;
+    if (feedback) moveMotionSnapshot = feedback.motionSnapshot;
     playedMove = played;
     lastMove = {
       from: played.from,
@@ -1373,6 +1397,62 @@ function connectButtons() {
   $("gc-download-pgn").addEventListener("click", downloadPGN);
 }
 
+function installBoardDragDrop() {
+  if (!board || board.dataset.gcDragDropReady === "true") return;
+  board.dataset.gcDragDropReady = "true";
+  const finishDrag = () => {
+    const drag = activeBoardDrag;
+    if (!drag) return null;
+    if (drag.sourcePiece) {
+      if (drag.previousVisibility) drag.sourcePiece.style.visibility = drag.previousVisibility;
+      else drag.sourcePiece.style.removeProperty("visibility");
+    }
+    drag.ghost?.remove();
+    activeBoardDrag = null;
+    return drag;
+  };
+  board.addEventListener("pointerdown", event => {
+    if (event.button !== 0 || event.isPrimary === false || thinking || resigned || isGameOver()) return;
+    const squareElement = event.target.closest?.("[data-square]");
+    const from = squareElement?.dataset.square, piece = from ? game.get(from) : null;
+    if (!piece || piece.color !== game.turn() || !isHumanTurn()) return;
+    const sourcePiece = squareElement.querySelector(".gc-piece");
+    if (!sourcePiece) return;
+    const rect = sourcePiece.getBoundingClientRect();
+    activeBoardDrag = { pointerId:event.pointerId,from,startX:event.clientX,startY:event.clientY,rect,sourcePiece,previousVisibility:sourcePiece.style.visibility,dragging:false,ghost:null };
+  });
+  document.addEventListener("pointermove", event => {
+    const drag = activeBoardDrag;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const dx=event.clientX-drag.startX,dy=event.clientY-drag.startY;
+    if (!drag.dragging && Math.hypot(dx,dy)<7) return;
+    if (!drag.dragging) {
+      drag.dragging=true;drag.sourcePiece.style.visibility="hidden";
+      const ghost=document.createElement("div");ghost.className="gc-drag-ghost";
+      Object.assign(ghost.style,{left:drag.rect.left+"px",top:drag.rect.top+"px",width:drag.rect.width+"px",height:drag.rect.height+"px"});
+      ghost.appendChild(drag.sourcePiece.cloneNode(true));document.body.appendChild(ghost);drag.ghost=ghost;
+    }
+    drag.ghost.style.transform="translate3d("+dx+"px,"+dy+"px,0)";
+    event.preventDefault();
+  },{passive:false});
+  document.addEventListener("pointerup", event => {
+    const drag=activeBoardDrag;if(!drag||drag.pointerId!==event.pointerId)return;
+    if(!drag.dragging){finishDrag();return;}
+    const destination=document.elementFromPoint(event.clientX,event.clientY)?.closest?.("[data-square]")?.dataset.square;
+    const from=drag.from;finishDrag();
+    suppressNextBoardClick=true;window.setTimeout(()=>{suppressNextBoardClick=false;},0);
+    if(!destination||destination===from||thinking||isGameOver())return;
+    const choices=game.moves({square:from,verbose:true}).filter(move=>move.to===destination);
+    if(!choices.length)return;
+    if(choices.length>1&&choices.every(move=>Boolean(move.promotion))){
+      choosePromotion(from,destination,choices,{skipAnimation:true});return;
+    }
+    const choice=choices[0];
+    commitMove({from,to:destination,promotion:choice.promotion},{skipAnimation:true});
+  });
+  document.addEventListener("pointercancel",event=>{if(activeBoardDrag?.pointerId===event.pointerId)finishDrag();});
+}
+
 // ============================================
 // RANDOM COLOR OPTION
 // ============================================
@@ -1457,6 +1537,16 @@ function installGlassChessPremiumBridge() {
     get termination() { return gameTermination ? { ...gameTermination } : null; },
     get generation() { return positionGeneration; },
     getBoardEffectsDiagnostics() { return boardEffects.getDiagnostics(); },
+    setMoveClassifications(items = []) {
+      moveClassifications.clear();
+      for (const item of Array.isArray(items) ? items : []) {
+        const quality = MOVE_QUALITY[item?.label], ply = Number(item?.ply), to = item?.move?.to;
+        if (!quality || !Number.isInteger(ply) || ply < 1 || !/^[a-h][1-8]$/.test(String(to || ""))) continue;
+        moveClassifications.set(ply, { ...quality, label: item.label, to });
+      }
+      renderBoard();
+      return moveClassifications.size;
+    },
     get turn() { return game.turn(); },
     get soundsEnabled() { return Boolean(settings.sounds); },
     setSoundEnabled(enabled) {
@@ -1591,13 +1681,16 @@ function installGlassChessPremiumBridge() {
     },
     rebuild(initialFen, moves) {
       const previousHistory = game.history({ verbose: true });
+      const sameMove = (a, b) => a && b && a.from === b.from && a.to === b.to &&
+        (a.promotion || undefined) === (b.promotion || undefined);
       const extendsByOne = Array.isArray(moves) && moves.length === previousHistory.length + 1 &&
-        previousHistory.every((oldMove, index) =>
-          oldMove.from === moves[index].from && oldMove.to === moves[index].to &&
-          (oldMove.promotion || undefined) === (moves[index].promotion || undefined)
-        );
+        previousHistory.every((oldMove, index) => sameMove(oldMove, moves[index]));
+      const retreatsByOne = Array.isArray(moves) && previousHistory.length === moves.length + 1 &&
+        moves.every((oldMove, index) => sameMove(oldMove, previousHistory[index]));
       const latestMove = extendsByOne ? moves[moves.length - 1] : null;
-      const motionSnapshot = latestMove ? boardEffects.captureMove(latestMove) : null;
+      const undoneMove = retreatsByOne ? previousHistory[previousHistory.length - 1] : null;
+      const motionSnapshot = latestMove ? boardEffects.captureMove(latestMove)
+        : undoneMove ? boardEffects.captureReverseMove(undoneMove) : null;
       gameStartFen = initialFen;
       gameToken++;
       positionGeneration++;
@@ -1611,6 +1704,7 @@ function installGlassChessPremiumBridge() {
       } finally { suppressGameCallbacks = false; }
       render();
       if (latestMove && motionSnapshot) finishMoveFeedback(latestMove, motionSnapshot);
+      else if (undoneMove && motionSnapshot) void boardEffects.animateMove(motionSnapshot);
     },
     calculatePositions(initialFen, moveList) {
       const savedMoves = game.history({ verbose: true });
@@ -1675,7 +1769,10 @@ function installGlassChessPremiumBridge() {
     const move = originalMove(...args);
     if (move && !suppressGameCallbacks) {
       const afterFen = game.fen();
-      const feedback = { motionSnapshot: boardEffects.captureMove(move), applied: true };
+      moveClassifications.clear();
+      const motionSnapshot = skipNextMoveAnimation ? null : boardEffects.captureMove(move);
+      skipNextMoveAnimation = false;
+      const feedback = { motionSnapshot, applied: true };
       moveFeedback.set(move, feedback);
       positionGeneration++;
 
@@ -1741,6 +1838,7 @@ function launch() {
   setupSettings();
   createAnalysisStudio();
   connectButtons();
+  installBoardDragDrop();
 
   applyPieceAppearance();
   applyPageBackground(settings.background);
