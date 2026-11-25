@@ -331,6 +331,10 @@ function addChatMessage(role, content, context = currentBoardContext()) {
     content: String(content),
     fen: context.fen,
     pgn: context.pgn,
+    turn: context.turn,
+    inCheck: context.inCheck,
+    checkState: context.checkState,
+    material: context.material,
     at: new Date().toISOString()
   });
   chatLog = chatLog.slice(-300);
