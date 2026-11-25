@@ -29,12 +29,12 @@
   box-shadow: inset 0 0 0 999px rgba(230,199,133,.14);
 }
 .gc-motion-ghost {
-  position: fixed; z-index: 2147481900; display: grid; place-items: center;
+  position: fixed; z-index: 49; display: grid; place-items: center;
   pointer-events: none !important; user-select: none; contain: layout paint;
-  will-change: transform, opacity;
+  will-change: transform, opacity; transform: translate3d(0,0,0);
 }
-.gc-motion-ghost-move,.gc-motion-ghost-castle-rook { z-index: 2147481950; }
-.gc-motion-ghost-capture { z-index: 2147481900; filter: saturate(.82); }
+.gc-motion-ghost-move,.gc-motion-ghost-castle-rook { z-index: 50; }
+.gc-motion-ghost-capture { z-index: 49; filter: saturate(.82); }
 .gc-motion-ghost .gc-piece {
   width: 100% !important; height: 100% !important; max-width: none !important;
   max-height: none !important; margin: 0 !important; transform: none !important;
@@ -88,3 +88,26 @@
   .gc-king-in-checkmate::before,.gc-king-in-checkmate .gc-piece,
   .gc-piece-promoted { animation: none !important; transition: none !important; }
 }
+
+
+/* Quality marks are attached to the current reviewed ply only. */
+#board .gc-move-quality-badge {
+  position:absolute;top:3px;right:3px;z-index:8;display:inline-grid;place-items:center;
+  min-width:15px;height:15px;padding:0 3px;border:1px solid currentColor;border-radius:5px;
+  color:#fff;background:rgba(12,18,29,.84);font:900 9px/1 system-ui,sans-serif;
+  letter-spacing:-.35px;text-shadow:0 1px 2px rgba(0,0,0,.35);
+  box-shadow:0 2px 6px rgba(0,0,0,.24);pointer-events:none;
+}
+#board .gc-quality-brilliant{color:#55dfc7}
+#board .gc-quality-great{color:#8dc5ff}
+#board .gc-quality-best{color:#76dfa0;font-size:11px}
+#board .gc-quality-inaccuracy{color:#f1cf7b;font-size:8px}
+#board .gc-quality-mistake{color:#ffad68}
+#board .gc-quality-blunder{color:#ff7487}
+#board .gc-quality-checkmate{color:#efd38e}
+.gc-drag-ghost {
+  position:fixed;z-index:60;display:grid;place-items:center;pointer-events:none!important;
+  user-select:none;will-change:transform;filter:drop-shadow(0 8px 9px rgba(0,0,0,.35));
+}
+.gc-drag-ghost .gc-piece{width:100%!important;height:100%!important;transform:none!important}
+@media(prefers-reduced-motion:reduce){.gc-motion-ghost,.gc-drag-ghost{transition:none!important;animation:none!important}}
