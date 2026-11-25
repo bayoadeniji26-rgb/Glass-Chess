@@ -1282,6 +1282,7 @@ async function hint() {
   const isCurrentPosition = () =>
     token === gameToken && generation === positionGeneration && game.fen() === fen;
   let watchdog = null;
+  let cancelled = false;
 
   try {
     // chess.js validates the complete FEN before it is sent to Stockfish.
@@ -1300,7 +1301,7 @@ async function hint() {
 
     const request = (async () => {
       await ensureEngineReady();
-      if (!isCurrentPosition()) return { cancelled: true };
+      if (cancelled || !isCurrentPosition()) return { cancelled: true };
       return engine.search(fen, {
         depth: DEPTH,
         timeoutMs: 5000,
@@ -1339,6 +1340,7 @@ async function hint() {
     showHintStatus("Suggested Move: " + move.san + " · " + move.from + " → " + move.to, "success");
     setEngineStatus("Stockfish 19 ready");
   } catch (error) {
+    cancelled = true;
     if (watchdog !== null) window.clearTimeout(watchdog);
     activeHintMove = null;
     $("board")?.querySelector(".gc-hint-arrow-layer")?.remove();
