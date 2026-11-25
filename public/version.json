@@ -1,11 +1,14 @@
 {
-  "version": "2026.11.25.3",
-  "name": "Glass Chess Hint Recovery & Smooth Piece Motion",
+  "version": "2026.11.25.4",
+  "name": "Glass Chess King Pawn & Personal Save",
   "updatedAt": "2026-11-25",
   "notes": [
-    "Hint requests now report Stockfish search progress and recover cleanly from cancellation",
-    "Stockfish searches have a watchdog timeout and automatically restart a stalled worker",
-    "Late messages from replaced Stockfish workers are ignored",
-    "Pawn and piece drag-and-drop moves use the same smooth single-piece movement animation as click moves"
+    "Hint now validates the live FEN, requests Stockfish within a five-second watchdog, and shows visible errors",
+    "Hint origin and destination squares glow with a directional board arrow",
+    "PNG export actions are kept directly beside board controls",
+    "Added custom background images and player/opponent profile pictures",
+    "Added King Pawn, a board-aware chess advisor connected to the live FEN and PGN",
+    "Added IndexedDB autosave and portable JSON save export/import for images, chat, settings and games",
+    "Cloud sync adapter hooks are available but require a configured secure backend"
   ]
 }
