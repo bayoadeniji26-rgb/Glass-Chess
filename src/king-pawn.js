@@ -68,10 +68,18 @@ function applyBackground(dataUrl) {
   if (!dataUrl) {
     document.body.classList.remove('gc-custom-background');
     document.body.style.removeProperty('--gc-custom-background-image');
+    document.body.style.removeProperty('background-image');
+    document.body.style.removeProperty('background-size');
+    document.body.style.removeProperty('background-position');
     return;
   }
   document.body.classList.add('gc-custom-background');
   document.body.style.setProperty('--gc-custom-background-image', 'url("' + dataUrl.replace(/["\\\n\r]/g, '') + '")');
+  // main.js uses an important inline background shorthand; set the image layer inline too.
+  document.body.style.setProperty('background-image', 'linear-gradient(rgba(8,12,22,.56), rgba(8,12,22,.68)), var(--gc-custom-background-image)', 'important');
+  document.body.style.setProperty('background-size', 'cover', 'important');
+  document.body.style.setProperty('background-position', 'center', 'important');
+  document.body.style.setProperty('background-attachment', 'fixed', 'important');
 }
 
 function createAvatar(label, side, initial) {
