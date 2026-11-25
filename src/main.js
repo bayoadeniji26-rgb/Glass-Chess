@@ -1238,41 +1238,65 @@ async function hint() {
   const generation = positionGeneration;
   const fen = game.fen();
   const side = game.turn();
+  const isCurrentPosition = () =>
+    token === gameToken && generation === positionGeneration && game.fen() === fen;
 
   $("best-move").textContent = "Finding a hint...";
-  setEngineStatus("Calculating hint...");
+  setEngineStatus("Starting Stockfish for hint...");
 
   try {
     await ensureEngineReady();
-    if (token !== gameToken || generation !== positionGeneration || game.fen() !== fen) return;
+    if (!isCurrentPosition()) {
+      if (token === gameToken) {
+        $("best-move").textContent = "Position changed — request a new hint.";
+        setEngineStatus(engine.ready ? "Stockfish 19 ready" : "Stockfish restarting...");
+      }
+      return;
+    }
+
     const result = await engine.search(fen, {
       depth: DEPTH,
+      timeoutMs: 22000,
       onInfo: info => {
-        if (token === gameToken && generation === positionGeneration && game.fen() === fen) {
-          updateEvaluation(info, side);
-        }
+        if (!isCurrentPosition()) return;
+        updateEvaluation(info, side);
+        setEngineStatus(info?.depth
+          ? `Stockfish calculating hint · depth ${info.depth}`
+          : "Stockfish calculating hint...");
       }
     });
 
-    if (token !== gameToken || generation !== positionGeneration || game.fen() !== fen || result.cancelled) return;
+    if (!isCurrentPosition()) {
+      if (token === gameToken) {
+        $("best-move").textContent = "Position changed — request a new hint.";
+        setEngineStatus(engine.ready ? "Stockfish 19 ready" : "Stockfish restarting...");
+      }
+      return;
+    }
+    if (result.cancelled) {
+      $("best-move").textContent = "Hint search was interrupted. Press Hint to try again.";
+      setEngineStatus(engine.ready ? "Stockfish 19 ready" : "Stockfish restarting...");
+      return;
+    }
 
     const move = getEngineMove(result.bestMove);
+    if (!move) throw new Error("Stockfish finished without returning a legal move.");
 
-    $("best-move").textContent = move
-      ? `Hint: ${move.san} (${move.from} → ${move.to})`
-      : "No hint available.";
-
+    $("best-move").textContent = `Hint: ${move.san} (${move.from} → ${move.to})`;
     setEngineStatus("Stockfish 19 ready");
   } catch (error) {
-    if (token === gameToken) {
-      $("best-move").textContent = "Hint unavailable.";
-      setEngineStatus("Engine error");
-      console.error(error);
+    if (token === gameToken && generation === positionGeneration) {
+      $("best-move").textContent = "Hint unavailable — " + (error?.message || "Stockfish could not complete the search.");
+      setEngineStatus(engine.ready ? "Stockfish 19 ready" : "Stockfish recovering...");
+      console.error("Stockfish hint failed:", error);
     }
   } finally {
+    // Always release the hint's thinking lock for the same game, including
+    // cancellation and timeout paths. A new game owns its own lock.
     if (token === gameToken) {
       thinking = false;
       render();
+      if (engine.ready && !isGameOver()) setEngineStatus("Stockfish 19 ready");
     }
   }
 }
@@ -1440,10 +1464,12 @@ function installBoardDragDrop() {
     const choices=game.moves({square:from,verbose:true}).filter(move=>move.to===destination);
     if(!choices.length)return;
     if(choices.length>1&&choices.every(move=>Boolean(move.promotion))){
-      choosePromotion(from,destination,choices,{skipAnimation:true});return;
+      choosePromotion(from,destination,choices);return;
     }
     const choice=choices[0];
-    commitMove({from,to:destination,promotion:choice.promotion},{skipAnimation:true});
+    // Dragging only controls the input gesture; the landing move still gets the
+    // same single-piece FLIP animation as a click-to-move.
+    commitMove({from,to:destination,promotion:choice.promotion});
   });
   document.addEventListener("pointercancel",event=>{if(activeBoardDrag?.pointerId===event.pointerId)finishDrag();});
 }
