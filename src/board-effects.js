@@ -11,7 +11,7 @@ export function createBoardEffects(board, isSoundEnabled = () => true, isAnimati
   const timers = new Map();
   const timerHandles = new Set();
   const animations = new Set();
-  const ghosts = new Set();
+  const motionNodes = new Set();
   const transientCleanups = new Set();
   const reducedMotion = () => Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
   const motionAllowed = () => !disposed && !reducedMotion() && Boolean(isAnimationEnabled());
@@ -22,24 +22,23 @@ export function createBoardEffects(board, isSoundEnabled = () => true, isAnimati
   }
 
   function pieceSnapshot(squareName) {
-    const piece = getSquare(squareName)?.querySelector('.gc-piece');
-    if (!piece) return null;
-    const rect = piece.getBoundingClientRect();
-    return { clone: piece.cloneNode(true), rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height } };
+    const element = getSquare(squareName)?.querySelector('.gc-piece');
+    if (!element) return null;
+    const rect = element.getBoundingClientRect();
+    return { element, rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height } };
   }
 
   function captureMove(move) {
     if (!move || !board) return null;
+    cancelTransientMotion();
     const motions = [];
     const mover = pieceSnapshot(move.from);
-    if (mover) motions.push({ ...mover, type: 'move', from: move.from, to: move.to });
-
+    if (mover) motions.push({ ...mover, type: 'move', from: move.from, to: move.to, promotion: move.promotion || null });
     if (move.captured) {
       const captureSquare = move.flags?.includes('e') ? move.to[0] + move.from[1] : move.to;
       const captured = pieceSnapshot(captureSquare);
       if (captured) motions.push({ ...captured, type: 'capture', from: captureSquare, to: move.to });
     }
-
     const fromFile = move.from.charCodeAt(0), toFile = move.to.charCodeAt(0);
     if (move.piece === 'k' && Math.abs(toFile - fromFile) === 2) {
       const rank = move.from[1], kingSide = toFile > fromFile;
@@ -72,19 +71,6 @@ export function createBoardEffects(board, isSoundEnabled = () => true, isAnimati
     }, duration);
     byClass.set(className, timer);
     timerHandles.add(timer);
-  }
-
-  function makeGhost(snapshot, type) {
-    const ghost = document.createElement('div');
-    ghost.className = 'gc-motion-ghost gc-motion-ghost-' + type;
-    Object.assign(ghost.style, {
-      left: snapshot.rect.left + 'px', top: snapshot.rect.top + 'px',
-      width: snapshot.rect.width + 'px', height: snapshot.rect.height + 'px'
-    });
-    ghost.appendChild(snapshot.clone);
-    document.body.appendChild(ghost);
-    ghosts.add(ghost);
-    return ghost;
   }
 
   function runAnimation(element, keyframes, options, cleanup = () => {}) {
@@ -120,8 +106,56 @@ export function createBoardEffects(board, isSoundEnabled = () => true, isAnimati
       try { animation.cancel(); } catch {}
     }
     animations.clear();
-    for (const ghost of ghosts) ghost.remove();
-    ghosts.clear();
+    motionNodes.clear();
+  }
+
+  function animatePieceNode(element, keyframes, options, cleanup) {
+    let animation = null, timer = null, settled = false, resolve;
+    const promise = new Promise(done => { resolve = done; });
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      if (timer !== null) {
+        window.clearTimeout(timer);
+        timerHandles.delete(timer);
+        timer = null;
+      }
+      transientCleanups.delete(finish);
+      if (animation) {
+        animations.delete(animation);
+        try { animation.cancel(); } catch {}
+      }
+      cleanup();
+      motionNodes.delete(element);
+      resolve();
+    };
+    transientCleanups.add(finish);
+    motionNodes.add(element);
+    if (!motionAllowed() || typeof element?.animate !== 'function') {
+      finish();
+      return promise;
+    }
+    try {
+      animation = element.animate(keyframes, {
+        duration: options.duration,
+        easing: options.easing,
+        fill: 'both'
+      });
+      animations.add(animation);
+      animation.finished.then(finish, finish);
+      timer = window.setTimeout(finish, options.duration + 180);
+      timerHandles.add(timer);
+    } catch {
+      finish();
+    }
+    return promise;
+  }
+
+  function resetMotionStyles(element) {
+    element.classList.remove('gc-piece-in-flight', 'gc-piece-capture-flight');
+    for (const property of ['position','left','top','width','height','z-index','will-change','transform','opacity','filter']) {
+      element.style.removeProperty(property);
+    }
   }
 
   function animateMove(snapshot) {
@@ -130,90 +164,62 @@ export function createBoardEffects(board, isSoundEnabled = () => true, isAnimati
     const completions = [];
 
     for (const motion of snapshot.motions) {
-      const isCapture = motion.type === 'capture';
-      const targetRect = isCapture ? null : getSquare(motion.to)?.getBoundingClientRect();
-      if (!isCapture && !targetRect) continue;
-      const ghost = makeGhost(motion, motion.type);
+      const element = motion.element;
+      if (!element) continue;
 
-      if (isCapture) {
-        let timer = null, settled = false, resolve;
-        const promise = new Promise(done => { resolve = done; });
+      if (motion.type === 'capture') {
+        Object.assign(element.style, {
+          position: 'fixed', left: motion.rect.left + 'px', top: motion.rect.top + 'px',
+          width: motion.rect.width + 'px', height: motion.rect.height + 'px',
+          zIndex: '49', willChange: 'transform, opacity'
+        });
+        element.classList.add('gc-piece-capture-flight');
+        document.body.appendChild(element);
         const cleanup = () => {
-          ghost.removeEventListener('transitionend', onEnd);
-          transientCleanups.delete(finish);
-          ghost.remove();
-          ghosts.delete(ghost);
+          element.remove();
+          resetMotionStyles(element);
         };
-        const finish = () => {
-          if (settled) return;
-          settled = true;
-          if (timer !== null) { window.clearTimeout(timer); timerHandles.delete(timer); timer = null; }
-          cleanup(); resolve();
-        };
-        const onEnd = event => {
-          if (event.target === ghost && event.propertyName === 'opacity') finish();
-        };
-        transientCleanups.add(finish);
-        ghost.style.transition = 'none';
-        void ghost.offsetHeight;
-        ghost.addEventListener('transitionend', onEnd);
-        ghost.style.transition = 'opacity ' + BOARD_MOTION.capture + 'ms ease-out, transform ' + BOARD_MOTION.capture + 'ms ease-out';
-        ghost.style.opacity = '0';
-        ghost.style.transform = 'translate3d(0,-2px,0) scale(.88)';
-        timer = window.setTimeout(finish, BOARD_MOTION.capture + 140);
-        timerHandles.add(timer);
-        completions.push(promise);
+        completions.push(animatePieceNode(element, [
+          { transform: 'translate3d(0,0,0) scale(1)', opacity: 1, offset: 0 },
+          { transform: 'translate3d(0,-2px,0) scale(.92)', opacity: 0, offset: 1 }
+        ], { duration: BOARD_MOTION.capture, easing: 'cubic-bezier(.2,.8,.2,1)' }, cleanup));
         continue;
       }
 
-      const targetLeft = targetRect.left + (targetRect.width - motion.rect.width) / 2;
-      const targetTop = targetRect.top + (targetRect.height - motion.rect.height) / 2;
+      const targetSquare = getSquare(motion.to);
+      const targetRect = targetSquare?.getBoundingClientRect();
+      if (!targetSquare || !targetRect) continue;
+      const destinationPiece = targetSquare.querySelector('.gc-piece');
+      const isPromotion = Boolean(motion.promotion);
+      if (destinationPiece && destinationPiece !== element) {
+        if (isPromotion) destinationPiece.style.visibility = 'hidden';
+        else destinationPiece.remove();
+      }
+
       const dx = targetRect.left + targetRect.width / 2 - (motion.rect.left + motion.rect.width / 2);
       const dy = targetRect.top + targetRect.height / 2 - (motion.rect.top + motion.rect.height / 2);
-      ghost.style.left = targetLeft + 'px';
-      ghost.style.top = targetTop + 'px';
-      const destinationPiece = getSquare(motion.to)?.querySelector('.gc-piece') || null;
-      const previousVisibility = destinationPiece?.style.visibility || '';
-      if (destinationPiece) destinationPiece.style.visibility = 'hidden';
+      element.classList.add('gc-piece-in-flight');
+      element.style.zIndex = '50';
+      element.style.willChange = 'transform';
+      targetSquare.appendChild(element);
 
-      let timer = null, settled = false, resolve;
-      const promise = new Promise(done => { resolve = done; });
       const cleanup = () => {
-        ghost.removeEventListener('transitionend', onEnd);
-        transientCleanups.delete(finish);
-        ghost.remove();
-        ghosts.delete(ghost);
-        if (destinationPiece) {
-          if (previousVisibility) destinationPiece.style.visibility = previousVisibility;
-          else destinationPiece.style.removeProperty('visibility');
-        }
+        resetMotionStyles(element);
+        if (isPromotion && destinationPiece) destinationPiece.style.removeProperty('visibility');
       };
-      const finish = () => {
-        if (settled) return;
-        settled = true;
-        if (timer !== null) { window.clearTimeout(timer); timerHandles.delete(timer); timer = null; }
-        cleanup(); resolve();
-      };
-      const onEnd = event => {
-        if (event.target === ghost && event.propertyName === 'transform') finish();
-      };
-      transientCleanups.add(finish);
-      ghost.style.transition = 'none';
-      ghost.style.transform = 'translate3d(' + (-dx) + 'px,' + (-dy) + 'px,0)';
-      ghost.style.zIndex = '50';
-      void ghost.offsetHeight;
-      ghost.addEventListener('transitionend', onEnd);
-      ghost.style.transition = 'transform ' + BOARD_MOTION.move + 'ms cubic-bezier(.2,.8,.2,1)';
-      ghost.style.transform = 'translate3d(0,0,0)';
-      timer = window.setTimeout(finish, BOARD_MOTION.move + 140);
-      timerHandles.add(timer);
-      completions.push(promise);
+      completions.push(animatePieceNode(element, [
+        { transform: 'translate3d(' + (-dx) + 'px,' + (-dy) + 'px,0) scale(.97)', offset: 0 },
+        { transform: 'translate3d(' + (-dx * .78) + 'px,' + (-dy * .78) + 'px,0) scale(1.055)', offset: .18 },
+        { transform: 'translate3d(' + (-dx * .18) + 'px,' + (-dy * .18) + 'px,0) scale(1.035)', offset: .72 },
+        { transform: 'translate3d(0,0,0) scale(1)', offset: 1 }
+      ], { duration: BOARD_MOTION.move, easing: 'cubic-bezier(.2,.8,.2,1)' }, cleanup));
     }
     return Promise.all(completions);
   }
 
   function captureReverseMove(move) {
     if (!move || !board) return null;
+    cancelTransientMotion();
     const motions = [];
     const mover = pieceSnapshot(move.to);
     if (mover) motions.push({ ...mover, type: 'move', from: move.to, to: move.from });
@@ -302,7 +308,7 @@ export function createBoardEffects(board, isSoundEnabled = () => true, isAnimati
   function getDiagnostics() {
     return {
       activeTimers: timerHandles.size, activeAnimations: animations.size,
-      activeGhosts: ghosts.size, activeMotionCleanups: transientCleanups.size,
+      activeGhosts: motionNodes.size, activeMotionCleanups: transientCleanups.size,
       audioContextState: audioContext?.state || 'not-created',
       reducedMotion: reducedMotion(), animationsEnabled: Boolean(isAnimationEnabled())
     };
@@ -317,8 +323,7 @@ export function createBoardEffects(board, isSoundEnabled = () => true, isAnimati
     cancelTransientMotion();
     for (const animation of animations) { try { animation.cancel(); } catch {} }
     animations.clear();
-    for (const ghost of ghosts) ghost.remove();
-    ghosts.clear();
+    motionNodes.clear();
     try { audioContext?.close?.().catch(() => {}); } catch {}
     audioContext = null;
   }
