@@ -1,16 +1,13 @@
 {
-  "version": "2026.11.25.6",
-  "name": "Glass Chess Cloud Accounts & Vault",
+  "version": "2026.11.25.7",
+  "name": "Glass Chess Auth & Donation Message Update",
   "updatedAt": "2026-11-25",
   "notes": [
-    "Optional Google sign-in with a guest-first experience and profile menu",
-    "Firebase Auth, Firestore profile/game sync, Storage images, offline persistence, and a Cloud Game Vault after Firebase setup",
-    "Cash App Donate and copy-tag actions for $RaphaelAboy",
-    "Hint verifies the current FEN, confirms Stockfish readiness, enforces a five-second timeout, and shows tactical arrows and square highlights",
-    "Clear Hint action and improved King Pawn move suggestion messaging",
-    "Viewport-locked desktop workspace with pinned Download PNG and Copy PNG actions",
-    "Compressed custom backgrounds and player avatars, preset backgrounds, and adjustable image dimmer",
-    "King Pawn quick prompts and saved per-message FEN, PGN, turn, check, and material context",
-    "SaveEngine keeps local IndexedDB and JSON backup support while signed-in profiles sync across devices"
+    "Google sign-in readiness checks now require Firebase web app authentication values and no longer block sign-in when Storage bucket setup is deferred",
+    "Google sign-in shows specific Firebase setup and OAuth/domain error guidance",
+    "Donate opens a message and suggested-amount dialog with a separate Cash App payment link",
+    "Donation notes send through EmailJS when its service, template and public key are configured",
+    "Download PNG and Copy PNG are repositioned clear of the floating Glass Hub Tools orb",
+    "Guests can continue playing without a Google account and local saves remain available"
   ]
 }
