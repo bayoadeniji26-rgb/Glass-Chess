@@ -283,6 +283,1324 @@ async function sendDonationMessage() {
     from_name: $('gc-donation-name').value.trim() || 'Glass Chess visitor',
     reply_to: email || '',
     donation_amount: selectedAmount === 'Other amount' ? '
+    cashapp_tag: CASHAPP_TAG,
+    submitted_at: new Date().toLocaleString(),
+    source_url: window.location.origin
+  };
+  try {
+    const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        service_id: EMAILJS_SERVICE_ID,
+        template_id: EMAILJS_TEMPLATE_ID,
+        user_id: EMAILJS_PUBLIC_KEY,
+        template_params: templateParams
+      })
+    });
+    if (!response.ok) {
+      const detail = await response.text().catch(() => '');
+      throw new Error(detail.slice(0, 300) || 'The email service rejected the message.');
+    }
+    status.textContent = 'Message sent! Thank you for supporting Glass Chess.';
+    toast('Your message was sent to the Glass Chess creator.');
+    form.reset();
+    $('gc-donation-custom-amount').hidden = true;
+  } catch (error) {
+    status.textContent = 'Your message could not be sent: ' + (error.message || 'Email service error') + '. Please try again.';
+    status.classList.add('is-error');
+    toast('Donation message could not be emailed.', true);
+  } finally {
+    send.disabled = false;
+    send.textContent = 'Send message';
+  }
+}
+
+function authErrorMessage(error) {
+  const code = error?.code || '';
+  const messages = {
+    'auth/unauthorized-domain': 'This website address is not authorized in Firebase Authentication. Add glass-chess-pro.onrender.com under Authentication → Settings → Authorized domains.',
+    'auth/operation-not-allowed': 'Google sign-in is disabled in Firebase. Enable Google under Authentication → Sign-in method.',
+    'auth/invalid-api-key': 'The Firebase API key is missing or incorrect. Copy the Web app config from Firebase Project settings.',
+    'auth/popup-blocked': 'The browser blocked the Google sign-in popup. Allow popups for this site and try again.',
+    'auth/popup-closed-by-user': 'The Google sign-in window was closed before sign-in finished.',
+    'auth/network-request-failed': 'Google sign-in could not reach Firebase. Check your internet connection or browser privacy extensions.',
+    'auth/web-storage-unsupported': 'This browser blocked the storage needed for Google sign-in. Try allowing site data or using another browser.',
+    'auth/invalid-oauth-client-id': 'The Google OAuth client is not configured correctly. Re-enable Google in Firebase Authentication and check its Web client in Google Cloud.'
+  };
+  return messages[code] || error?.message || 'Google sign-in could not be completed.';
+}
+
+function renderAuth() {
+  const signInButton = $('gc-google-signin');
+  const pill = $('gc-user-pill');
+  if (!signInButton || !pill) return;
+  signInButton.hidden = Boolean(activeUser);
+  pill.hidden = !activeUser;
+  if (!activeUser) return;
+  const image = profileAvatarUrl || activeUser.photoURL || '';
+  const avatar = $('gc-user-avatar');
+  if (image) {
+    avatar.src = image;
+    avatar.hidden = false;
+  } else {
+    avatar.removeAttribute('src');
+    avatar.hidden = true;
+  }
+  $('gc-user-name').textContent = activeUser.displayName || activeUser.email?.split('@')[0] || 'Glass Chess player';
+}
+
+async function loadFirebaseSdk() {
+  if (firebaseReady) return;
+  if (!hasFirebaseConfig) {
+    throw new Error('Google sign-in is not configured yet. Missing Firebase web-app values: ' +
+      missingFirebaseFields.map(key => 'VITE_FIREBASE_' + key.replace(/[A-Z]/g, letter => '_' + letter).toUpperCase()).join(', ') +
+      '. Copy them from Firebase Console → Project settings → Your apps → Web app, then add them to Render and redeploy.');
+  }
+  const [appModule, authModule, firestoreModule, storageModule] = await Promise.all([
+    import(/* @vite-ignore */ FIREBASE_CDN + 'firebase-app.js'),
+    import(/* @vite-ignore */ FIREBASE_CDN + 'firebase-auth.js'),
+    import(/* @vite-ignore */ FIREBASE_CDN + 'firebase-firestore.js'),
+    import(/* @vite-ignore */ FIREBASE_CDN + 'firebase-storage.js')
+  ]);
+  appSdk = appModule;
+  authSdk = authModule;
+  firestoreSdk = firestoreModule;
+  storageSdk = storageModule;
+  app = appSdk.getApps().length ? appSdk.getApp() : appSdk.initializeApp(firebaseConfig);
+  auth = authSdk.getAuth(app);
+  storage = firebaseConfig.storageBucket ? storageSdk.getStorage(app) : null;
+
+  // Keep Firestore's IndexedDB offline persistence enabled. Firebase currently
+  // marks this function obsolete but still exports it; the cache continues to
+  // work when the browser supports it. Failure is non-fatal (multi-tab/browser limits).
+  db = firestoreSdk.getFirestore(app);
+  if (typeof firestoreSdk.enableIndexedDbPersistence === 'function') {
+    try {
+      await firestoreSdk.enableIndexedDbPersistence(db);
+    } catch (error) {
+      console.info('Firestore IndexedDB persistence was not enabled:', error.code || error.message);
+    }
+  }
+  firebaseReady = true;
+}
+
+function mobileBrowser() {
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+    window.matchMedia?.('(max-width: 700px)').matches;
+}
+
+async function signIn() {
+  const button = $('gc-google-signin');
+  if (button) {
+    button.disabled = true;
+    button.querySelector('span').textContent = 'Connecting…';
+  }
+  try {
+    await loadFirebaseSdk();
+    const provider = new authSdk.GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    if (mobileBrowser()) {
+      await authSdk.signInWithRedirect(auth, provider);
+      return;
+    }
+    try {
+      await authSdk.signInWithPopup(auth, provider);
+    } catch (error) {
+      if (['auth/popup-blocked', 'auth/operation-not-supported-in-this-environment', 'auth/web-storage-unsupported'].includes(error.code)) {
+        await authSdk.signInWithRedirect(auth, provider);
+        return;
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error('Glass Chess Google sign-in failed:', error);
+    toast(authErrorMessage(error), true);
+  } finally {
+    if (button) {
+      button.disabled = false;
+      const span = button.querySelector('span');
+      if (span) span.textContent = 'Sign in with Google';
+    }
+  }
+}
+
+function profileRef(uid) {
+  return firestoreSdk.doc(db, 'users', uid, 'profile', 'settings');
+}
+function gamesRef(uid) {
+  return firestoreSdk.collection(db, 'users', uid, 'games');
+}
+
+function hashId(value) {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+async function uploadProfileAsset(uid, name, value) {
+  if (!value) return '';
+  if (/^https?:\/\//i.test(value)) return value;
+  if (!storage) return '';
+  if (!/^data:image\/(png|jpeg|webp);base64,/i.test(value)) return '';
+  const cacheKey = uid + ':' + name;
+  const previous = uploadedAssets.get(cacheKey);
+  if (previous?.data === value) return previous.url;
+  const match = value.match(/^data:(image\/(?:png|jpeg|webp));base64,/i);
+  const contentType = match?.[1] || 'image/webp';
+  const object = storageSdk.ref(storage, 'users/' + uid + '/profile/' + name);
+  await storageSdk.uploadString(object, value, 'data_url', { contentType });
+  const url = await storageSdk.getDownloadURL(object);
+  uploadedAssets.set(cacheKey, { data: value, url });
+  return url;
+}
+
+function gameDocumentId(user, game) {
+  const base = String(game.id || 'g_' + hashId(String(game.pgn || '') + '|' + String(game.fen || '')));
+  const safe = base.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 110);
+  return user.uid.slice(0, 12) + '_' + safe;
+}
+
+async function pushCloudState(state) {
+  if (!activeUser || !db) throw new Error('Sign in to sync your Glass Chess profile.');
+  const user = activeUser;
+  const [backgroundImageUrl, playerAvatarUrl, opponentAvatarUrl] = await Promise.all([
+    uploadProfileAsset(user.uid, 'background', state.backgroundImage || state.backgroundUrl || ''),
+    uploadProfileAsset(user.uid, 'avatar-player', state.avatars?.player || ''),
+    uploadProfileAsset(user.uid, 'avatar-opponent', state.avatars?.opponent || '')
+  ]);
+  const games = Array.isArray(state.games) ? state.games.slice(-150) : [];
+  if (state.activePgn && !games.some(game => game.pgn === state.activePgn)) {
+    games.push({ id: 'active_' + hashId(state.activePgn), pgn: state.activePgn, fen: state.activeFen || '', savedAt: new Date().toISOString(), status: 'in-progress' });
+  }
+  const cleanGames = games.filter(game => typeof game?.pgn === 'string' && game.pgn.trim()).slice(-150);
+  const profileData = {
+    ownerUid: user.uid,
+    displayName: user.displayName || '',
+    email: user.email || '',
+    photoURL: user.photoURL || '',
+    avatarUrl: profileAvatarUrl || '',
+    backgroundImageUrl,
+    backgroundUrl: state.backgroundUrl || '',
+    backgroundDimmer: Math.max(0, Math.min(88, Number(state.backgroundDimmer ?? 56))),
+    avatars: { player: playerAvatarUrl, opponent: opponentAvatarUrl },
+    chatLog: (Array.isArray(state.chatLog) ? state.chatLog : []).slice(-30).map(item => ({
+      role: String(item.role || '').slice(0, 20),
+      content: String(item.content || '').slice(0, 3000),
+      fen: String(item.fen || '').slice(0, 120),
+      pgn: String(item.pgn || '').slice(0, 10000),
+      turn: item.turn === 'b' ? 'b' : 'w',
+      inCheck: Boolean(item.inCheck),
+      checkState: String(item.checkState || '').slice(0, 80),
+      material: item.material && typeof item.material === 'object' ? item.material : {},
+      at: String(item.at || '')
+    })),
+    localStorage: state.localStorage || {},
+    activePgn: String(state.activePgn || ''),
+    activeFen: String(state.activeFen || ''),
+    updatedAtIso: new Date().toISOString(),
+    updatedAt: firestoreSdk.serverTimestamp()
+  };
+
+  const batch = firestoreSdk.writeBatch(db);
+  batch.set(profileRef(user.uid), profileData, { merge: true });
+  for (const game of cleanGames) {
+    const id = gameDocumentId(user, game);
+    const gameData = {
+      id,
+      ownerUid: user.uid,
+      pgn: game.pgn,
+      fen: String(game.fen || ''),
+      opponent: String(game.opponent || 'Glass Chess').slice(0, 120),
+      result: String(game.result || game.status || 'saved').slice(0, 60),
+      savedAtIso: String(game.savedAt || game.date || new Date().toISOString()),
+      updatedAtIso: new Date().toISOString()
+    };
+    batch.set(firestoreSdk.doc(db, 'users', user.uid, 'games', id), gameData, { merge: true });
+    batch.set(firestoreSdk.doc(db, 'global_matches', id), gameData, { merge: true });
+  }
+  await batch.commit();
+  return { syncedAt: new Date().toISOString(), gameCount: cleanGames.length };
+}
+
+async function pullCloudState() {
+  if (!activeUser || !db) throw new Error('Sign in to load your cloud profile.');
+  const user = activeUser;
+  const [profileSnapshot, gamesSnapshot] = await Promise.all([
+    firestoreSdk.getDoc(profileRef(user.uid)),
+    firestoreSdk.getDocs(gamesRef(user.uid))
+  ]);
+  const profile = profileSnapshot.exists() ? profileSnapshot.data() : {};
+  const games = gamesSnapshot.docs.map(snapshot => snapshot.data())
+    .sort((a, b) => String(a.savedAtIso || '').localeCompare(String(b.savedAtIso || '')));
+  return {
+    schema: 1,
+    backgroundImage: profile.backgroundImageUrl || profile.backgroundUrl || '',
+    backgroundUrl: profile.backgroundUrl || '',
+    backgroundDimmer: Number(profile.backgroundDimmer ?? 56),
+    avatars: profile.avatars || { player: '', opponent: '' },
+    chatLog: Array.isArray(profile.chatLog) ? profile.chatLog : [],
+    games,
+    activePgn: profile.activePgn || '',
+    activeFen: profile.activeFen || '',
+    localStorage: profile.localStorage || {},
+    profileAvatarUrl: profile.avatarUrl || '',
+    profileData: profile,
+    updatedAt: profile.updatedAtIso || ''
+  };
+}
+
+const cloudAdapter = {
+  push: pushCloudState,
+  pull: pullCloudState
+};
+
+function mergeCloudAndLocal(remote, local) {
+  const byId = new Map();
+  for (const game of [...(local.games || []), ...(remote.games || [])]) {
+    const key = game.id || game.pgn;
+    if (key) byId.set(key, game);
+  }
+  const chat = new Map();
+  for (const item of [...(local.chatLog || []), ...(remote.chatLog || [])]) {
+    const key = [item.at, item.role, item.content].join('|');
+    chat.set(key, item);
+  }
+  return {
+    ...local,
+    ...remote,
+    backgroundImage: remote.backgroundImage || local.backgroundImage || '',
+    backgroundUrl: remote.backgroundUrl || local.backgroundUrl || '',
+    backgroundDimmer: remote.backgroundDimmer ?? local.backgroundDimmer ?? 56,
+    avatars: { ...(local.avatars || {}), ...(remote.avatars || {}) },
+    chatLog: Array.from(chat.values()).slice(-300),
+    games: Array.from(byId.values()).slice(-150),
+    activePgn: remote.activePgn || local.activePgn || '',
+    activeFen: remote.activeFen || local.activeFen || '',
+    localStorage: { ...(local.localStorage || {}), ...(remote.localStorage || {}) }
+  };
+}
+
+function applyCloudProfileToApp(profile) {
+  profileAvatarUrl = profile.avatarUrl || profile.photoURL || profileAvatarUrl;
+  renderAuth();
+  Promise.resolve(window.GlassChessKingPawn?.applyCloudProfile?.(profile))
+    .catch(error => console.warn('Cloud profile could not be applied to the local workspace:', error));
+}
+
+function stopCloudObservers() {
+  stopProfileObserver?.();
+  stopGamesObserver?.();
+  stopProfileObserver = null;
+  stopGamesObserver = null;
+}
+
+function renderVault() {
+  const host = $('gc-cloud-vault-list');
+  const count = $('gc-cloud-vault-count');
+  if (!host || !count) return;
+  count.textContent = cloudGames.length + (cloudGames.length === 1 ? ' saved match' : ' saved matches');
+  host.replaceChildren();
+  const summary = $('gc-cloud-vault-profile');
+  const chats = $('gc-cloud-vault-chat');
+  if (summary) {
+    let preferences = {};
+    try { preferences = JSON.parse(cloudProfile.localStorage?.['glass-chess-settings'] || '{}'); } catch {}
+    const theme = String(preferences.theme || 'midnight').replace(/[-_]/g, ' ');
+    const bg = cloudProfile.backgroundImageUrl || cloudProfile.backgroundUrl ? 'Custom background' : String(preferences.background || 'midnight').replace(/[-_]/g, ' ');
+    const avatarCount = Object.values(cloudProfile.avatars || {}).filter(Boolean).length;
+    summary.replaceChildren();
+    const description = document.createElement('p');
+    description.textContent = 'Theme: ' + theme + ' · Background: ' + bg + ' · Custom player pictures: ' + avatarCount + ' · King Pawn messages: ' + (cloudProfile.chatLog || []).length;
+    const restore = document.createElement('button');
+    restore.type = 'button';
+    restore.textContent = 'Restore Cloud Profile';
+    restore.addEventListener('click', async () => {
+      try {
+        await window.GlassChessKingPawn?.applyCloudProfile?.(cloudProfile);
+        toast('Cloud profile, theme, player pictures, and King Pawn chat restored.');
+      } catch (error) { toast('Profile restore failed: ' + error.message, true); }
+    });
+    summary.append(description, restore);
+  }
+  if (chats) {
+    chats.replaceChildren();
+    const messages = Array.isArray(cloudProfile.chatLog) ? cloudProfile.chatLog : [];
+    if (!messages.length) {
+      const empty = document.createElement('p');
+      empty.className = 'gc-cloud-empty';
+      empty.textContent = 'No King Pawn messages are saved in the cloud yet.';
+      chats.appendChild(empty);
+    } else {
+      for (const message of messages.slice(-30)) {
+        const item = document.createElement('article');
+        item.className = 'gc-cloud-chat-entry';
+        const heading = document.createElement('strong');
+        heading.textContent = message.role === 'user' ? 'You' : 'King Pawn';
+        const body = document.createElement('p');
+        body.textContent = String(message.content || '');
+        const context = document.createElement('small');
+        context.textContent = (message.at ? new Date(message.at).toLocaleString() : 'Saved message') +
+          ' · ' + (message.turn === 'b' ? 'Black' : 'White') + ' to move' +
+          (message.inCheck ? ' · Check' : '');
+        item.append(heading, body, context);
+        chats.appendChild(item);
+      }
+    }
+  }
+  if (!cloudGames.length) {
+    const empty = document.createElement('p');
+    empty.className = 'gc-cloud-empty';
+    empty.textContent = 'No matches are saved to this account yet. Your games will appear here as you play.';
+    host.appendChild(empty);
+    return;
+  }
+  for (const game of cloudGames.slice().sort((a, b) => String(b.savedAtIso || '').localeCompare(String(a.savedAtIso || '')))) {
+    const card = document.createElement('article');
+    card.className = 'gc-cloud-game';
+    const info = document.createElement('div');
+    const title = document.createElement('strong');
+    title.textContent = game.opponent || 'Glass Chess match';
+    const meta = document.createElement('small');
+    const date = game.savedAtIso ? new Date(game.savedAtIso).toLocaleString() : 'Saved match';
+    const plies = game.pgn ? (game.pgn.match(/\d+\./g) || []).length : 0;
+    meta.textContent = date + ' · ' + plies + ' moves · ' + (game.result || 'saved');
+    info.append(title, meta);
+    const load = document.createElement('button');
+    load.type = 'button';
+    load.textContent = 'Load Game';
+    load.addEventListener('click', () => {
+      try {
+        window.GlassChess?.setMode?.('analysis', false);
+        window.GlassChess?.loadPgn?.(game.pgn);
+        closeVault();
+        toast('Cloud match loaded into Analysis Studio.');
+      } catch (error) {
+        toast('This saved game could not be loaded: ' + error.message, true);
+      }
+    });
+    card.append(info, load);
+    host.appendChild(card);
+  }
+}
+
+function mountVault() {
+  if ($('gc-cloud-vault')) return;
+  const modal = document.createElement('section');
+  modal.id = 'gc-cloud-vault';
+  modal.className = 'gc-cloud-vault';
+  modal.hidden = true;
+  modal.innerHTML = `
+    <div class="gc-cloud-vault-card" role="dialog" aria-modal="true" aria-labelledby="gc-cloud-vault-title">
+      <header><div><small>YOUR ACCOUNT</small><h2 id="gc-cloud-vault-title">Cloud Game Vault</h2><p id="gc-cloud-vault-count">0 saved matches</p></div><button type="button" id="gc-cloud-vault-close" aria-label="Close Cloud Game Vault">×</button></header>
+      <div class="gc-cloud-vault-scroll">
+        <div id="gc-cloud-vault-profile"></div>
+        <h3>Saved matches</h3>
+        <div id="gc-cloud-vault-list"></div>
+        <details class="gc-cloud-chat-archive"><summary>King Pawn chat archive</summary><div id="gc-cloud-vault-chat"></div></details>
+      </div>
+      <footer>Your cloud games, board themes, player pictures and King Pawn chats follow your Google account.</footer>
+    </div>`;
+  document.body.appendChild(modal);
+  $('gc-cloud-vault-close').addEventListener('click', closeVault);
+  modal.addEventListener('click', event => { if (event.target === modal) closeVault(); });
+  renderVault();
+}
+function openVault() {
+  mountVault();
+  $('gc-cloud-vault').hidden = false;
+  renderVault();
+  if (!activeUser) toast('Sign in with Google to open your Cloud Game Vault.', true);
+}
+function closeVault() {
+  if ($('gc-cloud-vault')) $('gc-cloud-vault').hidden = true;
+}
+
+async function attachRealtimeSync(user) {
+  stopCloudObservers();
+  const profileDocument = profileRef(user.uid);
+  stopProfileObserver = firestoreSdk.onSnapshot(profileDocument, snapshot => {
+    if (!snapshot.exists()) return;
+    const data = snapshot.data();
+    if (data.ownerUid !== user.uid) return;
+    cloudProfile = data;
+    renderVault();
+    applyCloudProfileToApp(data);
+    const localStorageValues = data.localStorage || {};
+    for (const [key, value] of Object.entries(localStorageValues)) {
+      if (String(key).startsWith('glass-chess-') && !/(token|secret|auth)/i.test(key)) {
+        try { localStorage.setItem(key, String(value)); } catch {}
+      }
+    }
+  }, error => {
+    console.warn('Glass Chess profile listener:', error);
+    setSyncStatus('Cloud connection paused', 'error');
+  });
+  stopGamesObserver = firestoreSdk.onSnapshot(gamesRef(user.uid), snapshot => {
+    cloudGames = snapshot.docs.map(item => item.data());
+    renderVault();
+    const sorted = cloudGames.slice().sort((a, b) => String(a.savedAtIso || '').localeCompare(String(b.savedAtIso || '')));
+    void saveEngine.saveData({ games: sorted.slice(-150) }).catch(error => console.warn('Cloud vault cache update failed:', error));
+  }, error => {
+    console.warn('Glass Chess games listener:', error);
+    setSyncStatus('Cloud connection paused', 'error');
+  });
+}
+
+async function syncOnSignIn(user) {
+  activeUser = user;
+  profileAvatarUrl = '';
+  renderAuth();
+  setSyncStatus('Syncing...', 'syncing');
+  saveEngine.setCloudAdapter(cloudAdapter);
+  try {
+    const [remote, local] = await Promise.all([cloudAdapter.pull(), saveEngine.loadData()]);
+    cloudProfile = remote.profileData || {};
+    cloudGames = remote.games.slice();
+    renderVault();
+    const remoteHasContent = remote.games.length || remote.chatLog.length ||
+      Object.keys(remote.localStorage || {}).length || remote.backgroundImage || remote.activePgn ||
+      remote.profileAvatarUrl || remote.avatars?.player || remote.avatars?.opponent;
+    if (remoteHasContent) {
+      const merged = mergeCloudAndLocal(remote, local);
+      await saveEngine.replaceData(merged);
+      await window.GlassChessKingPawn?.applyCloudProfile?.({
+        backgroundImageUrl: merged.backgroundImage,
+        backgroundUrl: merged.backgroundUrl,
+        backgroundDimmer: merged.backgroundDimmer,
+        avatars: merged.avatars,
+        chatLog: merged.chatLog,
+        localStorage: merged.localStorage,
+        avatarUrl: remote.profileAvatarUrl
+      });
+      profileAvatarUrl = remote.profileAvatarUrl || user.photoURL || '';
+      cloudGames = remote.games.slice();
+      await saveEngine.saveToCloud();
+    } else {
+      await saveEngine.saveToCloud();
+    }
+    await attachRealtimeSync(user);
+    setSyncStatus('Synced to Cloud', 'synced');
+  } catch (error) {
+    console.warn('Initial Cloud sync failed:', error);
+    setSyncStatus('Sync paused · retry', 'error');
+    toast('Signed in, but cloud sync failed: ' + (error.message || 'Check Firebase setup and rules.'), true);
+  }
+}
+
+async function syncNow() {
+  if (!activeUser) throw new Error('Sign in with Google to sync your games.');
+  if (syncInProgress) return;
+  syncInProgress = true;
+  setSyncStatus('Syncing...', 'syncing');
+  try {
+    clearTimeout(syncTimer);
+    await saveEngine.saveToCloud();
+    setSyncStatus('Synced to Cloud', 'synced');
+    toast('Glass Chess is synced to your Google account.');
+    const refreshed = await pullCloudState();
+    cloudGames = refreshed.games;
+    cloudProfile = refreshed.profileData || cloudProfile;
+    renderVault();
+  } catch (error) {
+    setSyncStatus('Sync failed', 'error');
+    toast('Cloud sync failed: ' + error.message, true);
+    throw error;
+  } finally {
+    syncInProgress = false;
+  }
+}
+
+function queueCloudSync() {
+  if (!activeUser) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => {
+    if (!activeUser || syncInProgress) return;
+    syncInProgress = true;
+    setSyncStatus('Syncing...', 'syncing');
+    saveEngine.saveToCloud().then(() => {
+      setSyncStatus('Synced to Cloud', 'synced');
+    }).catch(error => {
+      console.warn('Automatic Cloud sync failed:', error);
+      setSyncStatus('Sync paused · retry', 'error');
+    }).finally(() => { syncInProgress = false; });
+  }, 900);
+}
+
+function compressAvatar(file) {
+  return new Promise((resolve, reject) => {
+    if (!file || !/^image\/(png|jpeg|webp)$/i.test(file.type)) return reject(new Error('Choose a JPG, PNG, or WebP image.'));
+    if (file.size > 8 * 1024 * 1024) return reject(new Error('Choose an image smaller than 8 MB.'));
+    const image = new Image();
+    const url = URL.createObjectURL(file);
+    image.onload = () => {
+      const scale = Math.min(1, 512 / Math.max(image.width, image.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(image.width * scale));
+      canvas.height = Math.max(1, Math.round(image.height * scale));
+      canvas.getContext('2d')?.drawImage(image, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(blob => {
+        if (!blob) return reject(new Error('The avatar image could not be compressed.'));
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error('The avatar image could not be read.'));
+        reader.readAsDataURL(blob);
+      }, file.type === 'image/png' ? 'image/png' : 'image/webp', 0.82);
+    };
+    image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('The avatar image could not be opened.')); };
+    image.src = url;
+  });
+}
+
+async function uploadProfileAvatar(file) {
+  if (!file) return;
+  if (!activeUser) {
+    toast('Sign in first to sync a custom account picture.', true);
+    return;
+  }
+  try {
+    const image = await compressAvatar(file);
+    profileAvatarUrl = await uploadProfileAsset(activeUser.uid, 'account-avatar', image);
+    await firestoreSdk.setDoc(profileRef(activeUser.uid), {
+      ownerUid: activeUser.uid,
+      avatarUrl: profileAvatarUrl,
+      updatedAtIso: new Date().toISOString(),
+      updatedAt: firestoreSdk.serverTimestamp()
+    }, { merge: true });
+    renderAuth();
+    toast('Your Google profile pill picture was updated.');
+  } catch (error) {
+    toast('Profile picture upload failed: ' + error.message, true);
+  } finally {
+    $('gc-auth-avatar-file').value = '';
+  }
+}
+
+function onAuthState(user) {
+  if (user) {
+    void syncOnSignIn(user);
+    return;
+  }
+  activeUser = null;
+  profileAvatarUrl = '';
+  stopCloudObservers();
+  saveEngine.setCloudAdapter(null);
+  setSyncStatus('Guest mode · saved on this device', 'idle');
+  renderAuth();
+}
+
+async function initializeAuth() {
+  mountAuthWidget();
+  mountVault();
+  if (!hasFirebaseConfig) {
+    setSyncStatus('Guest mode · cloud setup needed', 'idle');
+    return;
+  }
+  try {
+    await loadFirebaseSdk();
+    await authSdk.getRedirectResult(auth).catch(error => {
+      console.warn('Google redirect sign-in:', error);
+      toast('Google sign-in did not complete: ' + error.message, true);
+    });
+    stopAuthObserver = authSdk.onAuthStateChanged(auth, onAuthState);
+  } catch (error) {
+    console.warn('Firebase initialization failed:', error);
+    setSyncStatus('Guest mode · cloud unavailable', 'error');
+  }
+}
+
+document.addEventListener('click', event => {
+  const menu = $('gc-auth-menu');
+  if (!menu || menu.hidden) return;
+  if (event.target.closest('#gc-auth-menu') || event.target.closest('#gc-user-pill')) return;
+  menu.hidden = true;
+  authMenuOpen = false;
+  $('gc-user-pill')?.setAttribute('aria-expanded', 'false');
+});
+window.addEventListener('resize', () => {
+  const menu = $('gc-auth-menu');
+  if (menu && !menu.hidden) menu.hidden = true;
+});
+
+window.GlassChessCloud = {
+  get user() { return activeUser; },
+  get configured() { return hasFirebaseConfig; },
+  get status() { return activeUser ? 'signed-in' : 'guest'; },
+  queueSync: queueCloudSync,
+  syncNow,
+  openVault,
+  signIn
+};
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => void initializeAuth(), { once: true });
+} else {
+  void initializeAuth();
+}
+ + Number(customAmount).toFixed(2) : selectedAmount,
+    message,
+    cashapp_tag: CASHAPP_TAG,
+    submitted_at: new Date().toLocaleString(),
+    source_url: window.location.origin
+  };
+  try {
+    const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        service_id: EMAILJS_SERVICE_ID,
+        template_id: EMAILJS_TEMPLATE_ID,
+        user_id: EMAILJS_PUBLIC_KEY,
+        template_params: templateParams
+      })
+    });
+    if (!response.ok) {
+      const detail = await response.text().catch(() => '');
+      throw new Error(detail.slice(0, 300) || 'The email service rejected the message.');
+    }
+    status.textContent = 'Message sent! Thank you for supporting Glass Chess.';
+    toast('Your message was sent to the Glass Chess creator.');
+    form.reset();
+  } catch (error) {
+    status.textContent = 'Your message could not be sent: ' + (error.message || 'Email service error') + '. Please try again.';
+    status.classList.add('is-error');
+    toast('Donation message could not be emailed.', true);
+  } finally {
+    send.disabled = false;
+    send.textContent = 'Send message';
+  }
+}
+
+function authErrorMessage(error) {
+  const code = error?.code || '';
+  const messages = {
+    'auth/unauthorized-domain': 'This website address is not authorized in Firebase Authentication. Add glass-chess-pro.onrender.com under Authentication → Settings → Authorized domains.',
+    'auth/operation-not-allowed': 'Google sign-in is disabled in Firebase. Enable Google under Authentication → Sign-in method.',
+    'auth/invalid-api-key': 'The Firebase API key is missing or incorrect. Copy the Web app config from Firebase Project settings.',
+    'auth/popup-blocked': 'The browser blocked the Google sign-in popup. Allow popups for this site and try again.',
+    'auth/popup-closed-by-user': 'The Google sign-in window was closed before sign-in finished.',
+    'auth/network-request-failed': 'Google sign-in could not reach Firebase. Check your internet connection or browser privacy extensions.',
+    'auth/web-storage-unsupported': 'This browser blocked the storage needed for Google sign-in. Try allowing site data or using another browser.',
+    'auth/invalid-oauth-client-id': 'The Google OAuth client is not configured correctly. Re-enable Google in Firebase Authentication and check its Web client in Google Cloud.'
+  };
+  return messages[code] || error?.message || 'Google sign-in could not be completed.';
+}
+
+function renderAuth() {
+  const signInButton = $('gc-google-signin');
+  const pill = $('gc-user-pill');
+  if (!signInButton || !pill) return;
+  signInButton.hidden = Boolean(activeUser);
+  pill.hidden = !activeUser;
+  if (!activeUser) return;
+  const image = profileAvatarUrl || activeUser.photoURL || '';
+  const avatar = $('gc-user-avatar');
+  if (image) {
+    avatar.src = image;
+    avatar.hidden = false;
+  } else {
+    avatar.removeAttribute('src');
+    avatar.hidden = true;
+  }
+  $('gc-user-name').textContent = activeUser.displayName || activeUser.email?.split('@')[0] || 'Glass Chess player';
+}
+
+async function loadFirebaseSdk() {
+  if (firebaseReady) return;
+  if (!hasFirebaseConfig) {
+    throw new Error('Google sign-in is not configured yet. Missing Firebase web-app values: ' +
+      missingFirebaseFields.map(key => 'VITE_FIREBASE_' + key.replace(/[A-Z]/g, letter => '_' + letter).toUpperCase()).join(', ') +
+      '. Copy them from Firebase Console → Project settings → Your apps → Web app, then add them to Render and redeploy.');
+  }
+  const [appModule, authModule, firestoreModule, storageModule] = await Promise.all([
+    import(/* @vite-ignore */ FIREBASE_CDN + 'firebase-app.js'),
+    import(/* @vite-ignore */ FIREBASE_CDN + 'firebase-auth.js'),
+    import(/* @vite-ignore */ FIREBASE_CDN + 'firebase-firestore.js'),
+    import(/* @vite-ignore */ FIREBASE_CDN + 'firebase-storage.js')
+  ]);
+  appSdk = appModule;
+  authSdk = authModule;
+  firestoreSdk = firestoreModule;
+  storageSdk = storageModule;
+  app = appSdk.getApps().length ? appSdk.getApp() : appSdk.initializeApp(firebaseConfig);
+  auth = authSdk.getAuth(app);
+  storage = firebaseConfig.storageBucket ? storageSdk.getStorage(app) : null;
+
+  // Keep Firestore's IndexedDB offline persistence enabled. Firebase currently
+  // marks this function obsolete but still exports it; the cache continues to
+  // work when the browser supports it. Failure is non-fatal (multi-tab/browser limits).
+  db = firestoreSdk.getFirestore(app);
+  if (typeof firestoreSdk.enableIndexedDbPersistence === 'function') {
+    try {
+      await firestoreSdk.enableIndexedDbPersistence(db);
+    } catch (error) {
+      console.info('Firestore IndexedDB persistence was not enabled:', error.code || error.message);
+    }
+  }
+  firebaseReady = true;
+}
+
+function mobileBrowser() {
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+    window.matchMedia?.('(max-width: 700px)').matches;
+}
+
+async function signIn() {
+  const button = $('gc-google-signin');
+  if (button) {
+    button.disabled = true;
+    button.querySelector('span').textContent = 'Connecting…';
+  }
+  try {
+    await loadFirebaseSdk();
+    const provider = new authSdk.GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    if (mobileBrowser()) {
+      await authSdk.signInWithRedirect(auth, provider);
+      return;
+    }
+    try {
+      await authSdk.signInWithPopup(auth, provider);
+    } catch (error) {
+      if (['auth/popup-blocked', 'auth/operation-not-supported-in-this-environment', 'auth/web-storage-unsupported'].includes(error.code)) {
+        await authSdk.signInWithRedirect(auth, provider);
+        return;
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error('Glass Chess Google sign-in failed:', error);
+    toast(authErrorMessage(error), true);
+  } finally {
+    if (button) {
+      button.disabled = false;
+      const span = button.querySelector('span');
+      if (span) span.textContent = 'Sign in with Google';
+    }
+  }
+}
+
+function profileRef(uid) {
+  return firestoreSdk.doc(db, 'users', uid, 'profile', 'settings');
+}
+function gamesRef(uid) {
+  return firestoreSdk.collection(db, 'users', uid, 'games');
+}
+
+function hashId(value) {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+async function uploadProfileAsset(uid, name, value) {
+  if (!value) return '';
+  if (/^https?:\/\//i.test(value)) return value;
+  if (!storage) return '';
+  if (!/^data:image\/(png|jpeg|webp);base64,/i.test(value)) return '';
+  const cacheKey = uid + ':' + name;
+  const previous = uploadedAssets.get(cacheKey);
+  if (previous?.data === value) return previous.url;
+  const match = value.match(/^data:(image\/(?:png|jpeg|webp));base64,/i);
+  const contentType = match?.[1] || 'image/webp';
+  const object = storageSdk.ref(storage, 'users/' + uid + '/profile/' + name);
+  await storageSdk.uploadString(object, value, 'data_url', { contentType });
+  const url = await storageSdk.getDownloadURL(object);
+  uploadedAssets.set(cacheKey, { data: value, url });
+  return url;
+}
+
+function gameDocumentId(user, game) {
+  const base = String(game.id || 'g_' + hashId(String(game.pgn || '') + '|' + String(game.fen || '')));
+  const safe = base.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 110);
+  return user.uid.slice(0, 12) + '_' + safe;
+}
+
+async function pushCloudState(state) {
+  if (!activeUser || !db) throw new Error('Sign in to sync your Glass Chess profile.');
+  const user = activeUser;
+  const [backgroundImageUrl, playerAvatarUrl, opponentAvatarUrl] = await Promise.all([
+    uploadProfileAsset(user.uid, 'background', state.backgroundImage || state.backgroundUrl || ''),
+    uploadProfileAsset(user.uid, 'avatar-player', state.avatars?.player || ''),
+    uploadProfileAsset(user.uid, 'avatar-opponent', state.avatars?.opponent || '')
+  ]);
+  const games = Array.isArray(state.games) ? state.games.slice(-150) : [];
+  if (state.activePgn && !games.some(game => game.pgn === state.activePgn)) {
+    games.push({ id: 'active_' + hashId(state.activePgn), pgn: state.activePgn, fen: state.activeFen || '', savedAt: new Date().toISOString(), status: 'in-progress' });
+  }
+  const cleanGames = games.filter(game => typeof game?.pgn === 'string' && game.pgn.trim()).slice(-150);
+  const profileData = {
+    ownerUid: user.uid,
+    displayName: user.displayName || '',
+    email: user.email || '',
+    photoURL: user.photoURL || '',
+    avatarUrl: profileAvatarUrl || '',
+    backgroundImageUrl,
+    backgroundUrl: state.backgroundUrl || '',
+    backgroundDimmer: Math.max(0, Math.min(88, Number(state.backgroundDimmer ?? 56))),
+    avatars: { player: playerAvatarUrl, opponent: opponentAvatarUrl },
+    chatLog: (Array.isArray(state.chatLog) ? state.chatLog : []).slice(-30).map(item => ({
+      role: String(item.role || '').slice(0, 20),
+      content: String(item.content || '').slice(0, 3000),
+      fen: String(item.fen || '').slice(0, 120),
+      pgn: String(item.pgn || '').slice(0, 10000),
+      turn: item.turn === 'b' ? 'b' : 'w',
+      inCheck: Boolean(item.inCheck),
+      checkState: String(item.checkState || '').slice(0, 80),
+      material: item.material && typeof item.material === 'object' ? item.material : {},
+      at: String(item.at || '')
+    })),
+    localStorage: state.localStorage || {},
+    activePgn: String(state.activePgn || ''),
+    activeFen: String(state.activeFen || ''),
+    updatedAtIso: new Date().toISOString(),
+    updatedAt: firestoreSdk.serverTimestamp()
+  };
+
+  const batch = firestoreSdk.writeBatch(db);
+  batch.set(profileRef(user.uid), profileData, { merge: true });
+  for (const game of cleanGames) {
+    const id = gameDocumentId(user, game);
+    const gameData = {
+      id,
+      ownerUid: user.uid,
+      pgn: game.pgn,
+      fen: String(game.fen || ''),
+      opponent: String(game.opponent || 'Glass Chess').slice(0, 120),
+      result: String(game.result || game.status || 'saved').slice(0, 60),
+      savedAtIso: String(game.savedAt || game.date || new Date().toISOString()),
+      updatedAtIso: new Date().toISOString()
+    };
+    batch.set(firestoreSdk.doc(db, 'users', user.uid, 'games', id), gameData, { merge: true });
+    batch.set(firestoreSdk.doc(db, 'global_matches', id), gameData, { merge: true });
+  }
+  await batch.commit();
+  return { syncedAt: new Date().toISOString(), gameCount: cleanGames.length };
+}
+
+async function pullCloudState() {
+  if (!activeUser || !db) throw new Error('Sign in to load your cloud profile.');
+  const user = activeUser;
+  const [profileSnapshot, gamesSnapshot] = await Promise.all([
+    firestoreSdk.getDoc(profileRef(user.uid)),
+    firestoreSdk.getDocs(gamesRef(user.uid))
+  ]);
+  const profile = profileSnapshot.exists() ? profileSnapshot.data() : {};
+  const games = gamesSnapshot.docs.map(snapshot => snapshot.data())
+    .sort((a, b) => String(a.savedAtIso || '').localeCompare(String(b.savedAtIso || '')));
+  return {
+    schema: 1,
+    backgroundImage: profile.backgroundImageUrl || profile.backgroundUrl || '',
+    backgroundUrl: profile.backgroundUrl || '',
+    backgroundDimmer: Number(profile.backgroundDimmer ?? 56),
+    avatars: profile.avatars || { player: '', opponent: '' },
+    chatLog: Array.isArray(profile.chatLog) ? profile.chatLog : [],
+    games,
+    activePgn: profile.activePgn || '',
+    activeFen: profile.activeFen || '',
+    localStorage: profile.localStorage || {},
+    profileAvatarUrl: profile.avatarUrl || '',
+    profileData: profile,
+    updatedAt: profile.updatedAtIso || ''
+  };
+}
+
+const cloudAdapter = {
+  push: pushCloudState,
+  pull: pullCloudState
+};
+
+function mergeCloudAndLocal(remote, local) {
+  const byId = new Map();
+  for (const game of [...(local.games || []), ...(remote.games || [])]) {
+    const key = game.id || game.pgn;
+    if (key) byId.set(key, game);
+  }
+  const chat = new Map();
+  for (const item of [...(local.chatLog || []), ...(remote.chatLog || [])]) {
+    const key = [item.at, item.role, item.content].join('|');
+    chat.set(key, item);
+  }
+  return {
+    ...local,
+    ...remote,
+    backgroundImage: remote.backgroundImage || local.backgroundImage || '',
+    backgroundUrl: remote.backgroundUrl || local.backgroundUrl || '',
+    backgroundDimmer: remote.backgroundDimmer ?? local.backgroundDimmer ?? 56,
+    avatars: { ...(local.avatars || {}), ...(remote.avatars || {}) },
+    chatLog: Array.from(chat.values()).slice(-300),
+    games: Array.from(byId.values()).slice(-150),
+    activePgn: remote.activePgn || local.activePgn || '',
+    activeFen: remote.activeFen || local.activeFen || '',
+    localStorage: { ...(local.localStorage || {}), ...(remote.localStorage || {}) }
+  };
+}
+
+function applyCloudProfileToApp(profile) {
+  profileAvatarUrl = profile.avatarUrl || profile.photoURL || profileAvatarUrl;
+  renderAuth();
+  Promise.resolve(window.GlassChessKingPawn?.applyCloudProfile?.(profile))
+    .catch(error => console.warn('Cloud profile could not be applied to the local workspace:', error));
+}
+
+function stopCloudObservers() {
+  stopProfileObserver?.();
+  stopGamesObserver?.();
+  stopProfileObserver = null;
+  stopGamesObserver = null;
+}
+
+function renderVault() {
+  const host = $('gc-cloud-vault-list');
+  const count = $('gc-cloud-vault-count');
+  if (!host || !count) return;
+  count.textContent = cloudGames.length + (cloudGames.length === 1 ? ' saved match' : ' saved matches');
+  host.replaceChildren();
+  const summary = $('gc-cloud-vault-profile');
+  const chats = $('gc-cloud-vault-chat');
+  if (summary) {
+    let preferences = {};
+    try { preferences = JSON.parse(cloudProfile.localStorage?.['glass-chess-settings'] || '{}'); } catch {}
+    const theme = String(preferences.theme || 'midnight').replace(/[-_]/g, ' ');
+    const bg = cloudProfile.backgroundImageUrl || cloudProfile.backgroundUrl ? 'Custom background' : String(preferences.background || 'midnight').replace(/[-_]/g, ' ');
+    const avatarCount = Object.values(cloudProfile.avatars || {}).filter(Boolean).length;
+    summary.replaceChildren();
+    const description = document.createElement('p');
+    description.textContent = 'Theme: ' + theme + ' · Background: ' + bg + ' · Custom player pictures: ' + avatarCount + ' · King Pawn messages: ' + (cloudProfile.chatLog || []).length;
+    const restore = document.createElement('button');
+    restore.type = 'button';
+    restore.textContent = 'Restore Cloud Profile';
+    restore.addEventListener('click', async () => {
+      try {
+        await window.GlassChessKingPawn?.applyCloudProfile?.(cloudProfile);
+        toast('Cloud profile, theme, player pictures, and King Pawn chat restored.');
+      } catch (error) { toast('Profile restore failed: ' + error.message, true); }
+    });
+    summary.append(description, restore);
+  }
+  if (chats) {
+    chats.replaceChildren();
+    const messages = Array.isArray(cloudProfile.chatLog) ? cloudProfile.chatLog : [];
+    if (!messages.length) {
+      const empty = document.createElement('p');
+      empty.className = 'gc-cloud-empty';
+      empty.textContent = 'No King Pawn messages are saved in the cloud yet.';
+      chats.appendChild(empty);
+    } else {
+      for (const message of messages.slice(-30)) {
+        const item = document.createElement('article');
+        item.className = 'gc-cloud-chat-entry';
+        const heading = document.createElement('strong');
+        heading.textContent = message.role === 'user' ? 'You' : 'King Pawn';
+        const body = document.createElement('p');
+        body.textContent = String(message.content || '');
+        const context = document.createElement('small');
+        context.textContent = (message.at ? new Date(message.at).toLocaleString() : 'Saved message') +
+          ' · ' + (message.turn === 'b' ? 'Black' : 'White') + ' to move' +
+          (message.inCheck ? ' · Check' : '');
+        item.append(heading, body, context);
+        chats.appendChild(item);
+      }
+    }
+  }
+  if (!cloudGames.length) {
+    const empty = document.createElement('p');
+    empty.className = 'gc-cloud-empty';
+    empty.textContent = 'No matches are saved to this account yet. Your games will appear here as you play.';
+    host.appendChild(empty);
+    return;
+  }
+  for (const game of cloudGames.slice().sort((a, b) => String(b.savedAtIso || '').localeCompare(String(a.savedAtIso || '')))) {
+    const card = document.createElement('article');
+    card.className = 'gc-cloud-game';
+    const info = document.createElement('div');
+    const title = document.createElement('strong');
+    title.textContent = game.opponent || 'Glass Chess match';
+    const meta = document.createElement('small');
+    const date = game.savedAtIso ? new Date(game.savedAtIso).toLocaleString() : 'Saved match';
+    const plies = game.pgn ? (game.pgn.match(/\d+\./g) || []).length : 0;
+    meta.textContent = date + ' · ' + plies + ' moves · ' + (game.result || 'saved');
+    info.append(title, meta);
+    const load = document.createElement('button');
+    load.type = 'button';
+    load.textContent = 'Load Game';
+    load.addEventListener('click', () => {
+      try {
+        window.GlassChess?.setMode?.('analysis', false);
+        window.GlassChess?.loadPgn?.(game.pgn);
+        closeVault();
+        toast('Cloud match loaded into Analysis Studio.');
+      } catch (error) {
+        toast('This saved game could not be loaded: ' + error.message, true);
+      }
+    });
+    card.append(info, load);
+    host.appendChild(card);
+  }
+}
+
+function mountVault() {
+  if ($('gc-cloud-vault')) return;
+  const modal = document.createElement('section');
+  modal.id = 'gc-cloud-vault';
+  modal.className = 'gc-cloud-vault';
+  modal.hidden = true;
+  modal.innerHTML = `
+    <div class="gc-cloud-vault-card" role="dialog" aria-modal="true" aria-labelledby="gc-cloud-vault-title">
+      <header><div><small>YOUR ACCOUNT</small><h2 id="gc-cloud-vault-title">Cloud Game Vault</h2><p id="gc-cloud-vault-count">0 saved matches</p></div><button type="button" id="gc-cloud-vault-close" aria-label="Close Cloud Game Vault">×</button></header>
+      <div class="gc-cloud-vault-scroll">
+        <div id="gc-cloud-vault-profile"></div>
+        <h3>Saved matches</h3>
+        <div id="gc-cloud-vault-list"></div>
+        <details class="gc-cloud-chat-archive"><summary>King Pawn chat archive</summary><div id="gc-cloud-vault-chat"></div></details>
+      </div>
+      <footer>Your cloud games, board themes, player pictures and King Pawn chats follow your Google account.</footer>
+    </div>`;
+  document.body.appendChild(modal);
+  $('gc-cloud-vault-close').addEventListener('click', closeVault);
+  modal.addEventListener('click', event => { if (event.target === modal) closeVault(); });
+  renderVault();
+}
+function openVault() {
+  mountVault();
+  $('gc-cloud-vault').hidden = false;
+  renderVault();
+  if (!activeUser) toast('Sign in with Google to open your Cloud Game Vault.', true);
+}
+function closeVault() {
+  if ($('gc-cloud-vault')) $('gc-cloud-vault').hidden = true;
+}
+
+async function attachRealtimeSync(user) {
+  stopCloudObservers();
+  const profileDocument = profileRef(user.uid);
+  stopProfileObserver = firestoreSdk.onSnapshot(profileDocument, snapshot => {
+    if (!snapshot.exists()) return;
+    const data = snapshot.data();
+    if (data.ownerUid !== user.uid) return;
+    cloudProfile = data;
+    renderVault();
+    applyCloudProfileToApp(data);
+    const localStorageValues = data.localStorage || {};
+    for (const [key, value] of Object.entries(localStorageValues)) {
+      if (String(key).startsWith('glass-chess-') && !/(token|secret|auth)/i.test(key)) {
+        try { localStorage.setItem(key, String(value)); } catch {}
+      }
+    }
+  }, error => {
+    console.warn('Glass Chess profile listener:', error);
+    setSyncStatus('Cloud connection paused', 'error');
+  });
+  stopGamesObserver = firestoreSdk.onSnapshot(gamesRef(user.uid), snapshot => {
+    cloudGames = snapshot.docs.map(item => item.data());
+    renderVault();
+    const sorted = cloudGames.slice().sort((a, b) => String(a.savedAtIso || '').localeCompare(String(b.savedAtIso || '')));
+    void saveEngine.saveData({ games: sorted.slice(-150) }).catch(error => console.warn('Cloud vault cache update failed:', error));
+  }, error => {
+    console.warn('Glass Chess games listener:', error);
+    setSyncStatus('Cloud connection paused', 'error');
+  });
+}
+
+async function syncOnSignIn(user) {
+  activeUser = user;
+  profileAvatarUrl = '';
+  renderAuth();
+  setSyncStatus('Syncing...', 'syncing');
+  saveEngine.setCloudAdapter(cloudAdapter);
+  try {
+    const [remote, local] = await Promise.all([cloudAdapter.pull(), saveEngine.loadData()]);
+    cloudProfile = remote.profileData || {};
+    cloudGames = remote.games.slice();
+    renderVault();
+    const remoteHasContent = remote.games.length || remote.chatLog.length ||
+      Object.keys(remote.localStorage || {}).length || remote.backgroundImage || remote.activePgn ||
+      remote.profileAvatarUrl || remote.avatars?.player || remote.avatars?.opponent;
+    if (remoteHasContent) {
+      const merged = mergeCloudAndLocal(remote, local);
+      await saveEngine.replaceData(merged);
+      await window.GlassChessKingPawn?.applyCloudProfile?.({
+        backgroundImageUrl: merged.backgroundImage,
+        backgroundUrl: merged.backgroundUrl,
+        backgroundDimmer: merged.backgroundDimmer,
+        avatars: merged.avatars,
+        chatLog: merged.chatLog,
+        localStorage: merged.localStorage,
+        avatarUrl: remote.profileAvatarUrl
+      });
+      profileAvatarUrl = remote.profileAvatarUrl || user.photoURL || '';
+      cloudGames = remote.games.slice();
+      await saveEngine.saveToCloud();
+    } else {
+      await saveEngine.saveToCloud();
+    }
+    await attachRealtimeSync(user);
+    setSyncStatus('Synced to Cloud', 'synced');
+  } catch (error) {
+    console.warn('Initial Cloud sync failed:', error);
+    setSyncStatus('Sync paused · retry', 'error');
+    toast('Signed in, but cloud sync failed: ' + (error.message || 'Check Firebase setup and rules.'), true);
+  }
+}
+
+async function syncNow() {
+  if (!activeUser) throw new Error('Sign in with Google to sync your games.');
+  if (syncInProgress) return;
+  syncInProgress = true;
+  setSyncStatus('Syncing...', 'syncing');
+  try {
+    clearTimeout(syncTimer);
+    await saveEngine.saveToCloud();
+    setSyncStatus('Synced to Cloud', 'synced');
+    toast('Glass Chess is synced to your Google account.');
+    const refreshed = await pullCloudState();
+    cloudGames = refreshed.games;
+    cloudProfile = refreshed.profileData || cloudProfile;
+    renderVault();
+  } catch (error) {
+    setSyncStatus('Sync failed', 'error');
+    toast('Cloud sync failed: ' + error.message, true);
+    throw error;
+  } finally {
+    syncInProgress = false;
+  }
+}
+
+function queueCloudSync() {
+  if (!activeUser) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => {
+    if (!activeUser || syncInProgress) return;
+    syncInProgress = true;
+    setSyncStatus('Syncing...', 'syncing');
+    saveEngine.saveToCloud().then(() => {
+      setSyncStatus('Synced to Cloud', 'synced');
+    }).catch(error => {
+      console.warn('Automatic Cloud sync failed:', error);
+      setSyncStatus('Sync paused · retry', 'error');
+    }).finally(() => { syncInProgress = false; });
+  }, 900);
+}
+
+function compressAvatar(file) {
+  return new Promise((resolve, reject) => {
+    if (!file || !/^image\/(png|jpeg|webp)$/i.test(file.type)) return reject(new Error('Choose a JPG, PNG, or WebP image.'));
+    if (file.size > 8 * 1024 * 1024) return reject(new Error('Choose an image smaller than 8 MB.'));
+    const image = new Image();
+    const url = URL.createObjectURL(file);
+    image.onload = () => {
+      const scale = Math.min(1, 512 / Math.max(image.width, image.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(image.width * scale));
+      canvas.height = Math.max(1, Math.round(image.height * scale));
+      canvas.getContext('2d')?.drawImage(image, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(blob => {
+        if (!blob) return reject(new Error('The avatar image could not be compressed.'));
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error('The avatar image could not be read.'));
+        reader.readAsDataURL(blob);
+      }, file.type === 'image/png' ? 'image/png' : 'image/webp', 0.82);
+    };
+    image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('The avatar image could not be opened.')); };
+    image.src = url;
+  });
+}
+
+async function uploadProfileAvatar(file) {
+  if (!file) return;
+  if (!activeUser) {
+    toast('Sign in first to sync a custom account picture.', true);
+    return;
+  }
+  try {
+    const image = await compressAvatar(file);
+    profileAvatarUrl = await uploadProfileAsset(activeUser.uid, 'account-avatar', image);
+    await firestoreSdk.setDoc(profileRef(activeUser.uid), {
+      ownerUid: activeUser.uid,
+      avatarUrl: profileAvatarUrl,
+      updatedAtIso: new Date().toISOString(),
+      updatedAt: firestoreSdk.serverTimestamp()
+    }, { merge: true });
+    renderAuth();
+    toast('Your Google profile pill picture was updated.');
+  } catch (error) {
+    toast('Profile picture upload failed: ' + error.message, true);
+  } finally {
+    $('gc-auth-avatar-file').value = '';
+  }
+}
+
+function onAuthState(user) {
+  if (user) {
+    void syncOnSignIn(user);
+    return;
+  }
+  activeUser = null;
+  profileAvatarUrl = '';
+  stopCloudObservers();
+  saveEngine.setCloudAdapter(null);
+  setSyncStatus('Guest mode · saved on this device', 'idle');
+  renderAuth();
+}
+
+async function initializeAuth() {
+  mountAuthWidget();
+  mountVault();
+  if (!hasFirebaseConfig) {
+    setSyncStatus('Guest mode · cloud setup needed', 'idle');
+    return;
+  }
+  try {
+    await loadFirebaseSdk();
+    await authSdk.getRedirectResult(auth).catch(error => {
+      console.warn('Google redirect sign-in:', error);
+      toast('Google sign-in did not complete: ' + error.message, true);
+    });
+    stopAuthObserver = authSdk.onAuthStateChanged(auth, onAuthState);
+  } catch (error) {
+    console.warn('Firebase initialization failed:', error);
+    setSyncStatus('Guest mode · cloud unavailable', 'error');
+  }
+}
+
+document.addEventListener('click', event => {
+  const menu = $('gc-auth-menu');
+  if (!menu || menu.hidden) return;
+  if (event.target.closest('#gc-auth-menu') || event.target.closest('#gc-user-pill')) return;
+  menu.hidden = true;
+  authMenuOpen = false;
+  $('gc-user-pill')?.setAttribute('aria-expanded', 'false');
+});
+window.addEventListener('resize', () => {
+  const menu = $('gc-auth-menu');
+  if (menu && !menu.hidden) menu.hidden = true;
+});
+
+window.GlassChessCloud = {
+  get user() { return activeUser; },
+  get configured() { return hasFirebaseConfig; },
+  get status() { return activeUser ? 'signed-in' : 'guest'; },
+  queueSync: queueCloudSync,
+  syncNow,
+  openVault,
+  signIn
+};
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => void initializeAuth(), { once: true });
+} else {
+  void initializeAuth();
+}
+ + Number(customAmount).toFixed(2) : selectedAmount,
     message,
     cashapp_tag: CASHAPP_TAG,
     submitted_at: new Date().toLocaleString(),
