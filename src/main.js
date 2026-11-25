@@ -1194,39 +1194,34 @@ async function startGame() {
 async function undoMove() {
   if (premiumReplayLock) return;
   const token = ++gameToken;
-
   thinking = false;
   await engine.stop();
-
   if (token !== gameToken) return;
 
-  const count =
-    gameMode === "computer" && game.history().length >= 2 ? 2 : 1;
-
-  for (let i = 0; i < count; i++) {
-    if (game.history().length) {
-      game.undo();
-    }
-  }
-
+  const count = gameMode === "computer" && game.history().length >= 2 ? 2 : 1;
   resigned = false;
   winner = "";
   selected = null;
   legalMoves = [];
+  gameTermination = null;
+  clearPromotion();
+
+  // Undo computer replies in sequence so each same DOM piece gets one clean return slide.
+  for (let i = 0; i < count && game.history().length; i++) {
+    const lastPlayed = game.history({ verbose: true }).at(-1);
+    const reverseMotion = boardEffects.captureReverseMove(lastPlayed);
+    game.undo();
+    render();
+    if (reverseMotion) await boardEffects.animateMove(reverseMotion);
+    if (token !== gameToken) return;
+  }
 
   const history = game.history({ verbose: true });
   const previous = history[history.length - 1];
-
-  lastMove = previous
-    ? { from: previous.from, to: previous.to }
-    : null;
-
-  gameTermination = null;
+  lastMove = previous ? { from: previous.from, to: previous.to } : null;
   positionGeneration++;
   window.GlassChessGameplaySuite?.onUserUndo?.();
-  clearPromotion();
   render();
-
   setEngineStatus("Stockfish 19 ready");
 }
 
