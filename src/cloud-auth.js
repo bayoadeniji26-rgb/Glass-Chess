@@ -33,6 +33,7 @@ let activeUser = null;
 let profileAvatarUrl = '';
 let authMenuOpen = false;
 let cloudGames = [];
+let cloudProfile = {};
 let stopAuthObserver = null;
 let stopProfileObserver = null;
 let stopGamesObserver = null;
@@ -375,6 +376,7 @@ async function pullCloudState() {
     activeFen: profile.activeFen || '',
     localStorage: profile.localStorage || {},
     profileAvatarUrl: profile.avatarUrl || '',
+    profileData: profile,
     updatedAt: profile.updatedAtIso || ''
   };
 }
@@ -429,6 +431,53 @@ function renderVault() {
   if (!host || !count) return;
   count.textContent = cloudGames.length + (cloudGames.length === 1 ? ' saved match' : ' saved matches');
   host.replaceChildren();
+  const summary = $('gc-cloud-vault-profile');
+  const chats = $('gc-cloud-vault-chat');
+  if (summary) {
+    let preferences = {};
+    try { preferences = JSON.parse(cloudProfile.localStorage?.['glass-chess-settings'] || '{}'); } catch {}
+    const theme = String(preferences.theme || 'midnight').replace(/[-_]/g, ' ');
+    const bg = cloudProfile.backgroundImageUrl || cloudProfile.backgroundUrl ? 'Custom background' : String(preferences.background || 'midnight').replace(/[-_]/g, ' ');
+    const avatarCount = Object.values(cloudProfile.avatars || {}).filter(Boolean).length;
+    summary.replaceChildren();
+    const description = document.createElement('p');
+    description.textContent = 'Theme: ' + theme + ' · Background: ' + bg + ' · Custom player pictures: ' + avatarCount + ' · King Pawn messages: ' + (cloudProfile.chatLog || []).length;
+    const restore = document.createElement('button');
+    restore.type = 'button';
+    restore.textContent = 'Restore Cloud Profile';
+    restore.addEventListener('click', async () => {
+      try {
+        await window.GlassChessKingPawn?.applyCloudProfile?.(cloudProfile);
+        toast('Cloud profile, theme, player pictures, and King Pawn chat restored.');
+      } catch (error) { toast('Profile restore failed: ' + error.message, true); }
+    });
+    summary.append(description, restore);
+  }
+  if (chats) {
+    chats.replaceChildren();
+    const messages = Array.isArray(cloudProfile.chatLog) ? cloudProfile.chatLog : [];
+    if (!messages.length) {
+      const empty = document.createElement('p');
+      empty.className = 'gc-cloud-empty';
+      empty.textContent = 'No King Pawn messages are saved in the cloud yet.';
+      chats.appendChild(empty);
+    } else {
+      for (const message of messages.slice(-30)) {
+        const item = document.createElement('article');
+        item.className = 'gc-cloud-chat-entry';
+        const heading = document.createElement('strong');
+        heading.textContent = message.role === 'user' ? 'You' : 'King Pawn';
+        const body = document.createElement('p');
+        body.textContent = String(message.content || '');
+        const context = document.createElement('small');
+        context.textContent = (message.at ? new Date(message.at).toLocaleString() : 'Saved message') +
+          ' · ' + (message.turn === 'b' ? 'Black' : 'White') + ' to move' +
+          (message.inCheck ? ' · Check' : '');
+        item.append(heading, body, context);
+        chats.appendChild(item);
+      }
+    }
+  }
   if (!cloudGames.length) {
     const empty = document.createElement('p');
     empty.className = 'gc-cloud-empty';
@@ -474,7 +523,12 @@ function mountVault() {
   modal.innerHTML = `
     <div class="gc-cloud-vault-card" role="dialog" aria-modal="true" aria-labelledby="gc-cloud-vault-title">
       <header><div><small>YOUR ACCOUNT</small><h2 id="gc-cloud-vault-title">Cloud Game Vault</h2><p id="gc-cloud-vault-count">0 saved matches</p></div><button type="button" id="gc-cloud-vault-close" aria-label="Close Cloud Game Vault">×</button></header>
-      <div id="gc-cloud-vault-list"></div>
+      <div class="gc-cloud-vault-scroll">
+        <div id="gc-cloud-vault-profile"></div>
+        <h3>Saved matches</h3>
+        <div id="gc-cloud-vault-list"></div>
+        <details class="gc-cloud-chat-archive"><summary>King Pawn chat archive</summary><div id="gc-cloud-vault-chat"></div></details>
+      </div>
       <footer>Your cloud games, board themes, player pictures and King Pawn chats follow your Google account.</footer>
     </div>`;
   document.body.appendChild(modal);
@@ -499,6 +553,8 @@ async function attachRealtimeSync(user) {
     if (!snapshot.exists()) return;
     const data = snapshot.data();
     if (data.ownerUid !== user.uid) return;
+    cloudProfile = data;
+    renderVault();
     applyCloudProfileToApp(data);
     const localStorageValues = data.localStorage || {};
     for (const [key, value] of Object.entries(localStorageValues)) {
@@ -529,6 +585,9 @@ async function syncOnSignIn(user) {
   saveEngine.setCloudAdapter(cloudAdapter);
   try {
     const [remote, local] = await Promise.all([cloudAdapter.pull(), saveEngine.loadData()]);
+    cloudProfile = remote.profileData || {};
+    cloudGames = remote.games.slice();
+    renderVault();
     const remoteHasContent = remote.games.length || remote.chatLog.length ||
       Object.keys(remote.localStorage || {}).length || remote.backgroundImage || remote.activePgn;
     if (remoteHasContent) {
@@ -568,7 +627,9 @@ async function syncNow() {
     await saveEngine.saveToCloud();
     setSyncStatus('Synced to Cloud', 'synced');
     toast('Glass Chess is synced to your Google account.');
-    cloudGames = (await pullCloudState()).games;
+    const refreshed = await pullCloudState();
+    cloudGames = refreshed.games;
+    cloudProfile = refreshed.profileData || cloudProfile;
     renderVault();
   } catch (error) {
     setSyncStatus('Sync failed', 'error');
