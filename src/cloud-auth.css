@@ -120,3 +120,40 @@
   #gc-top-actions #gc-copy-cashapp { display: none; }
   .topbar > .brand { margin-left: 130px; }
 }
+
+/* Keep board export actions reachable in the viewport-locked play screen. */
+#gc-export-toolbar {
+  position: fixed !important;
+  right: 14px !important;
+  bottom: 12px !important;
+  z-index: 2147483000 !important;
+  padding: 5px !important;
+  border: 1px solid rgba(205,216,244,.16) !important;
+  border-radius: 12px !important;
+  background: rgba(12,18,29,.88) !important;
+  box-shadow: 0 10px 26px rgba(0,0,0,.26) !important;
+  backdrop-filter: blur(14px);
+}
+.gc-kp-prompts {
+  display: flex; flex-wrap: wrap; gap: 5px; padding: 8px 11px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.gc-kp-prompts button {
+  min-height: 27px; padding: 4px 8px; border: 1px solid rgba(218,205,255,.16);
+  border-radius: 8px; color: #dfe5f7; background: rgba(255,255,255,.055);
+  font-size: 9px; font-weight: 650; cursor: pointer;
+}
+.gc-kp-prompts button:hover { color: #f3d68f; border-color: rgba(243,214,143,.45); }
+#gc-personalization select,
+#gc-personalization input[type="range"] {
+  width: 100%; accent-color: #c8a968;
+}
+#gc-personalization select {
+  min-height: 34px; padding: 6px 9px; border-radius: 8px;
+  border: 1px solid rgba(213,225,250,.17); color: #edf2ff;
+  background: rgba(5,9,18,.72); font-size: 11px;
+}
+@media (max-width: 760px) {
+  #gc-export-toolbar { right: 7px !important; bottom: 7px !important; gap: 3px !important; }
+  #gc-export-toolbar button { min-height: 28px !important; padding: 4px 7px !important; font-size: 9px !important; }
+}
