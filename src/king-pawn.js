@@ -132,6 +132,7 @@ function applyAvatar(side, dataUrl) {
 function mountPersonalization() {
   createAvatar('opponent', 'opponent', '♚');
   createAvatar('player', 'player', '♔');
+  installBoardExportActions();
 
   const options = $('gc-options');
   if (!options || $('gc-personalization')) return;
@@ -363,6 +364,129 @@ function renderChat() {
   list.scrollTop = list.scrollHeight;
 }
 
+
+function boardPngBlob() {
+  return new Promise((resolve, reject) => {
+    const board = $('board');
+    const api = window.GlassChess;
+    if (!board || !api?.fen) return reject(new Error('The chessboard is not ready.'));
+    let position;
+    try { position = new Chess(api.fen); } catch { return reject(new Error('The current board position is invalid.')); }
+    const squares = Array.from(board.querySelectorAll('[data-square]'));
+    if (squares.length !== 64) return reject(new Error('The board is still rendering. Try again.'));
+    const canvas = document.createElement('canvas');
+    const cell = 144;
+    canvas.width = cell * 8;
+    canvas.height = cell * 8;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return reject(new Error('Canvas export is unavailable in this browser.'));
+    const glyphs = {
+      wk:'♔',wq:'♕',wr:'♖',wb:'♗',wn:'♘',wp:'♙',
+      bk:'♚',bq:'♛',br:'♜',bb:'♝',bn:'♞',bp:'♟'
+    };
+    squares.forEach((element, index) => {
+      const x = (index % 8) * cell;
+      const y = Math.floor(index / 8) * cell;
+      const style = getComputedStyle(element);
+      ctx.fillStyle = style.backgroundColor || '#b58863';
+      ctx.fillRect(x, y, cell, cell);
+      const squareName = element.dataset.square;
+      const piece = position.get(squareName);
+      if (piece) {
+        const glyph = glyphs[piece.color + piece.type];
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = '112px "Segoe UI Symbol", "DejaVu Sans", serif';
+        ctx.lineWidth = 2.2;
+        ctx.strokeStyle = piece.color === 'w' ? '#282828' : '#eee8dc';
+        ctx.fillStyle = piece.color === 'w' ? '#fffdf4' : '#171717';
+        ctx.strokeText(glyph, x + cell / 2, y + cell / 2 + 2);
+        ctx.fillText(glyph, x + cell / 2, y + cell / 2 + 2);
+        ctx.restore();
+      }
+      const coordinates = element.querySelectorAll('.gc-coordinate');
+      if (coordinates.length) {
+        ctx.save();
+        ctx.font = '17px system-ui, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillStyle = 'rgba(20,24,32,.8)';
+        for (const coord of coordinates) {
+          if (coord.classList.contains('gc-rank')) ctx.fillText(coord.textContent, x + 5, y + 4);
+          if (coord.classList.contains('gc-file')) {
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText(coord.textContent, x + cell - 5, y + cell - 4);
+          }
+        }
+        ctx.restore();
+      }
+    });
+    canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('The PNG image could not be created.')), 'image/png');
+  });
+}
+
+async function exportBoardPng(copyToClipboard) {
+  const blob = await boardPngBlob();
+  if (copyToClipboard) {
+    if (!navigator.clipboard?.write || !window.ClipboardItem) {
+      throw new Error('This browser does not allow copying images. Use Download PNG instead.');
+    }
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+    showToast('Board PNG copied to clipboard.');
+    return;
+  }
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'glass-chess-board.png';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1200);
+  showToast('Board PNG downloaded.');
+}
+
+function installBoardExportActions() {
+  const controls = document.querySelector('.board-controls');
+  if (!controls || $('gc-export-toolbar')) return;
+  const toolbar = document.createElement('div');
+  toolbar.id = 'gc-export-toolbar';
+  toolbar.setAttribute('role', 'group');
+  toolbar.setAttribute('aria-label', 'Board image export');
+
+  const findExisting = (kind, terms) => Array.from(document.querySelectorAll('button')).find(button => {
+    if (button.closest('#gc-export-toolbar')) return false;
+    const label = (button.textContent || '') + ' ' + (button.getAttribute('aria-label') || '') + ' ' + button.id;
+    return terms.some(term => label.toLowerCase().includes(term));
+  });
+  const entries = [
+    { kind:'download', terms:['download png','download-png'], label:'Download PNG' },
+    { kind:'copy', terms:['copy png','copy-png'], label:'Copy PNG' }
+  ];
+  for (const entry of entries) {
+    let button = findExisting(entry.kind, entry.terms);
+    if (!button) {
+      button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = entry.label;
+      button.addEventListener('click', async () => {
+        button.disabled = true;
+        try { await exportBoardPng(entry.kind === 'copy'); }
+        catch (error) { showToast(error.message, true); }
+        finally { button.disabled = false; }
+      });
+    } else {
+      button.textContent = entry.label;
+      button.classList.add('gc-export-existing');
+    }
+    button.dataset.gcExportKind = entry.kind;
+    toolbar.appendChild(button);
+  }
+  controls.appendChild(toolbar);
+}
+
 function mountKingPawn() {
   if ($('gc-king-pawn')) return;
   const dock = document.createElement('div');
@@ -496,9 +620,6 @@ function installHintFeedback() {
 }
 
 async function restoreAndMount() {
-  mountPersonalization();
-  mountKingPawn();
-  installHintFeedback();
   try {
     saveState = await saveEngine.loadData();
     chatLog = Array.isArray(saveState.chatLog) ? saveState.chatLog.slice(-300) : [];
@@ -540,7 +661,10 @@ function captureGameState(event) {
   });
 }
 
+let bootStarted = false;
 function boot() {
+  if (bootStarted) return;
+  bootStarted = true;
   mountPersonalization();
   mountKingPawn();
   installHintFeedback();
