@@ -157,3 +157,31 @@
   #gc-export-toolbar { right: 7px !important; bottom: 7px !important; gap: 3px !important; }
   #gc-export-toolbar button { min-height: 28px !important; padding: 4px 7px !important; font-size: 9px !important; }
 }
+
+.gc-cloud-vault-scroll { padding: 14px 18px; overflow: auto; }
+.gc-cloud-vault-scroll > h3 { margin: 16px 0 6px; color: #d8bd7b; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
+#gc-cloud-vault-profile {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 13px; border: 1px solid rgba(255,255,255,.1); border-radius: 12px;
+  background: rgba(255,255,255,.045);
+}
+#gc-cloud-vault-profile p { margin: 0; color: #aab6cb; font-size: 10px; line-height: 1.5; }
+#gc-cloud-vault-profile button {
+  flex: 0 0 auto; min-height: 31px; padding: 0 10px; border: 1px solid rgba(220,200,146,.3);
+  border-radius: 8px; color: #f4dda5; background: rgba(220,200,146,.08);
+  font-size: 10px; font-weight: 700; cursor: pointer;
+}
+#gc-cloud-vault-list { padding: 4px 0; overflow: visible; }
+.gc-cloud-chat-archive { margin-top: 16px; padding: 11px 12px; border: 1px solid rgba(255,255,255,.1); border-radius: 11px; background: rgba(255,255,255,.035); }
+.gc-cloud-chat-archive summary { color: #e4eaf8; font-size: 11px; font-weight: 700; cursor: pointer; }
+#gc-cloud-vault-chat { display: grid; gap: 8px; margin-top: 11px; }
+.gc-cloud-chat-entry { padding: 9px; border: 1px solid rgba(255,255,255,.07); border-radius: 9px; background: rgba(0,0,0,.12); }
+.gc-cloud-chat-entry strong { color: #e8d39e; font-size: 10px; }
+.gc-cloud-chat-entry p { margin: 5px 0; color: #e0e6f4; font-size: 11px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.gc-cloud-chat-entry small { color: #8999b4; font-size: 9px; }
+body.gc-custom-background .panel,
+body.gc-custom-background .gc-workspace-drawer,
+body.gc-custom-background #gc-floating-hub .gc-hub-drawer {
+  backdrop-filter: blur(12px) saturate(1.15);
+  -webkit-backdrop-filter: blur(12px) saturate(1.15);
+}
