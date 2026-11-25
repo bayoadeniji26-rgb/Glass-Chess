@@ -28,16 +28,25 @@
 #board .square.gc-last-move:not(.selected) {
   box-shadow: inset 0 0 0 999px rgba(230,199,133,.14);
 }
-.gc-motion-ghost {
-  position: fixed; z-index: 49; display: grid; place-items: center;
-  pointer-events: none !important; user-select: none; contain: layout paint;
-  will-change: transform, opacity; transform: translate3d(0,0,0);
+.gc-piece-in-flight {
+  position: relative !important;
+  z-index: 50 !important;
+  will-change: transform;
+  transform-origin: center center;
+  transition: none !important;
+  filter: drop-shadow(0 5px 5px rgba(0,0,0,.22));
 }
-.gc-motion-ghost-move,.gc-motion-ghost-castle-rook { z-index: 50; }
-.gc-motion-ghost-capture { z-index: 49; filter: saturate(.82); }
-.gc-motion-ghost .gc-piece {
-  width: 100% !important; height: 100% !important; max-width: none !important;
-  max-height: none !important; margin: 0 !important; transform: none !important;
+.gc-piece-capture-flight {
+  display: flex !important;
+  position: fixed !important;
+  z-index: 49 !important;
+  margin: 0 !important;
+  pointer-events: none !important;
+  user-select: none;
+  will-change: transform, opacity;
+  transform-origin: center center;
+  transition: none !important;
+  filter: saturate(.82) drop-shadow(0 2px 3px rgba(0,0,0,.25));
 }
 .gc-king-in-check,.gc-king-in-checkmate { position: relative !important; isolation: isolate; }
 .gc-king-in-check::before,.gc-king-in-checkmate::before {
@@ -83,7 +92,7 @@
   100% { transform: translate3d(0,0,0) scale(1); filter: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  #board [data-square],#board .gc-piece,.gc-motion-ghost,
+  #board [data-square],#board .gc-piece,.gc-piece-in-flight,.gc-piece-capture-flight,
   .gc-king-in-check::before,.gc-king-in-check .gc-piece,
   .gc-king-in-checkmate::before,.gc-king-in-checkmate .gc-piece,
   .gc-piece-promoted { animation: none !important; transition: none !important; }
@@ -110,6 +119,6 @@
   user-select:none;will-change:transform;filter:drop-shadow(0 8px 9px rgba(0,0,0,.35));
 }
 .gc-drag-ghost .gc-piece{width:100%!important;height:100%!important;transform:none!important}
-@media(prefers-reduced-motion:reduce){.gc-motion-ghost,.gc-drag-ghost{transition:none!important;animation:none!important}}
+@media(prefers-reduced-motion:reduce){.gc-piece-in-flight,.gc-piece-capture-flight,.gc-drag-ghost{transition:none!important;animation:none!important}}
 
 #board [data-square] { touch-action:none; }
