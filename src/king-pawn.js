@@ -11,6 +11,10 @@ let hintMove = null;
 let hintFen = '';
 let saveTimer = null;
 let restoreComplete = false;
+let currentBackgroundImage = '';
+let currentBackgroundUrl = '';
+let avatarImages = { player: '', opponent: '' };
+let savedGames = [];
 
 function safeImageData(file) {
   return new Promise((resolve, reject) => {
@@ -65,6 +69,7 @@ function showToast(message, isError = false) {
 }
 
 function applyBackground(dataUrl) {
+  currentBackgroundImage = dataUrl || '';
   if (!dataUrl) {
     document.body.classList.remove('gc-custom-background');
     document.body.style.removeProperty('--gc-custom-background-image');
@@ -124,6 +129,7 @@ function createAvatar(label, side, initial) {
 }
 
 function applyAvatar(side, dataUrl) {
+  avatarImages[side] = dataUrl || '';
   const button = document.querySelector('[data-gc-avatar="' + side + '"]');
   if (!button) return;
   if (dataUrl) {
@@ -171,6 +177,7 @@ function mountPersonalization() {
       const image = await safeImageData(file);
       applyBackground(image);
       $('gc-background-url').value = '';
+      currentBackgroundUrl = '';
       queueSave({ backgroundImage: image, backgroundUrl: '' });
       showToast('Custom background saved.');
     } catch (error) { showToast(error.message, true); }
@@ -184,11 +191,13 @@ function mountPersonalization() {
       showToast('Use an http or https image URL.', true);
       return;
     }
+    currentBackgroundUrl = url.href;
     applyBackground(url.href);
     queueSave({ backgroundImage: url.href, backgroundUrl: url.href });
     showToast('Background URL saved.');
   });
   $('gc-background-reset').addEventListener('click', () => {
+    currentBackgroundUrl = '';
     applyBackground('');
     $('gc-background-url').value = '';
     queueSave({ backgroundImage: '', backgroundUrl: '' });
@@ -213,14 +222,18 @@ function exportBlob(filename, content, type) {
 
 async function exportSave() {
   try {
+    clearTimeout(saveTimer);
     const api = window.GlassChess;
-    if (api) {
-      await saveEngine.saveData({
-        activePgn: api.pgn || '',
-        activeFen: api.fen || '',
-        localStorage: saveLegacySettings()
-      });
-    }
+    await saveEngine.saveData({
+      backgroundImage: currentBackgroundImage,
+      backgroundUrl: currentBackgroundUrl,
+      avatars: avatarImages,
+      chatLog,
+      games: savedGames,
+      activePgn: api?.pgn || '',
+      activeFen: api?.fen || '',
+      localStorage: saveLegacySettings()
+    });
     const json = await saveEngine.exportSave();
     exportBlob('glass-chess.kingpawn.json', json, 'application/json');
     showToast('Your complete Glass Chess save was exported.');
@@ -235,6 +248,8 @@ async function importSave(event) {
     const text = await file.text();
     const data = await saveEngine.importSave(text);
     saveState = data;
+    savedGames = Array.isArray(data.games) ? data.games.slice() : [];
+    currentBackgroundUrl = data.backgroundUrl || '';
     for (const [key, value] of Object.entries(data.localStorage || {})) {
       try { localStorage.setItem(key, String(value)); } catch {}
     }
@@ -285,7 +300,7 @@ function chessTopicAnswer(question, context) {
       current.moves().length + ' legal moves' + (current.isCheck() ? ', and the king is in check' : '') + '.'
     : '';
   const opening = [
-    [/ruy lopez|spanish opening|morphy/i, 'The Ruy Lopez starts 1.e4 e5 2.Nf3 Nc6 3.Bb5. White pressures the c6-knight, which supports e5. Develop smoothly, castle, and keep central tension; Black can challenge the bishop with ...a6 or develop with ...Nf6.'],
+    [/ruy lopez|spanish opening/i, 'The Ruy Lopez starts 1.e4 e5 2.Nf3 Nc6 3.Bb5. White pressures the c6-knight, which supports e5. Develop smoothly, castle, and keep central tension; Black can challenge the bishop with ...a6 or develop with ...Nf6.'],
     [/italian game|giuoco piano/i, 'The Italian Game begins 1.e4 e5 2.Nf3 Nc6 3.Bc4. White aims at f7 and can build with c3 and d4. Black should develop quickly and contest the center rather than chase the bishop.'],
     [/sicilian/i, 'The Sicilian Defense begins 1.e4 c5. Black fights for d4 asymmetrically and often gets active queenside play, while White usually gets space and attacking chances. Know your chosen variation before memorizing long move sequences.'],
     [/queens gambit/i, 'The Queen’s Gambit begins 1.d4 d5 2.c4. White offers the c-pawn to challenge Black’s d5-pawn and gain central influence. Black can accept, decline with ...e6, or play ...c6.'],
@@ -631,6 +646,8 @@ async function restoreAndMount() {
   try {
     saveState = await saveEngine.loadData();
     chatLog = Array.isArray(saveState.chatLog) ? saveState.chatLog.slice(-300) : [];
+    savedGames = Array.isArray(saveState.games) ? saveState.games.slice() : [];
+    currentBackgroundUrl = saveState.backgroundUrl || '';
     applyBackground(saveState.backgroundImage || '');
     applyAvatar('player', saveState.avatars?.player || '');
     applyAvatar('opponent', saveState.avatars?.opponent || '');
@@ -656,10 +673,11 @@ function captureGameState(event) {
   const pgn = detail.pgn || api.pgn || '';
   const fen = detail.fen || api.fen || '';
   const gameSnapshot = pgn ? { pgn, fen, savedAt: new Date().toISOString() } : null;
-  const games = Array.isArray(saveState?.games) ? saveState.games.slice() : [];
+  const games = savedGames.slice();
   if (gameSnapshot && games.at(-1)?.pgn !== pgn) {
     games.push(gameSnapshot);
     if (games.length > 150) games.splice(0, games.length - 150);
+    savedGames = games;
   }
   queueSave({
     activePgn: pgn,
