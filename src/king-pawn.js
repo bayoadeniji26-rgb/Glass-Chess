@@ -830,6 +830,7 @@ function boot() {
       }
       try {
         const settings = JSON.parse(localStorage.getItem('glass-chess-settings') || '{}');
+        if ($('gc-background-preset') && settings.background) $('gc-background-preset').value = settings.background;
         window.GlassChess?.updateAppearance?.({
           theme: settings.theme, background: settings.background, backgroundColor: settings.backgroundColor,
           pieceStyle: settings.pieceStyle, whitePieceColor: settings.whitePieceColor, blackPieceColor: settings.blackPieceColor
