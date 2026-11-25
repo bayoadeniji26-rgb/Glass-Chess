@@ -210,8 +210,6 @@ async function loadFirebaseSdk() {
     } catch (error) {
       console.info('Firestore IndexedDB persistence was not enabled:', error.code || error.message);
     }
-  } else if (typeof firestoreSdk.initializeFirestore === 'function' && typeof firestoreSdk.persistentLocalCache === 'function') {
-    db = firestoreSdk.initializeFirestore(app, { localCache: firestoreSdk.persistentLocalCache() });
   }
   firebaseReady = true;
 }
@@ -314,12 +312,13 @@ async function pushCloudState(state) {
     avatarUrl: profileAvatarUrl || '',
     backgroundImageUrl,
     backgroundUrl: state.backgroundUrl || '',
+    backgroundDimmer: Math.max(0, Math.min(88, Number(state.backgroundDimmer ?? 56))),
     avatars: { player: playerAvatarUrl, opponent: opponentAvatarUrl },
-    chatLog: (Array.isArray(state.chatLog) ? state.chatLog : []).slice(-60).map(item => ({
+    chatLog: (Array.isArray(state.chatLog) ? state.chatLog : []).slice(-30).map(item => ({
       role: String(item.role || '').slice(0, 20),
-      content: String(item.content || '').slice(0, 4000),
+      content: String(item.content || '').slice(0, 3000),
       fen: String(item.fen || '').slice(0, 120),
-      pgn: String(item.pgn || '').slice(0, 20000),
+      pgn: String(item.pgn || '').slice(0, 10000),
       at: String(item.at || '')
     })),
     localStorage: state.localStorage || {},
