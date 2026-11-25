@@ -15,22 +15,35 @@ let currentBackgroundImage = '';
 let currentBackgroundUrl = '';
 let avatarImages = { player: '', opponent: '' };
 let savedGames = [];
+let activeSaveGameId = null;
+let backgroundDimmer = 56;
 let aiAdapter = null;
 
 function safeImageData(file) {
   return new Promise((resolve, reject) => {
-    if (!file || !/^image\/(png|jpeg|webp)$/i.test(file.type)) {
-      reject(new Error('Choose a JPG, PNG, or WebP image.'));
-      return;
-    }
-    if (file.size > MAX_IMAGE_BYTES) {
-      reject(new Error('That image is over 8 MB. Choose a smaller image.'));
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error('The image could not be read.'));
-    reader.readAsDataURL(file);
+    if (!file || !/^image\/(png|jpeg|webp)$/i.test(file.type)) return reject(new Error('Choose a JPG, PNG, or WebP image.'));
+    if (file.size > MAX_IMAGE_BYTES) return reject(new Error('That image is over 8 MB. Choose a smaller image.'));
+    const image = new Image();
+    const url = URL.createObjectURL(file);
+    image.onload = () => {
+      const scale = Math.min(1, 1920 / Math.max(image.naturalWidth, image.naturalHeight));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const context = canvas.getContext('2d');
+      if (!context) { URL.revokeObjectURL(url); reject(new Error('Image compression is unavailable.')); return; }
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(blob => {
+        if (!blob) return reject(new Error('The image could not be compressed.'));
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error('The image could not be read.'));
+        reader.readAsDataURL(blob);
+      }, file.type === 'image/png' ? 'image/png' : 'image/webp', 0.84);
+    };
+    image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('The selected image could not be opened.')); };
+    image.src = url;
   });
 }
 
@@ -49,7 +62,7 @@ function queueSave(patch) {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     saveEngine.saveData({ ...patch, localStorage: saveLegacySettings() })
-      .then(value => { saveState = value; })
+      .then(value => { saveState = value; window.GlassChessCloud?.queueSync?.(); })
       .catch(error => showToast('Save problem: ' + error.message, true));
   }, 180);
 }
@@ -79,10 +92,12 @@ function applyBackground(dataUrl) {
     document.body.style.removeProperty('background-position');
     return;
   }
+  const dim = Math.max(0, Math.min(0.88, Number(backgroundDimmer) / 100));
+  const lower = Math.min(0.94, dim + 0.12);
   document.body.classList.add('gc-custom-background');
   document.body.style.setProperty('--gc-custom-background-image', 'url("' + dataUrl.replace(/["\\\n\r]/g, '') + '")');
   // main.js uses an important inline background shorthand; set the image layer inline too.
-  document.body.style.setProperty('background-image', 'linear-gradient(rgba(8,12,22,.56), rgba(8,12,22,.68)), var(--gc-custom-background-image)', 'important');
+  document.body.style.setProperty('background-image', 'linear-gradient(rgba(8,12,22,' + dim + '), rgba(8,12,22,' + lower + ')), var(--gc-custom-background-image)', 'important');
   document.body.style.setProperty('background-size', 'cover', 'important');
   document.body.style.setProperty('background-position', 'center', 'important');
   document.body.style.setProperty('background-attachment', 'fixed', 'important');
@@ -156,8 +171,12 @@ function mountPersonalization() {
   section.innerHTML = [
     '<div class="divider"></div>',
     '<p class="eyebrow">PERSONALIZE YOUR BOARD</p>',
-    '<button type="button" id="gc-background-open" class="gc-settings-action">Theme / Background</button>',
+    '<button type="button" id="gc-background-open" class="gc-settings-action">Customize Theme / Upload Background</button>',
     '<input type="file" id="gc-background-file" accept="image/png,image/jpeg,image/webp" hidden>',
+    '<label for="gc-background-preset">Preset background</label>',
+    '<select id="gc-background-preset"><option value="midnight">Midnight</option><option value="sky">Open Sky</option><option value="aurora">Aurora Lights</option><option value="fruit">Colorful Fruit</option><option value="sunset">Sunset</option><option value="ocean">Deep Ocean</option><option value="forest">Forest</option><option value="marble">Marble</option></select>',
+    '<label for="gc-background-dimmer">Background dimmer <span id="gc-background-dimmer-value">56%</span></label>',
+    '<input id="gc-background-dimmer" type="range" min="0" max="88" value="56">',
     '<label for="gc-background-url">Or paste an image URL</label>',
     '<input id="gc-background-url" type="url" placeholder="https://example.com/background.jpg" autocomplete="url">',
     '<div class="gc-settings-actions"><button type="button" id="gc-background-apply">Apply URL</button><button type="button" id="gc-background-reset">Reset to Default</button></div>',
@@ -171,6 +190,19 @@ function mountPersonalization() {
   options.appendChild(section);
 
   $('gc-background-open').addEventListener('click', () => $('gc-background-file').click());
+  $('gc-background-preset').addEventListener('change', event => {
+    currentBackgroundUrl = '';
+    applyBackground('');
+    window.GlassChess?.updateAppearance?.({ background: event.target.value });
+    queueSave({ backgroundImage: '', backgroundUrl: '', backgroundPreset: event.target.value });
+    showToast('Preset background applied.');
+  });
+  $('gc-background-dimmer').addEventListener('input', event => {
+    backgroundDimmer = Number(event.target.value);
+    $('gc-background-dimmer-value').textContent = backgroundDimmer + '%';
+    if (currentBackgroundImage) applyBackground(currentBackgroundImage);
+    queueSave({ backgroundDimmer });
+  });
   $('gc-background-file').addEventListener('change', async () => {
     const file = $('gc-background-file').files?.[0];
     if (!file) return;
@@ -272,12 +304,19 @@ async function importSave(event) {
 
 function currentBoardContext() {
   const api = window.GlassChess;
+  const chess = api?.game;
+  const material = { w: { p: 0, n: 0, b: 0, r: 0, q: 0 }, b: { p: 0, n: 0, b: 0, r: 0, q: 0 } };
+  try {
+    for (const row of chess?.board?.() || []) for (const piece of row || []) {
+      if (piece && material[piece.color]?.[piece.type] !== undefined) material[piece.color][piece.type] += 1;
+    }
+  } catch {}
+  const inCheck = Boolean(chess?.isCheck?.());
   return {
-    fen: api?.fen || '',
-    pgn: api?.pgn || '',
-    history: api?.history || [],
-    gameOver: Boolean(api?.gameOver),
-    turn: api?.turn || 'w'
+    fen: api?.fen || '', pgn: api?.pgn || '', history: api?.history || [],
+    gameOver: Boolean(api?.gameOver), turn: api?.turn || 'w', inCheck,
+    checkState: inCheck ? (api?.turn === 'w' ? 'White is in check' : 'Black is in check') : 'No king is in check',
+    material
   };
 }
 
@@ -354,7 +393,10 @@ async function makeChessAnswer(question) {
           pgn: context.pgn,
           history: context.history,
           turn: context.turn,
-          gameOver: context.gameOver
+          gameOver: context.gameOver,
+          inCheck: context.inCheck,
+          checkState: context.checkState,
+          material: context.material
         }
       });
       const text = typeof answer === 'string' ? answer : answer?.answer;
@@ -486,7 +528,9 @@ async function exportBoardPng(copyToClipboard) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = 'glass-chess-board.png';
+  const api = window.GlassChess;
+  const moveNumber = Math.max(1, Math.ceil((api?.history?.length || 0) / 2));
+  link.download = 'chess-match-' + new Date().toISOString().slice(0, 10) + '-' + moveNumber + '.png';
   document.body.appendChild(link);
   link.click();
   link.remove();
@@ -542,6 +586,12 @@ function mountKingPawn() {
     '<section id="gc-king-pawn-panel" aria-label="King Pawn chess assistant" hidden>',
     '<header><span class="gc-kp-crown">♛</span><div><strong>King Pawn</strong><small>Chess advisor · Board-aware</small></div><button type="button" id="gc-king-pawn-close" aria-label="Close King Pawn">×</button></header>',
     '<div class="gc-kp-context" id="gc-kp-context">Connected to your current board and move list.</div>',
+    '<div class="gc-kp-prompts" aria-label="Quick chess questions">' +
+      '<button type="button" data-kp-prompt="Analyze my current position">Analyze position</button>' +
+      '<button type="button" data-kp-prompt="Why was my last move good or bad?">Review last move</button>' +
+      '<button type="button" data-kp-prompt="What opening are we playing?">Identify opening</button>' +
+      '<button type="button" data-kp-prompt="Suggest a strategic plan">Strategic plan</button>' +
+    '</div>',
     '<div id="gc-king-pawn-messages" aria-live="polite"></div>',
     '<form id="gc-king-pawn-form"><label class="gc-kp-sr-only" for="gc-king-pawn-input">Ask King Pawn a chess question</label><textarea id="gc-king-pawn-input" rows="2" maxlength="1200" placeholder="Ask about a move, opening, tactic, or rule…"></textarea><button type="submit">Ask King Pawn</button></form>',
     '<footer>Powered by chess knowledge + Stockfish 19</footer>',
@@ -562,6 +612,10 @@ function mountKingPawn() {
   }
   launcher.addEventListener('click', () => panel.hidden ? open() : close());
   $('gc-king-pawn-close').addEventListener('click', close);
+  dock.querySelectorAll('[data-kp-prompt]').forEach(button => button.addEventListener('click', () => {
+    $('gc-king-pawn-input').value = button.dataset.kpPrompt || '';
+    $('gc-king-pawn-form').requestSubmit();
+  }));
   $('gc-king-pawn-form').addEventListener('submit', async event => {
     event.preventDefault();
     const input = $('gc-king-pawn-input');
@@ -660,7 +714,8 @@ function installHintFeedback() {
     const status = $('gc-kp-context');
     if (status) {
       status.textContent = 'Live position · ' + (context.turn === 'w' ? 'White' : 'Black') +
-        ' to move · ' + context.history.length + ' plies · FEN and PGN update automatically';
+        ' to move · ' + context.history.length + ' plies · ' + context.checkState +
+        ' · material counts · FEN and PGN update automatically';
     }
   });
 }
@@ -671,10 +726,14 @@ async function restoreAndMount() {
     chatLog = Array.isArray(saveState.chatLog) ? saveState.chatLog.slice(-300) : [];
     savedGames = Array.isArray(saveState.games) ? saveState.games.slice() : [];
     currentBackgroundUrl = saveState.backgroundUrl || '';
+    backgroundDimmer = Math.max(0, Math.min(88, Number(saveState.backgroundDimmer ?? 56)));
     applyBackground(saveState.backgroundImage || '');
     applyAvatar('player', saveState.avatars?.player || '');
     applyAvatar('opponent', saveState.avatars?.opponent || '');
     if ($('gc-background-url')) $('gc-background-url').value = saveState.backgroundUrl || '';
+    if ($('gc-background-dimmer')) $('gc-background-dimmer').value = String(backgroundDimmer);
+    if ($('gc-background-dimmer-value')) $('gc-background-dimmer-value').textContent = backgroundDimmer + '%';
+    if ($('gc-background-preset')) $('gc-background-preset').value = saveState.backgroundPreset || 'midnight';
     const api = window.GlassChess;
     if (api && !api.history?.length && saveState.activePgn && typeof api.loadPgn === 'function') {
       try { api.loadPgn(saveState.activePgn); } catch (error) { console.warn('Saved game could not be restored:', error); }
@@ -736,7 +795,35 @@ function boot() {
       aiAdapter = adapter;
     },
     syncToCloud: () => saveEngine.saveToCloud(),
-    loadFromCloud: () => saveEngine.loadFromCloud()
+    loadFromCloud: () => saveEngine.loadFromCloud(),
+    async applyCloudProfile(profile = {}) {
+      currentBackgroundUrl = profile.backgroundUrl || '';
+      backgroundDimmer = Math.max(0, Math.min(88, Number(profile.backgroundDimmer ?? 56)));
+      const background = profile.backgroundImageUrl || profile.backgroundImage || currentBackgroundUrl || '';
+      applyBackground(background);
+      if ($('gc-background-dimmer')) $('gc-background-dimmer').value = String(backgroundDimmer);
+      if ($('gc-background-dimmer-value')) $('gc-background-dimmer-value').textContent = backgroundDimmer + '%';
+      if ($('gc-background-url')) $('gc-background-url').value = currentBackgroundUrl;
+      if (profile.avatars) {
+        avatarImages = { player: profile.avatars.player || '', opponent: profile.avatars.opponent || '' };
+        applyAvatar('player', avatarImages.player);
+        applyAvatar('opponent', avatarImages.opponent);
+      }
+      if (Array.isArray(profile.chatLog)) { chatLog = profile.chatLog.slice(-300); renderChat(); }
+      for (const [key, value] of Object.entries(profile.localStorage || {})) {
+        if (String(key).startsWith('glass-chess-') && !/(token|secret|auth)/i.test(key)) {
+          try { localStorage.setItem(key, String(value)); } catch {}
+        }
+      }
+      try {
+        const settings = JSON.parse(localStorage.getItem('glass-chess-settings') || '{}');
+        window.GlassChess?.updateAppearance?.({
+          theme: settings.theme, background: settings.background, backgroundColor: settings.backgroundColor,
+          pieceStyle: settings.pieceStyle, whitePieceColor: settings.whitePieceColor, blackPieceColor: settings.blackPieceColor
+        });
+      } catch {}
+      await saveEngine.saveData({ backgroundImage: background, backgroundUrl: currentBackgroundUrl, backgroundDimmer, avatars: avatarImages, chatLog });
+    }
   };
 }
 
