@@ -14,6 +14,9 @@ const CASHAPP_TAG = '$RaphaelAboy';
 const CASHAPP_URL = 'https://cash.app/$RaphaelAboy';
 const FIREBASE_VERSION = '13.4.0';
 const FIREBASE_CDN = `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/`;
+const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID || '';
+const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || '';
+const EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || '';
 
 // Firebase Console > Project settings > Your apps > Web app configuration.
 // The same values can be set in Render's Static Site > Environment.
@@ -149,10 +152,8 @@ function mountAuthWidget() {
       <button id="gc-donate" type="button" title="Support Glass Chess"><span aria-hidden="true">$</span> Donate</button>
       <button id="gc-copy-cashapp" type="button" title="Copy Cash App tag">Copy $RaphaelAboy</button>
     `;
-    $('gc-donate').addEventListener('click', () => {
-      const opened = window.open(CASHAPP_URL, '_blank', 'noopener,noreferrer');
-      if (!opened) toast('Your browser blocked the Cash App tab. Open cash.app/$RaphaelAboy directly.', true);
-    });
+    $('gc-donate').addEventListener('click', () => openDonationDialog());
+    mountDonationDialog();
     $('gc-copy-cashapp').addEventListener('click', async () => {
       try {
         await navigator.clipboard.writeText(CASHAPP_TAG);
@@ -163,6 +164,157 @@ function mountAuthWidget() {
     });
   }
   renderAuth();
+}
+
+function mountDonationDialog() {
+  if ($('gc-donation-dialog')) return;
+  const modal = document.createElement('section');
+  modal.id = 'gc-donation-dialog';
+  modal.className = 'gc-donation-overlay';
+  modal.hidden = true;
+  modal.innerHTML = `
+    <div class="gc-donation-card" role="dialog" aria-modal="true" aria-labelledby="gc-donation-title">
+      <header class="gc-donation-header">
+        <div class="gc-donation-mark" aria-hidden="true">$</div>
+        <div><small>SUPPORT THE PROJECT</small><h2 id="gc-donation-title">Support Glass Chess</h2>
+        <p>Your contribution helps keep the board improving.</p></div>
+        <button type="button" id="gc-donation-close" aria-label="Close donation dialog">×</button>
+      </header>
+      <form id="gc-donation-form">
+        <label for="gc-donation-name">Your name <span>(optional)</span></label>
+        <input id="gc-donation-name" name="from_name" maxlength="80" autocomplete="name" placeholder="Name">
+        <label for="gc-donation-email">Your email <span>(optional, for a reply)</span></label>
+        <input id="gc-donation-email" name="reply_to" type="email" maxlength="160" autocomplete="email" placeholder="you@example.com">
+        <label for="gc-donation-amount">Donation amount</label>
+        <select id="gc-donation-amount" name="donation_amount">
+          <option value="Not specified">Choose an amount (optional)</option>
+          <option value="$3">$3</option><option value="$5">$5</option>
+          <option value="$10">$10</option><option value="$15">$15</option>
+          <option value="$20">$20</option><option value="$25">$25</option>
+          <option value="$50">$50</option><option value="Other amount">Other amount</option>
+        </select>
+        <label for="gc-donation-message">Message <span>(sent to the Glass Chess creator)</span></label>
+        <textarea id="gc-donation-message" name="message" rows="4" maxlength="1200" required placeholder="Write a thank-you, suggestion, or note about your donation…"></textarea>
+        <input class="gc-donation-honeypot" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <p id="gc-donation-status" class="gc-donation-status" role="status">
+          Messages are emailed using the project's email service. Payment happens separately in Cash App.
+        </p>
+        <div class="gc-donation-actions">
+          <button type="submit" id="gc-donation-send">Send message</button>
+          <a href="${CASHAPP_URL}" target="_blank" rel="noopener noreferrer" id="gc-donation-cashapp">Continue to Cash App <span aria-hidden="true">↗</span></a>
+        </div>
+        <small class="gc-donation-footnote">Cash App: <strong>${CASHAPP_TAG}</strong>. Sending a message does not make a payment.</small>
+      </form>
+    </div>`;
+  document.body.appendChild(modal);
+  const close = () => { modal.hidden = true; };
+  $('gc-donation-close').addEventListener('click', close);
+  modal.addEventListener('click', event => { if (event.target === modal) close(); });
+  $('gc-donation-cashapp').addEventListener('click', () => {
+    // The link opens Cash App separately. Keep the message form open so it can still be sent.
+  });
+  $('gc-donation-form').addEventListener('submit', event => {
+    event.preventDefault();
+    void sendDonationMessage();
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && !modal.hidden) close();
+  });
+}
+
+function openDonationDialog() {
+  mountDonationDialog();
+  const modal = $('gc-donation-dialog');
+  if (!modal) return;
+  modal.hidden = false;
+  $('gc-donation-status').textContent = EMAILJS_SERVICE_ID && EMAILJS_TEMPLATE_ID && EMAILJS_PUBLIC_KEY
+    ? 'Your message will be emailed to the recipient configured in the EmailJS template. Payment is separate in Cash App.'
+    : 'Email delivery needs EmailJS configuration before messages can be sent. You can still continue to Cash App below.';
+  $('gc-donation-message').focus();
+}
+
+async function sendDonationMessage() {
+  const form = $('gc-donation-form');
+  const send = $('gc-donation-send');
+  const status = $('gc-donation-status');
+  if (!form || !send || !status) return;
+  if (form.elements.website?.value) {
+    status.textContent = 'Thanks. Your message could not be submitted.';
+    return;
+  }
+  if (!EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID || !EMAILJS_PUBLIC_KEY) {
+    status.textContent = 'Email is not connected yet. Add VITE_EMAILJS_SERVICE_ID, VITE_EMAILJS_TEMPLATE_ID, and VITE_EMAILJS_PUBLIC_KEY to Render, then redeploy.';
+    status.classList.add('is-error');
+    return;
+  }
+  const message = $('gc-donation-message').value.trim();
+  if (message.length < 3) {
+    status.textContent = 'Please write a short message before sending.';
+    status.classList.add('is-error');
+    $('gc-donation-message').focus();
+    return;
+  }
+  const email = $('gc-donation-email').value.trim();
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    status.textContent = 'Please enter a valid email address or leave that field blank.';
+    status.classList.add('is-error');
+    $('gc-donation-email').focus();
+    return;
+  }
+  send.disabled = true;
+  send.textContent = 'Sending…';
+  status.classList.remove('is-error');
+  status.textContent = 'Sending your message securely through the configured email service…';
+  const templateParams = {
+    from_name: $('gc-donation-name').value.trim() || 'Glass Chess visitor',
+    reply_to: email || 'No reply email supplied',
+    donation_amount: $('gc-donation-amount').value,
+    message,
+    cashapp_tag: CASHAPP_TAG,
+    submitted_at: new Date().toLocaleString(),
+    source_url: window.location.origin
+  };
+  try {
+    const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        service_id: EMAILJS_SERVICE_ID,
+        template_id: EMAILJS_TEMPLATE_ID,
+        user_id: EMAILJS_PUBLIC_KEY,
+        template_params: templateParams
+      })
+    });
+    if (!response.ok) {
+      const detail = await response.text().catch(() => '');
+      throw new Error(detail.slice(0, 300) || 'The email service rejected the message.');
+    }
+    status.textContent = 'Message sent! Thank you for supporting Glass Chess.';
+    toast('Your message was sent to the Glass Chess creator.');
+    form.reset();
+  } catch (error) {
+    status.textContent = 'Your message could not be sent: ' + (error.message || 'Email service error') + '. Please try again.';
+    status.classList.add('is-error');
+    toast('Donation message could not be emailed.', true);
+  } finally {
+    send.disabled = false;
+    send.textContent = 'Send message';
+  }
+}
+
+function authErrorMessage(error) {
+  const code = error?.code || '';
+  const messages = {
+    'auth/unauthorized-domain': 'This website address is not authorized in Firebase Authentication. Add glass-chess-pro.onrender.com under Authentication → Settings → Authorized domains.',
+    'auth/operation-not-allowed': 'Google sign-in is disabled in Firebase. Enable Google under Authentication → Sign-in method.',
+    'auth/invalid-api-key': 'The Firebase API key is missing or incorrect. Copy the Web app config from Firebase Project settings.',
+    'auth/popup-blocked': 'The browser blocked the Google sign-in popup. Allow popups for this site and try again.',
+    'auth/popup-closed-by-user': 'The Google sign-in window was closed before sign-in finished.',
+    'auth/network-request-failed': 'Google sign-in could not reach Firebase. Check your internet connection or browser privacy extensions.',
+    'auth/web-storage-unsupported': 'This browser blocked the storage needed for Google sign-in. Try allowing site data or using another browser.',
+    'auth/invalid-oauth-client-id': 'The Google OAuth client is not configured correctly. Re-enable Google in Firebase Authentication and check its Web client in Google Cloud.'
+  };
+  return messages[code] || error?.message || 'Google sign-in could not be completed.';
 }
 
 function renderAuth() {
@@ -244,7 +396,8 @@ async function signIn() {
       throw error;
     }
   } catch (error) {
-    toast(error.message || 'Google sign-in could not be completed.', true);
+    console.error('Glass Chess Google sign-in failed:', error);
+    toast(authErrorMessage(error), true);
   } finally {
     if (button) {
       button.disabled = false;
