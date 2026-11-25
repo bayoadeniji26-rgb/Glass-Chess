@@ -1,12 +1,11 @@
 {
-  "version": "2026.11.25.2",
-  "name": "Glass Chess Single-Piece Motion Polish",
+  "version": "2026.11.25.3",
+  "name": "Glass Chess Hint Recovery & Smooth Piece Motion",
   "updatedAt": "2026-11-25",
   "notes": [
-    "Move animation now travels with the original piece element instead of a cloned ghost",
-    "One composited transform animation with subtle lift and settle easing",
-    "Castling moves both original pieces together; captures fade using the original captured piece",
-    "Promotion reveals the new piece only after the pawn reaches its square",
-    "Undo and one-step history replay animate the actual piece back to its previous square"
+    "Hint requests now report Stockfish search progress and recover cleanly from cancellation",
+    "Stockfish searches have a watchdog timeout and automatically restart a stalled worker",
+    "Late messages from replaced Stockfish workers are ignored",
+    "Pawn and piece drag-and-drop moves use the same smooth single-piece movement animation as click moves"
   ]
 }
