@@ -35,6 +35,17 @@ In Firebase Console → Storage → Rules, publish the contents of `storage.rule
 
 These rules restrict each user's profile, saved games, and uploaded images to that authenticated user. The `global_matches` mirror is also owner-readable only; it is a mirror collection, not a public game feed.
 
+For command-line deployment from the repository root:
+
+```bash
+npm install --global firebase-tools
+firebase login
+firebase use --add
+firebase deploy --only firestore:rules,storage
+```
+
+Choose the same Firebase project used for the web configuration when `firebase use --add` prompts you. You can also paste the two rule files into the Firebase Console instead.
+
 ## 4. Verify sign-in and cloud sync
 
 1. Open the production site and click **Sign in with Google** in the top-left.
