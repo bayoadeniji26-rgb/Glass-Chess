@@ -117,9 +117,14 @@
   #gc-top-actions button { min-height: 28px; padding: 0 6px; font-size: 8px; }
 }
 @media (max-width: 420px) {
-  #gc-top-actions #gc-copy-cashapp { display: none; }
+  #gc-top-actions #gc-copy-cashapp {
+    display: inline-block; max-width: 82px; padding: 0 5px;
+    overflow: hidden; text-overflow: ellipsis; font-size: 8px;
+  }
   .topbar > .brand { margin-left: 130px; }
 }
+#gc-clear-hint { min-height: 32px; padding: 5px 10px; border-radius: 9px; font-size: 11px; }
+
 
 /* Keep board export actions reachable in the viewport-locked play screen. */
 #gc-export-toolbar {
