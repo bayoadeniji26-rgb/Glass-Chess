@@ -233,7 +233,12 @@ function mountPersonalization() {
     currentBackgroundUrl = '';
     applyBackground('');
     $('gc-background-url').value = '';
-    queueSave({ backgroundImage: '', backgroundUrl: '' });
+    window.GlassChess?.updateAppearance?.({ background: 'midnight' });
+    $('gc-background-preset').value = 'midnight';
+    backgroundDimmer = 56;
+    $('gc-background-dimmer').value = '56';
+    $('gc-background-dimmer-value').textContent = '56%';
+    queueSave({ backgroundImage: '', backgroundUrl: '', backgroundDimmer, backgroundPreset: 'midnight' });
     showToast('Default background restored.');
   });
   $('gc-save-export').addEventListener('click', exportSave);
@@ -754,10 +759,14 @@ function captureGameState(event) {
   if (!api || !restoreComplete) return;
   const pgn = detail.pgn || api.pgn || '';
   const fen = detail.fen || api.fen || '';
-  const gameSnapshot = pgn ? { pgn, fen, savedAt: new Date().toISOString() } : null;
+  if (!pgn) activeSaveGameId = null;
+  if (pgn && !activeSaveGameId) activeSaveGameId = 'match_' + (crypto.randomUUID?.() || (Date.now() + '_' + Math.random().toString(36).slice(2)));
+  const gameSnapshot = pgn ? { id: activeSaveGameId, pgn, fen, savedAt: new Date().toISOString(), status: detail.gameOver ? 'finished' : 'in-progress' } : null;
   const games = savedGames.slice();
-  if (gameSnapshot && games.at(-1)?.pgn !== pgn) {
-    games.push(gameSnapshot);
+  if (gameSnapshot) {
+    const index = games.findIndex(item => item.id === gameSnapshot.id);
+    if (index >= 0) games[index] = gameSnapshot;
+    else games.push(gameSnapshot);
     if (games.length > 150) games.splice(0, games.length - 150);
     savedGames = games;
   }
