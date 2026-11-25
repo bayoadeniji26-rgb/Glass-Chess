@@ -48,6 +48,8 @@ class ChessEngine {
       this.worker = worker;
 
       worker.onmessage = event => {
+        // Ignore late output from a worker that has already been replaced.
+        if (this.worker !== worker) return;
         const message = String(event.data ?? "").trim();
         if (message === "uciok") {
           try {
@@ -81,10 +83,11 @@ class ChessEngine {
       };
 
       worker.onerror = error => {
+        if (this.worker !== worker) return;
         if (!settled) {
           failStart(error);
         } else {
-          this.handleWorkerFailure(error);
+          this.handleWorkerFailure(error, worker);
         }
       };
 
@@ -103,16 +106,18 @@ class ChessEngine {
     return pending;
   }
 
-  handleWorkerFailure(error) {
+  handleWorkerFailure(error, failedWorker = this.worker) {
+    if (failedWorker && this.worker && this.worker !== failedWorker) return;
     this.searchGeneration += 1;
     this.ready = false;
     const active = this.activeSearch;
     this.activeSearch = null;
+    if (active?.timeout) clearTimeout(active.timeout);
     if (active) {
       try { active.reject(error instanceof Error ? error : new Error("Stockfish worker failed.")); }
       catch {}
     }
-    try { this.worker?.terminate(); } catch {}
+    try { failedWorker?.terminate(); } catch {}
     this.worker = null;
   }
 
@@ -224,6 +229,7 @@ class ChessEngine {
 
       return new Promise((resolve, reject) => {
         const depth = Math.max(1, Math.min(30, Number(options.depth) || 10));
+        const timeoutMs = Math.max(3000, Math.min(90000, Number(options.timeoutMs) || 30000));
         const search = {
           id: requestId,
           resolve,
@@ -231,7 +237,8 @@ class ChessEngine {
           onInfo: options.onInfo,
           latestInfo: null,
           variations: new Map(),
-          cancelled: false
+          cancelled: false,
+          timeout: null
         };
         this.activeSearch = search;
         try {
@@ -243,6 +250,24 @@ class ChessEngine {
           this.send("setoption name MultiPV value " + this.multiPV);
           this.send("position fen " + fen);
           this.send("go depth " + depth);
+          // A lost worker response must never leave Hint or analysis pending forever.
+          search.timeout = setTimeout(() => {
+            if (this.activeSearch !== search) return;
+            this.activeSearch = null;
+            search.timeout = null;
+            this.searchGeneration += 1;
+            this.ready = false;
+            const timedOutWorker = this.worker;
+            this.worker = null;
+            try { timedOutWorker?.terminate(); } catch {}
+            search.reject(new Error(
+              "Stockfish did not return a best move within " + Math.round(timeoutMs / 1000) +
+              " seconds. The engine is restarting; try Hint again."
+            ));
+            void this.start().catch(error => {
+              console.error("Stockfish restart after search timeout failed:", error);
+            });
+          }, timeoutMs);
         } catch (error) {
           if (this.activeSearch === search) this.activeSearch = null;
           reject(error);
@@ -285,6 +310,10 @@ class ChessEngine {
 
     const search = this.activeSearch;
     this.activeSearch = null;
+    if (search.timeout) {
+      clearTimeout(search.timeout);
+      search.timeout = null;
+    }
     const match = message.match(/^bestmove\s+(\S+)/);
     const rawBestMove = match ? match[1] : null;
     const bestMove = rawBestMove && rawBestMove !== "(none)" && rawBestMove !== "0000"
@@ -309,6 +338,10 @@ class ChessEngine {
 
     const search = this.activeSearch;
     search.cancelled = true;
+    if (search.timeout) {
+      clearTimeout(search.timeout);
+      search.timeout = null;
+    }
     const originalResolve = search.resolve;
     const originalReject = search.reject;
 
