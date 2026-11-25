@@ -8,8 +8,11 @@ service cloud.firestore {
 
     // Global mirror documents are not public: only their owner can read or write them.
     match /global_matches/{gameId} {
-      allow create, update: if request.auth != null
+      allow create: if request.auth != null
         && request.resource.data.ownerUid == request.auth.uid;
+      allow update: if request.auth != null
+        && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerUid == resource.data.ownerUid;
       allow read, delete: if request.auth != null
         && resource.data.ownerUid == request.auth.uid;
     }
