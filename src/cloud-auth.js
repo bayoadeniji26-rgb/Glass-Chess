@@ -283,6 +283,7 @@ async function sendDonationMessage() {
     from_name: $('gc-donation-name').value.trim() || 'Glass Chess visitor',
     reply_to: email || '',
     donation_amount: selectedAmount === 'Other amount' ? String.fromCharCode(36) + Number(customAmount).toFixed(2) : selectedAmount,
+    message,
     cashapp_tag: CASHAPP_TAG,
     submitted_at: new Date().toLocaleString(),
     source_url: window.location.origin
