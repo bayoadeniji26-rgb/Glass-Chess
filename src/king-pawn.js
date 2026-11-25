@@ -263,7 +263,8 @@ async function importSave(event) {
     if (api && data.activePgn && typeof api.loadPgn === 'function') api.loadPgn(data.activePgn);
     else if (api && data.activeFen && typeof api.loadFen === 'function') api.loadFen(data.activeFen);
     renderChat();
-    showToast('Save imported. Your profile and game data are restored.');
+    showToast('Save imported. Reloading Glass Chess to apply all settings and restore the saved game…');
+    window.setTimeout(() => window.location.reload(), 650);
   } catch (error) { showToast('Import failed: ' + error.message, true); }
   event.target.value = '';
 }
