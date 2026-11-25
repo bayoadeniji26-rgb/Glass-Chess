@@ -267,10 +267,6 @@ async function sendDonationMessage() {
     $('gc-donation-email').focus();
     return;
   }
-  send.disabled = true;
-  send.textContent = 'Sending…';
-  status.classList.remove('is-error');
-  status.textContent = 'Sending your message securely through the configured email service…';
   const selectedAmount = $('gc-donation-amount').value;
   const customAmount = $('gc-donation-custom-amount').value;
   if (selectedAmount === 'Other amount' && (!Number.isFinite(Number(customAmount)) || Number(customAmount) < 1 || Number(customAmount) > 1000)) {
@@ -279,6 +275,10 @@ async function sendDonationMessage() {
     $('gc-donation-custom-amount').focus();
     return;
   }
+  send.disabled = true;
+  send.textContent = 'Sending…';
+  status.classList.remove('is-error');
+  status.textContent = 'Sending your message securely through the configured email service…';
   const templateParams = {
     from_name: $('gc-donation-name').value.trim() || 'Glass Chess visitor',
     reply_to: email || '',
