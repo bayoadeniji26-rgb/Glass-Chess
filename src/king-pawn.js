@@ -15,6 +15,7 @@ let currentBackgroundImage = '';
 let currentBackgroundUrl = '';
 let avatarImages = { player: '', opponent: '' };
 let savedGames = [];
+let aiAdapter = null;
 
 function safeImageData(file) {
   return new Promise((resolve, reject) => {
@@ -340,6 +341,27 @@ async function makeChessAnswer(question) {
   const chessWords = /\b(chess|board|opening|endgame|tactic|fork|pin|skewer|check|mate|castl|en passant|pawn|rook|bishop|knight|queen|king|move|position|fen|pgn|grandmaster|fischer|kasparov|morphy|stalemate|promotion|opposition|lucena|philidor)\b/i;
   if (!chessWords.test(question)) {
     return 'I am King Pawn, royal advisor of the 64 squares. I only advise on chess matters. Ask me about a move, opening, tactic, rule, endgame, or this board.';
+  }
+
+  // A secure server-backed model can be attached without exposing its API key in the browser.
+  if (aiAdapter) {
+    try {
+      const answer = await aiAdapter({
+        systemPrompt: 'You are King Pawn, a helpful chess-only advisor for Glass Chess. Answer chess questions accurately and clearly, explain ideas in beginner-friendly steps, distinguish rules from strategy, and never invent a move or claim certainty without calculation. If the user asks about a non-chess topic, politely redirect them to chess. Analyze the supplied live board position and recent PGN when relevant. Do not make moves for the user.',
+        question,
+        board: {
+          fen: context.fen,
+          pgn: context.pgn,
+          history: context.history,
+          turn: context.turn,
+          gameOver: context.gameOver
+        }
+      });
+      const text = typeof answer === 'string' ? answer : answer?.answer;
+      if (typeof text === 'string' && text.trim()) return text.trim().slice(0, 12000);
+    } catch (error) {
+      console.warn('King Pawn AI adapter failed; using the local chess advisor:', error);
+    }
   }
 
   const contextAnswer = chessTopicAnswer(question, context);
@@ -709,6 +731,10 @@ function boot() {
     ask: makeChessAnswer,
     getMessages: () => chatLog.slice(),
     setCloudAdapter: adapter => saveEngine.setCloudAdapter(adapter),
+    setAIAdapter(adapter) {
+      if (adapter !== null && typeof adapter !== 'function') throw new TypeError('King Pawn AI adapter must be an async function.');
+      aiAdapter = adapter;
+    },
     syncToCloud: () => saveEngine.saveToCloud(),
     loadFromCloud: () => saveEngine.loadFromCloud()
   };
