@@ -452,7 +452,8 @@ function renderMoveHistory() {
   const history=inspectedFullHistory||api.history;
   host.innerHTML=history.map((move,index)=>{
     const badge=reviewData[index]?.label;
-    return '<button type="button" data-ply="'+(index+1)+'"><span>'+(Math.floor(index/2)+1)+(move.color==='w'?'.':'…')+' '+esc(move.san)+'</span>'+(badge?'<small class="gcl-badge gcl-badge-'+badge.toLowerCase()+'">'+esc(badge)+'</small>':'')+'</button>';
+    const icon=classificationIcon(badge);
+    return '<button type="button" data-ply="'+(index+1)+'"><span>'+(Math.floor(index/2)+1)+(move.color==='w'?'.':'…')+' '+esc(move.san)+'</span>'+(icon?'<small class="gcl-badge gcl-badge-'+badge.toLowerCase()+'" title="'+esc(badge)+'" aria-label="'+esc(badge)+'">'+esc(icon)+'</small>':'')+'</button>';
   }).join('')||'<p class="gcl-muted">No moves yet.</p>';
   host.querySelectorAll('[data-ply]').forEach(btn=>btn.addEventListener('click',()=>inspectPly(Number(btn.dataset.ply))));
 }
@@ -525,6 +526,9 @@ function reviewMoveData(item) {
     if(!move)return null;
     return {from,to,piece:REVIEW_PIECES[piece.color+piece.type]||'♟',san:move.san,after:position.fen()};
   } catch { return null; }
+}
+function classificationIcon(label) {
+  return ({Brilliant:'!!',Great:'!',Best:'★',Inaccuracy:'?!',Mistake:'?',Blunder:'??',Checkmate:'#'})[label] || '';
 }
 function miniReviewBoard(item, suggestion) {
   if(!suggestion)return '';
@@ -625,6 +629,7 @@ async function analyzeGame() {
     }
     if(token===reviewToken&&generation===api.generation&&snapshotFen===api.fen&&!aborted){
       updateClassifications(results);
+      api.setMoveClassifications?.(results);
       renderSummary(results,rated?Math.round(totalAccuracy/rated):null,sideAccuracy);
       retryQueue=results.filter(item=>['Mistake','Blunder'].includes(item.label) && (api.mode!=='computer'||item.move.color===(api.playerColor==='black'?'b':'w')));
       document.getElementById('gcl-retry-mistakes').disabled=!retryQueue.length;
@@ -1088,6 +1093,7 @@ function onPositionLoad(fen) {
   currentStartFen=fen||START_FEN;
   lastAutoReviewKey='';
   reviewData=[];
+  api.setMoveClassifications?.([]);
   inspectedFullHistory=null;
   inspectedIndex=null;
   cancelPreMove();
@@ -1110,6 +1116,7 @@ function onReset(fen) {
   currentStartFen=fen||START_FEN;
   lastAutoReviewKey='';
   reviewData=[];
+  api.setMoveClassifications?.([]);
   retryQueue=[];retryIndex=0;retryActive=false;
   activePuzzle=null;
   inspectedFullHistory=null;inspectedIndex=null;
