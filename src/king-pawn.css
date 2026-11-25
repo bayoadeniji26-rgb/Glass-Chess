@@ -11,7 +11,8 @@
 .gc-player-avatar:focus-visible { outline: 2px solid #8ddbf7; outline-offset: 2px; }
 
 #gc-hint-status {
-  position: fixed; left: 50%; bottom: 16px; z-index: 2147483000; transform: translateX(-50%);\n  width: min(calc(100vw - 36px), 720px); min-height: 34px; margin: 0; padding: 7px 11px;
+  position: fixed; left: 50%; bottom: 16px; z-index: 2147483000; transform: translateX(-50%);
+  width: min(calc(100vw - 36px), 720px); min-height: 34px; margin: 0; padding: 7px 11px;
   border: 1px solid rgba(115,215,245,.42); border-radius: 10px;
   color: #dff8ff; background: rgba(21,125,157,.16); font-size: 12px;
 }
