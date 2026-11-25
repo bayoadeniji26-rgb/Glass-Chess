@@ -349,6 +349,17 @@ function chessTopicAnswer(question, context) {
     ? ' Current position: ' + (current.turn() === 'w' ? 'White' : 'Black') + ' to move, ' +
       current.moves().length + ' legal moves' + (current.isCheck() ? ', and the king is in check' : '') + '.'
     : '';
+
+  // Short, reliable answers for common chess questions before the deeper topic library.
+  if (/when (was|is) chess (made|invented|created)|who invented chess|origin of chess|history of chess/.test(q)) {
+    return 'Chess developed from an earlier Indian strategy game called chaturanga, around the 6th century CE. It spread through Persia and the Islamic world, then reached Europe. The rules gradually changed, and the modern game took shape in Europe around the late 15th century. So chess was not invented by one known person on one exact date.';
+  }
+  if (/chess sucks|chess is boring|i hate chess|i do not like chess/.test(q)) {
+    return 'Fair enough — chess is not everybody’s thing. Some people dislike how much thinking it takes, how long games can last, or how frustrating a mistake feels. What part do you dislike most: the rules, the time, or losing?';
+  }
+  if (/why (do|should) (i|you|people) (play )?chess|why do you chess|what is the point of chess|benefits of chess/.test(q)) {
+    return 'People play chess for different reasons: solving problems, planning ahead, competing, being creative, and enjoying a challenge. I do not play like a person, but I can help explain positions, tactics, and ideas while you play.';
+  }
   const opening = [
     [/ruy lopez|spanish opening/i, 'The Ruy Lopez starts 1.e4 e5 2.Nf3 Nc6 3.Bb5. White pressures the c6-knight, which supports e5. Develop smoothly, castle, and keep central tension; Black can challenge the bishop with ...a6 or develop with ...Nf6.'],
     [/italian game|giuoco piano/i, 'The Italian Game begins 1.e4 e5 2.Nf3 Nc6 3.Bc4. White aims at f7 and can build with c3 and d4. Black should develop quickly and contest the center rather than chase the bishop.'],
@@ -395,7 +406,7 @@ async function makeChessAnswer(question) {
   if (aiAdapter) {
     try {
       const answer = await aiAdapter({
-        systemPrompt: 'You are King Pawn, a helpful chess-only advisor for Glass Chess. Answer chess questions accurately and clearly, explain ideas in beginner-friendly steps, distinguish rules from strategy, and never invent a move or claim certainty without calculation. If the user asks about a non-chess topic, politely redirect them to chess. Analyze the supplied live board position and recent PGN when relevant. Do not make moves for the user.',
+        systemPrompt: 'You are King Pawn, Glass Chess's chess-only advisor. Answer the full range of chess questions: history, rules, how to play, openings, tactics, strategy, famous games and players, training, opinions, and the live position. Be conversational and beginner-friendly, but accurate. Acknowledge opinions such as 'chess sucks' without arguing. Distinguish official rules from strategic advice. Never invent a move, statistic, quote, or historical certainty; explain uncertainty. If a question is not about chess, politely say you only answer chess-related questions and suggest a chess question. Analyze the supplied live board and PGN when relevant. Never make moves for the user.',
         question,
         board: {
           fen: context.fen,
