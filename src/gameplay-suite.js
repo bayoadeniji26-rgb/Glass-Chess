@@ -618,16 +618,8 @@ async function analyzeGame() {
       sideAccuracy[moves[i].color].count++;
       results.push({ply:i+1,move:moves[i],before:positions[i],after:positions[i+1],best:before.bestMove,label,loss,accuracy});
       updateClassifications(results);
-      const destination=board?.querySelector('[data-square="'+moves[i].to+'"]');
-      if(destination){
-        const badge=document.createElement('span');
-        badge.className='gcl-review-destination-badge gcl-badge gcl-badge-'+label.toLowerCase();
-        badge.textContent=label;
-        destination.appendChild(badge);
-        window.setTimeout(()=>badge.remove(),1800);
-        destination.classList.add('gcl-review-destination');
-        window.setTimeout(()=>destination.classList.remove('gcl-review-destination'),1800);
-      }
+      // Keep post-game classifications in Game Lab. Never paint transient labels
+      // onto the live board while replaying the whole game for analysis.
       summary.textContent='Analyzing '+(i+1)+' / '+moves.length;
       progress.style.width=((i+1)/Math.max(1,moves.length)*100)+'%';
     }

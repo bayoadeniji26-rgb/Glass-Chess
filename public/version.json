@@ -1,12 +1,11 @@
 {
-  "version": "2026.11.24.9",
-  "name": "Glass Chess Checkmate Review & Motion Fixes",
-  "updatedAt": "2026-11-24",
+  "version": "2026.11.24.10",
+  "name": "Glass Chess Board Review Overlay Fix",
+  "updatedAt": "2026-11-25",
   "notes": [
-    "Terminal checkmating moves are classified as Checkmate instead of Best",
+    "Game review labels remain in Game Lab instead of animating over live board squares",
     "Completed checkmates show MATE and the actual final mating move",
-    "Visual inspector normalizes boolean results and includes a status regression check",
-    "Piece travel motion is smoother and slower while respecting reduced-motion settings",
-    "Mate-zero engine scores no longer acquire an incorrect positive sign"
+    "Visual inspector safely normalizes boolean checks",
+    "Smoother piece travel motion with reduced-motion support"
   ]
 }
