@@ -17,13 +17,15 @@ Google sign-in is optional. Guests can continue playing without an account; loca
 
 Copy `.env.example` to `.env.local` for local development and fill in the values from Firebase Console → Project settings → Your apps → Web app.
 
-For Render, open the **Glass-Chess-PRO** Static Site → Environment and add these build-time variables:
+For Render, open the **Glass-Chess-PRO** Static Site → Environment and add these build-time variables (the Firebase values must come from your own Firebase project):
 
 - `VITE_FIREBASE_API_KEY`
 - `VITE_FIREBASE_AUTH_DOMAIN`
 - `VITE_FIREBASE_PROJECT_ID`
 - `VITE_FIREBASE_STORAGE_BUCKET`
 - `VITE_FIREBASE_APP_ID`
+
+The `authDomain` value must be the Firebase-provided auth domain shown in your Web app config (usually `YOUR-PROJECT-ID.firebaseapp.com`). **Do not put `glass-chess-pro.onrender.com` in the `authDomain` field.** The Render hostname is added separately to Firebase Authentication's Authorized domains.
 
 Redeploy after saving the variables. Vite embeds `VITE_*` values into browser code, so use only Firebase's normal web-app config here. **Never put a Firebase Admin SDK private key, service-account JSON, or other server secret in these variables.**
 
@@ -56,6 +58,22 @@ Choose the same Firebase project used for the web configuration when `firebase u
 
 If sign-in succeeds but sync fails, inspect the browser console and check that the Firestore and Storage rules above were published and that the Firebase project has billing/Storage access configured as required by your project.
 
-## 5. Cash App donations
+## 5. Donation messages by email + Cash App
 
-The Donate action opens `https://cash.app/$RaphaelAboy` in a new tab. Donations are voluntary; the site does not collect payment-card or bank information.
+The Donate button opens an in-app form. A visitor can add their name, reply email, suggested amount, and message. **Sending the message does not charge them**; they use the separate Cash App link to make a voluntary payment to `$RaphaelAboy`.
+
+To email submitted messages to your inbox:
+
+1. Create an account at [EmailJS](https://www.emailjs.com/) and connect an email service (for example, your own Gmail account).
+2. Create an EmailJS email template. Set the template's **To Email** field directly to the inbox where you want to receive donation notes. Do not make this a user-editable field.
+3. Put these variables in the template body: `{{from_name}}`, `{{reply_to}}`, `{{donation_amount}}`, `{{message}}`, `{{cashapp_tag}}`, `{{submitted_at}}`, and `{{source_url}}`.
+4. In EmailJS Account, copy your **Public Key**. From Email Services, copy the **Service ID**. From Email Templates, copy the **Template ID**.
+5. Add these build-time variables in Render → Glass-Chess-PRO → Environment:
+   - `VITE_EMAILJS_SERVICE_ID`
+   - `VITE_EMAILJS_TEMPLATE_ID`
+   - `VITE_EMAILJS_PUBLIC_KEY`
+6. In EmailJS security settings, restrict allowed origins to your live Glass Chess domain (and localhost only when testing). Redeploy the Render Static Site.
+
+The browser sends the message to EmailJS's documented `/api/v1.0/email/send` endpoint using the public key. Keep your EmailJS private key and any SMTP password out of Vite variables and out of GitHub. See the [EmailJS send API](https://www.emailjs.com/docs/rest-api/send/) and [SDK send reference](https://www.emailjs.com/docs/sdk/send/).
+
+The app can display the donation form before EmailJS is configured, but it cannot deliver messages to your inbox until these three values are added and the template's recipient is set.
