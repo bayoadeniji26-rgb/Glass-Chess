@@ -320,6 +320,15 @@ function createExtraControls() {
     controls.insertAdjacentElement("afterend", status);
   }
 
+  if (controls && !$("gc-clear-hint")) {
+    const clear = document.createElement("button");
+    clear.type = "button";
+    clear.id = "gc-clear-hint";
+    clear.textContent = "Clear Hint";
+    clear.title = "Clear the tactical hint and arrow";
+    controls.appendChild(clear);
+  }
+
   if (controls && !$("gc-tools")) {
     const tools = document.createElement("div");
 
@@ -1263,6 +1272,14 @@ function showHintStatus(message, kind = "success") {
   status.textContent = message;
 }
 
+function clearHint() {
+  activeHintMove = null;
+  $("board")?.querySelector(".gc-hint-arrow-layer")?.remove();
+  renderBoard();
+  showHintStatus("Hint cleared.", "success");
+  document.dispatchEvent(new CustomEvent("glasschess:hint", { detail: { fen: game.fen(), move: null } }));
+}
+
 async function hint() {
   const hintButton = $("hint");
   if (thinking) {
@@ -1290,7 +1307,7 @@ async function hint() {
     thinking = true;
     if (hintButton) {
       hintButton.disabled = true;
-      hintButton.textContent = "Calculating…";
+      hintButton.textContent = "Analyzing Position...";
     }
     activeHintMove = null;
     $("board")?.querySelector(".gc-hint-arrow-layer")?.remove();
@@ -1301,6 +1318,7 @@ async function hint() {
 
     const request = (async () => {
       await ensureEngineReady();
+      if (!engine.ready) throw new Error("Stockfish did not finish initializing. Try restarting the engine.");
       if (cancelled || !isCurrentPosition()) return { cancelled: true };
       return engine.search(fen, {
         depth: DEPTH,
@@ -1336,8 +1354,8 @@ async function hint() {
     document.dispatchEvent(new CustomEvent("glasschess:hint", {
       detail: { fen, move: { from: move.from, to: move.to, san: move.san } }
     }));
-    $("best-move").textContent = "Suggested Move: " + move.san + " (" + move.from + " → " + move.to + ")";
-    showHintStatus("Suggested Move: " + move.san + " · " + move.from + " → " + move.to, "success");
+    $("best-move").textContent = "King Pawn’s Hint: Play " + move.san + " (" + move.from + " → " + move.to + ")";
+    showHintStatus("King Pawn’s Hint: Play " + move.san + " · " + move.from + " → " + move.to, "success");
     setEngineStatus("Stockfish 19 ready");
   } catch (error) {
     cancelled = true;
@@ -1467,6 +1485,7 @@ function connectButtons() {
   });
 
   $("hint").addEventListener("click", hint);
+  $("gc-clear-hint")?.addEventListener("click", clearHint);
 
   $("gc-resign").addEventListener("click", resign);
 
