@@ -14,9 +14,9 @@ const CASHAPP_TAG = '$RaphaelAboy';
 const CASHAPP_URL = 'https://cash.app/$RaphaelAboy';
 const FIREBASE_VERSION = '13.4.0';
 const FIREBASE_CDN = `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/`;
-const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID || '';
-const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || '';
-const EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || '';
+const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID || 'service_3l9tc2a';
+const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || 'template_qwi52h9';
+const EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'aKuTsseHTnwR-RWg';
 
 // Firebase Console > Project settings > Your apps > Web app configuration.
 // The same values can be set in Render's Static Site > Environment.
@@ -249,7 +249,7 @@ async function sendDonationMessage() {
     return;
   }
   if (!EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID || !EMAILJS_PUBLIC_KEY) {
-    status.textContent = 'Email is not connected yet. Add VITE_EMAILJS_SERVICE_ID, VITE_EMAILJS_TEMPLATE_ID, and VITE_EMAILJS_PUBLIC_KEY to Render, then redeploy.';
+    status.textContent = 'Email is not connected yet. Check the EmailJS settings in src/cloud-auth.js and confirm the template recipient is configured.';
     status.classList.add('is-error');
     return;
   }
