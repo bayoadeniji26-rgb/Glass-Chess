@@ -99,6 +99,7 @@ let moveClassifications = new Map();
 let skipNextMoveAnimation = false;
 let suppressNextBoardClick = false;
 let activeBoardDrag = null;
+let activeHintMove = null;
 const MOVE_QUALITY = {
   Brilliant: { key: "brilliant", symbol: "!!" }, Great: { key: "great", symbol: "!" },
   Best: { key: "best", symbol: "★" }, Inaccuracy: { key: "inaccuracy", symbol: "?!" },
@@ -310,6 +311,15 @@ function createExtraControls() {
 
   const controls = document.querySelector(".board-controls");
 
+  if (controls && !$("gc-hint-status")) {
+    const status = document.createElement("div");
+    status.id = "gc-hint-status";
+    status.hidden = true;
+    status.setAttribute("role", "status");
+    status.setAttribute("aria-live", "polite");
+    controls.insertAdjacentElement("afterend", status);
+  }
+
   if (controls && !$("gc-tools")) {
     const tools = document.createElement("div");
 
@@ -438,6 +448,9 @@ function renderBoard() {
       element.replaceChildren();
 
       if (selected === square) element.classList.add("selected");
+      const visibleHint = activeHintMove?.fen === game.fen() ? activeHintMove.move : null;
+      if (visibleHint?.from === square) element.classList.add("gc-hint-origin");
+      if (visibleHint?.to === square) element.classList.add("gc-hint-destination");
       if (gameMode === "analysis" && analysisBestMove) {
         if (analysisBestMove.from === square) element.style.boxShadow = "inset 0 0 0 4px #e0a82e";
         if (analysisBestMove.to === square) element.style.boxShadow = "inset 0 0 0 5px #28a879";
@@ -626,6 +639,18 @@ function render() {
   $("evaluation").hidden = !settings.evaluation;
   window.GlassChessGameplaySuite?.refresh?.();
   window.GlassChessAdvancedLab?.refresh?.();
+  document.dispatchEvent(new CustomEvent("glasschess:statechange", {
+    detail: {
+      fen: game.fen(),
+      pgn: game.pgn(),
+      history: game.history({ verbose: true }),
+      mode: gameMode,
+      profile,
+      gameOver: isGameOver(),
+      turn: game.turn(),
+      appearance: { ...settings }
+    }
+  }));
 }
 
 // ============================================
@@ -1229,10 +1254,26 @@ async function undoMove() {
 // HINT
 // ============================================
 
-async function hint() {
-  if (thinking || isGameOver() || resigned) return;
+function showHintStatus(message, kind = "success") {
+  const status = $("gc-hint-status");
+  if (!status) return;
+  status.hidden = false;
+  status.classList.toggle("is-error", kind === "error");
+  status.classList.toggle("is-loading", kind === "loading");
+  status.textContent = message;
+}
 
-  thinking = true;
+async function hint() {
+  const hintButton = $("hint");
+  if (thinking) {
+    showHintStatus("Hint Error: Stockfish is already busy with another move or analysis.", "error");
+    return;
+  }
+  if (isGameOver() || resigned) {
+    showHintStatus("Hint Error: This game is already over. Start a new game to request a hint.", "error");
+    document.dispatchEvent(new CustomEvent("glasschess:hint", { detail: { error: "Game is over." } }));
+    return;
+  }
 
   const token = gameToken;
   const generation = positionGeneration;
@@ -1240,63 +1281,85 @@ async function hint() {
   const side = game.turn();
   const isCurrentPosition = () =>
     token === gameToken && generation === positionGeneration && game.fen() === fen;
-
-  $("best-move").textContent = "Finding a hint...";
-  setEngineStatus("Starting Stockfish for hint...");
+  let watchdog = null;
 
   try {
-    await ensureEngineReady();
+    // chess.js validates the complete FEN before it is sent to Stockfish.
+    new Chess(fen);
+    thinking = true;
+    if (hintButton) {
+      hintButton.disabled = true;
+      hintButton.textContent = "Calculating…";
+    }
+    activeHintMove = null;
+    $("board")?.querySelector(".gc-hint-arrow-layer")?.remove();
+    renderBoard();
+    $("best-move").textContent = "Calculating hint…";
+    setEngineStatus("Stockfish is calculating a hint…");
+    showHintStatus("Calculating… Stockfish is checking this exact position.", "loading");
+
+    const request = (async () => {
+      await ensureEngineReady();
+      if (!isCurrentPosition()) return { cancelled: true };
+      return engine.search(fen, {
+        depth: DEPTH,
+        timeoutMs: 5000,
+        onInfo: info => {
+          if (!isCurrentPosition()) return;
+          updateEvaluation(info, side);
+          setEngineStatus(info?.depth
+            ? "Stockfish calculating hint · depth " + info.depth
+            : "Stockfish calculating hint…");
+        }
+      });
+    })();
+
+    const result = await Promise.race([
+      request,
+      new Promise((resolve, reject) => {
+        watchdog = window.setTimeout(() => reject(new Error("Stockfish failed to respond within 5 seconds.")), 5000);
+      })
+    ]);
+    if (watchdog !== null) window.clearTimeout(watchdog);
+
     if (!isCurrentPosition()) {
-      if (token === gameToken) {
-        $("best-move").textContent = "Position changed — request a new hint.";
-        setEngineStatus(engine.ready ? "Stockfish 19 ready" : "Stockfish restarting...");
-      }
-      return;
+      throw new Error("The board position changed while Stockfish was calculating. Request a new hint.");
     }
+    if (result?.cancelled) throw new Error("The hint search was cancelled before a move was returned.");
 
-    const result = await engine.search(fen, {
-      depth: DEPTH,
-      timeoutMs: 22000,
-      onInfo: info => {
-        if (!isCurrentPosition()) return;
-        updateEvaluation(info, side);
-        setEngineStatus(info?.depth
-          ? `Stockfish calculating hint · depth ${info.depth}`
-          : "Stockfish calculating hint...");
-      }
-    });
+    const move = getEngineMove(result?.bestMove);
+    if (!move) throw new Error("Stockfish did not return a legal move for this position.");
 
-    if (!isCurrentPosition()) {
-      if (token === gameToken) {
-        $("best-move").textContent = "Position changed — request a new hint.";
-        setEngineStatus(engine.ready ? "Stockfish 19 ready" : "Stockfish restarting...");
-      }
-      return;
-    }
-    if (result.cancelled) {
-      $("best-move").textContent = "Hint search was interrupted. Press Hint to try again.";
-      setEngineStatus(engine.ready ? "Stockfish 19 ready" : "Stockfish restarting...");
-      return;
-    }
-
-    const move = getEngineMove(result.bestMove);
-    if (!move) throw new Error("Stockfish finished without returning a legal move.");
-
-    $("best-move").textContent = `Hint: ${move.san} (${move.from} → ${move.to})`;
+    activeHintMove = { fen, move: { from: move.from, to: move.to, san: move.san } };
+    render();
+    document.dispatchEvent(new CustomEvent("glasschess:hint", {
+      detail: { fen, move: { from: move.from, to: move.to, san: move.san } }
+    }));
+    $("best-move").textContent = "Suggested Move: " + move.san + " (" + move.from + " → " + move.to + ")";
+    showHintStatus("Suggested Move: " + move.san + " · " + move.from + " → " + move.to, "success");
     setEngineStatus("Stockfish 19 ready");
   } catch (error) {
-    if (token === gameToken && generation === positionGeneration) {
-      $("best-move").textContent = "Hint unavailable — " + (error?.message || "Stockfish could not complete the search.");
-      setEngineStatus(engine.ready ? "Stockfish 19 ready" : "Stockfish recovering...");
-      console.error("Stockfish hint failed:", error);
+    if (watchdog !== null) window.clearTimeout(watchdog);
+    activeHintMove = null;
+    $("board")?.querySelector(".gc-hint-arrow-layer")?.remove();
+    if (token === gameToken) {
+      const reason = error?.message || "Engine failed to analyze this position.";
+      $("best-move").textContent = "Hint Error: " + reason;
+      showHintStatus("Hint Error: " + reason, "error");
+      setEngineStatus(engine.ready ? "Stockfish 19 ready" : "Stockfish recovering…");
+      console.error("Stockfish Hint failed:", error);
     }
+    void engine.stop().catch(() => {});
   } finally {
-    // Always release the hint's thinking lock for the same game, including
-    // cancellation and timeout paths. A new game owns its own lock.
+    if (watchdog !== null) window.clearTimeout(watchdog);
     if (token === gameToken) {
       thinking = false;
       render();
       if (engine.ready && !isGameOver()) setEngineStatus("Stockfish 19 ready");
+    }
+    if (hintButton) {
+      hintButton.disabled = false;
+      hintButton.textContent = "✦ Hint";
     }
   }
 }
