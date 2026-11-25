@@ -218,7 +218,7 @@ export function createBoardEffects(board, isSoundEnabled = () => true, isAnimati
   }
 
   function captureReverseMove(move) {
-    if (!move || !board) return null;
+    if (!move || !board || move.promotion) return null;
     cancelTransientMotion();
     const motions = [];
     const mover = pieceSnapshot(move.to);
