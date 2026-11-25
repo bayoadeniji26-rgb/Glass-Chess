@@ -1,11 +1,12 @@
 {
-  "version": "2026.11.24.10",
-  "name": "Glass Chess Board Review Overlay Fix",
+  "version": "2026.11.25.1",
+  "name": "Glass Chess FLIP Motion & Move Quality Badges",
   "updatedAt": "2026-11-25",
   "notes": [
-    "Game review labels remain in Game Lab instead of animating over live board squares",
-    "Completed checkmates show MATE and the actual final mating move",
-    "Visual inspector safely normalizes boolean checks",
-    "Smoother piece travel motion with reduced-motion support"
+    "180 ms hardware-accelerated FLIP movement for clicks, Stockfish, premoves and one-step history replay",
+    "Castling animates king and rook together; captures and en passant fade over 100 ms",
+    "Promotion piece appears after the pawn reaches its destination",
+    "Legal pointer drag-and-drop moves snap immediately",
+    "Compact move-quality symbols appear on the reviewed move without cluttering other squares"
   ]
 }
