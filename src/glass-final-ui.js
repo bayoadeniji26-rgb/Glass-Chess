@@ -325,7 +325,7 @@ import './glass-final-ui.css';
     // Focus mode reserves compact space for player labels, toolbar and actions.
     const surroundingUI = focusMode
       ? (viewportWidth < 600 ? 158 : 166)
-      : (viewportWidth < 600 ? 170 : 178);
+      : (viewportWidth < 600 ? 205 : 190);
     const verticalCap = focusMode
       ? Math.max(180, viewportHeight - toolbarHeight - surroundingUI - 18)
       : Math.max(180, Math.min(viewportHeight * 0.70, viewportHeight - toolbarHeight - surroundingUI - 72));
