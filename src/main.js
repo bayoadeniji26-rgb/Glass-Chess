@@ -100,6 +100,7 @@ let skipNextMoveAnimation = false;
 let suppressNextBoardClick = false;
 let activeBoardDrag = null;
 let activeHintMove = null;
+let pendingPremove = null;
 const MOVE_QUALITY = {
   Brilliant: { key: "brilliant", symbol: "!!" }, Great: { key: "great", symbol: "!" },
   Best: { key: "best", symbol: "★" }, Inaccuracy: { key: "inaccuracy", symbol: "?!" },
@@ -320,6 +321,15 @@ function createExtraControls() {
     controls.insertAdjacentElement("afterend", status);
   }
 
+  if (controls && !$("gc-premove-status")) {
+    const status = document.createElement("div");
+    status.id = "gc-premove-status";
+    status.hidden = true;
+    status.setAttribute("role", "status");
+    status.setAttribute("aria-live", "polite");
+    controls.insertAdjacentElement("afterend", status);
+  }
+
   if (controls && !$("gc-clear-hint")) {
     const clear = document.createElement("button");
     clear.type = "button";
@@ -460,6 +470,10 @@ function renderBoard() {
       const visibleHint = activeHintMove?.fen === game.fen() ? activeHintMove.move : null;
       if (visibleHint?.from === square) element.classList.add("gc-hint-origin");
       if (visibleHint?.to === square) element.classList.add("gc-hint-destination");
+      if (pendingPremove?.gameToken === gameToken) {
+        if (pendingPremove.from === square) element.classList.add("gc-premove-origin");
+        if (pendingPremove.to === square) element.classList.add("gc-premove-target");
+      }
       if (gameMode === "analysis" && analysisBestMove) {
         if (analysisBestMove.from === square) element.style.boxShadow = "inset 0 0 0 4px #e0a82e";
         if (analysisBestMove.to === square) element.style.boxShadow = "inset 0 0 0 5px #28a879";
@@ -751,13 +765,14 @@ function finishMoveFeedback(move, motionSnapshot) {
   if (move.promotion) Promise.resolve(travel).then(() => {
     if (game.get(move.to)?.type === move.promotion) boardEffects.animatePromotion(move.to);
   });
-  if (game.isCheckmate()) return;
+  if (game.isCheckmate()) return travel;
   if (game.isCheck()) {
     boardEffects.animateCheck(findKingSquare(game.turn()));
     boardEffects.playSound("check");
   } else {
     boardEffects.playSound(move.captured ? "capture" : (move.promotion ? "promotion" : "move"));
   }
+  return travel;
 }
 
 function commitMove(input, options = {}) {
@@ -819,9 +834,87 @@ function commitMove(input, options = {}) {
   }
 }
 
+function showPremoveStatus(message, visible = true) {
+  const status = $("gc-premove-status");
+  if (!status) return;
+  status.hidden = !visible;
+  status.textContent = message;
+}
+
+function handlePremoveSquare(square) {
+  if (gameMode !== "computer" || window.GlassChessOnlinePlus?.isOnline?.() || !thinking) return;
+  const piece = game.get(square);
+  const humanSide = getHumanSide();
+
+  if (selected === square) {
+    selected = null;
+    pendingPremove = null;
+    showPremoveStatus("Queued move cleared.", false);
+    render();
+    return;
+  }
+
+  if (piece?.color === humanSide) {
+    selected = square;
+    pendingPremove = null;
+    showPremoveStatus("Choose where this piece should move after Stockfish finishes.");
+    render();
+    return;
+  }
+
+  if (selected) {
+    pendingPremove = {
+      from: selected,
+      to: square,
+      gameToken,
+      queuedAtFen: game.fen()
+    };
+    selected = null;
+    showPremoveStatus("Premove queued · " + pendingPremove.from + " → " + pendingPremove.to);
+    render();
+  }
+}
+
+function executePendingPremove(token) {
+  const queued = pendingPremove;
+  pendingPremove = null;
+  selected = null;
+  legalMoves = [];
+
+  if (!queued || queued.gameToken !== token || token !== gameToken) return;
+  if (gameMode !== "computer" || game.turn() !== getHumanSide() || isGameOver() || resigned) {
+    showPremoveStatus("Premove cancelled because the turn or game changed.");
+    render();
+    return;
+  }
+
+  const piece = game.get(queued.from);
+  const legal = piece?.color === getHumanSide()
+    ? game.moves({ square: queued.from, verbose: true }).filter(move => move.to === queued.to)
+    : [];
+
+  if (!legal.length) {
+    showPremoveStatus("Premove cancelled · that move is not legal in the new position.");
+    render();
+    return;
+  }
+
+  const chosen = legal.find(move => move.promotion === "q") || legal[0];
+  showPremoveStatus("Premove played · " + chosen.san);
+  commitMove({
+    from: chosen.from,
+    to: chosen.to,
+    ...(chosen.promotion ? { promotion: chosen.promotion } : {})
+  });
+}
+
 function handleSquare(square) {
   if (suppressNextBoardClick) { suppressNextBoardClick = false; return; }
-  if (thinking || resigned || isGameOver()) return;
+  if (thinking) {
+    handlePremoveSquare(square);
+    return;
+  }
+  if (resigned || isGameOver()) return;
   if (!isHumanTurn()) return;
 
   if (selected) {
@@ -1005,7 +1098,22 @@ async function computerMove() {
     if (token === gameToken) {
       thinking = false;
       render();
-      if (playedMove) finishMoveFeedback(playedMove, moveMotionSnapshot);
+      if (playedMove) {
+        const motion = finishMoveFeedback(playedMove, moveMotionSnapshot);
+        if (pendingPremove) {
+          Promise.resolve(motion).then(() => {
+            if (token === gameToken) executePendingPremove(token);
+          });
+        } else if (selected) {
+          selected = null;
+          render();
+        }
+      } else if (pendingPremove) {
+        pendingPremove = null;
+        selected = null;
+        showPremoveStatus("Premove cleared because Stockfish did not complete a move.");
+        render();
+      }
       window.GlassChessGameplaySuite?.onEngineTurnReady?.();
     }
   }
@@ -1143,6 +1251,9 @@ async function newGame() {
   const token = ++gameToken;
 
   thinking = false;
+  pendingPremove = null;
+  selected = null;
+  showPremoveStatus("", false);
   await engine.stop();
 
   if (token !== gameToken) return;
@@ -1229,6 +1340,9 @@ async function undoMove() {
   if (premiumReplayLock) return;
   const token = ++gameToken;
   thinking = false;
+  pendingPremove = null;
+  selected = null;
+  showPremoveStatus("", false);
   await engine.stop();
   if (token !== gameToken) return;
 
@@ -1401,6 +1515,8 @@ function resign() {
   resigned = true;
   gameTermination = { type: "resignation", winner, loser };
   thinking = false;
+  pendingPremove = null;
+  selected = null;
   gameToken++;
   positionGeneration++;
 
@@ -1421,6 +1537,8 @@ function finishOnTime(loserSide) {
   winner = draw ? "" : winningName;
   resigned = false;
   thinking = false;
+  pendingPremove = null;
+  selected = null;
   gameToken++;
   positionGeneration++;
   void engine.stop();
