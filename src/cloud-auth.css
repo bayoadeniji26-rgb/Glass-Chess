@@ -1,0 +1,122 @@
+/* Google account, cloud status, donation actions, and vault */
+#gc-auth-widget {
+  position: fixed !important;
+  top: 16px !important;
+  left: 16px !important;
+  z-index: 2147483200 !important;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  font: 600 13px/1.25 Inter, ui-sans-serif, system-ui, sans-serif;
+}
+#gc-auth-widget * { box-sizing: border-box; }
+#gc-google-signin {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  min-height: 42px; padding: 0 14px;
+  border: 1px solid rgba(255,255,255,.2); border-radius: 12px;
+  color: #20232a; background: rgba(255,255,255,.96);
+  box-shadow: 0 8px 24px rgba(0,0,0,.25);
+  font-size: 12px; font-weight: 700; cursor: pointer;
+  transition: transform .16s ease, box-shadow .16s ease, background .16s ease;
+}
+#gc-google-signin svg { width: 18px; height: 18px; flex: 0 0 18px; }
+#gc-google-signin:hover { transform: translateY(-1px); box-shadow: 0 11px 28px rgba(0,0,0,.3); background: #fff; }
+#gc-google-signin:disabled { opacity: .65; cursor: wait; }
+#gc-google-signin[hidden], #gc-user-pill[hidden] { display: none !important; }
+#gc-user-pill {
+  display: flex; align-items: center; gap: 9px;
+  max-width: min(250px, calc(100vw - 28px)); min-height: 45px; padding: 5px 11px 5px 6px;
+  border: 1px solid rgba(220,230,255,.2); border-radius: 999px;
+  color: #f2f5ff; background: rgba(17,24,39,.93);
+  box-shadow: 0 8px 24px rgba(0,0,0,.3);
+  text-align: left; cursor: pointer;
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+}
+#gc-user-avatar {
+  display: block; width: 32px; height: 32px; flex: 0 0 32px;
+  border-radius: 50%; object-fit: cover; background: #313c52;
+}
+#gc-user-avatar[hidden] { display: none !important; }
+#gc-user-pill .gc-user-copy { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+#gc-user-name { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+#gc-user-pill small { display: flex; align-items: center; gap: 5px; color: #aab8d1; font-size: 9px; white-space: nowrap; }
+#gc-auth-sync-dot { width: 6px; height: 6px; flex: 0 0 6px; display: inline-block; border-radius: 50%; background: #8793a8; }
+#gc-auth-sync-dot[data-state="synced"] { background: #39d98a; box-shadow: 0 0 9px rgba(57,217,138,.5); }
+#gc-auth-sync-dot[data-state="syncing"] { background: #f2c36b; animation: gc-cloud-pulse 1s ease-in-out infinite; }
+#gc-auth-sync-dot[data-state="error"] { background: #ff7777; }
+@keyframes gc-cloud-pulse { 50% { opacity: .35; } }
+.gc-user-chevron { color: #8793a8; font-size: 13px; margin-left: 2px; }
+#gc-auth-menu {
+  position: fixed; z-index: 2147483201; width: 202px; padding: 7px;
+  border: 1px solid rgba(220,230,255,.16); border-radius: 14px;
+  color: #f0f4ff; background: rgba(14,20,33,.98);
+  box-shadow: 0 18px 45px rgba(0,0,0,.45); backdrop-filter: blur(16px);
+}
+#gc-auth-menu[hidden] { display: none !important; }
+#gc-auth-menu button {
+  display: block; width: 100%; min-height: 36px; padding: 8px 10px;
+  border: 0; border-radius: 8px; color: inherit; background: transparent;
+  text-align: left; font-size: 11px; font-weight: 650; cursor: pointer;
+}
+#gc-auth-menu button:hover { background: rgba(255,255,255,.09); color: #f3d99e; }
+.gc-auth-menu-divider { height: 1px; margin: 5px 3px; background: rgba(255,255,255,.1); }
+
+#gc-top-actions { display: flex; align-items: center; justify-content: center; gap: 6px; margin-left: auto; }
+#gc-top-actions button {
+  min-height: 33px; padding: 0 11px; border: 1px solid rgba(255,255,255,.13);
+  border-radius: 9px; color: #eef3ff; background: rgba(255,255,255,.065);
+  font: 700 10px/1 system-ui,sans-serif; white-space: nowrap; cursor: pointer;
+}
+#gc-top-actions #gc-donate {
+  border-color: rgba(0,214,50,.55); color: #071d0d;
+  background: #00D632; box-shadow: 0 5px 15px rgba(0,214,50,.16);
+}
+#gc-top-actions #gc-donate:hover { background: #21e34c; transform: translateY(-1px); }
+#gc-top-actions #gc-copy-cashapp:hover { border-color: rgba(0,214,50,.5); color: #8ef6a7; }
+.topbar { gap: 8px; }
+.topbar > .brand { margin-left: 218px; }
+#new-game { flex: 0 0 auto; }
+
+.gc-cloud-vault {
+  position: fixed; inset: 0; z-index: 2147483210; display: grid; place-items: center;
+  padding: 18px; background: rgba(3,7,15,.72); backdrop-filter: blur(8px);
+}
+.gc-cloud-vault[hidden] { display: none !important; }
+.gc-cloud-vault-card {
+  width: min(620px, 100%); max-height: min(720px, calc(100dvh - 36px));
+  display: flex; flex-direction: column; overflow: hidden;
+  border: 1px solid rgba(220,230,255,.16); border-radius: 20px;
+  color: #eff3ff; background: linear-gradient(155deg, rgba(27,35,54,.99), rgba(11,16,27,.99));
+  box-shadow: 0 28px 90px rgba(0,0,0,.55);
+}
+.gc-cloud-vault-card > header { display: flex; justify-content: space-between; gap: 16px; padding: 20px 21px 15px; border-bottom: 1px solid rgba(255,255,255,.1); }
+.gc-cloud-vault-card header small { color: #d8bd7b; font-size: 9px; letter-spacing: .17em; font-weight: 800; }
+.gc-cloud-vault-card h2 { margin: 5px 0; font-size: 22px; }
+.gc-cloud-vault-card header p, .gc-cloud-vault-card footer { color: #9caac2; font-size: 11px; }
+.gc-cloud-vault-card header p { margin: 0; }
+#gc-cloud-vault-close { width: 32px; height: 32px; border: 1px solid rgba(255,255,255,.13); border-radius: 9px; color: white; background: rgba(255,255,255,.06); font-size: 22px; cursor: pointer; }
+#gc-cloud-vault-list { padding: 12px 18px; overflow: auto; }
+.gc-cloud-game { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px 4px; border-bottom: 1px solid rgba(255,255,255,.08); }
+.gc-cloud-game > div { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.gc-cloud-game strong { font-size: 12px; }
+.gc-cloud-game small { color: #9caac2; font-size: 10px; }
+.gc-cloud-game button { flex: 0 0 auto; min-height: 32px; padding: 0 11px; border: 1px solid rgba(220,200,146,.3); border-radius: 8px; color: #f4dda5; background: rgba(220,200,146,.08); font-size: 10px; font-weight: 700; cursor: pointer; }
+.gc-cloud-empty { color: #aab6cb; font-size: 12px; line-height: 1.6; }
+.gc-cloud-vault-card > footer { padding: 12px 20px 16px; border-top: 1px solid rgba(255,255,255,.08); line-height: 1.5; }
+
+@media (max-width: 760px) {
+  #gc-auth-widget { top: 7px !important; left: 7px !important; }
+  #gc-google-signin { min-height: 33px; padding: 0 8px; gap: 5px; border-radius: 9px; font-size: 9px; }
+  #gc-google-signin svg { width: 14px; height: 14px; flex-basis: 14px; }
+  #gc-user-pill { min-height: 34px; gap: 6px; padding: 3px 7px 3px 4px; }
+  #gc-user-avatar { width: 25px; height: 25px; flex-basis: 25px; }
+  #gc-user-name { max-width: 78px; font-size: 9px; }
+  #gc-user-pill small { font-size: 7px; }
+  .topbar > .brand { margin-left: 142px; }
+  #gc-top-actions { gap: 3px; }
+  #gc-top-actions button { min-height: 28px; padding: 0 6px; font-size: 8px; }
+}
+@media (max-width: 420px) {
+  #gc-top-actions #gc-copy-cashapp { display: none; }
+  .topbar > .brand { margin-left: 130px; }
+}
