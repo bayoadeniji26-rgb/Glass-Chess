@@ -131,7 +131,7 @@ function mountAuthWidget() {
     <input id="gc-auth-avatar-file" type="file" accept="image/png,image/jpeg,image/webp" hidden>
   `;
   header.insertBefore(widget, header.firstChild);
-  $('gc-google-signin').addEventListener('click', () => void signIn());
+  $('gc-google-signin').addEventListener('click', () => signIn());
   $('gc-user-pill').addEventListener('click', () => {
     const menu = ensureMenu();
     authMenuOpen = !authMenuOpen;
@@ -249,7 +249,7 @@ async function sendDonationMessage() {
     return;
   }
   if (!EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID || !EMAILJS_PUBLIC_KEY) {
-    status.textContent = 'Email is not connected yet. Check the EmailJS settings in src/cloud-auth.js and confirm the template recipient is configured.';
+    status.textContent = 'This feature is not available. Try again later.';
     status.classList.add('is-error');
     return;
   }
@@ -308,9 +308,9 @@ async function sendDonationMessage() {
     form.reset();
     $('gc-donation-custom-amount').hidden = true;
   } catch (error) {
-    status.textContent = 'Your message could not be sent: ' + (error.message || 'Email service error') + '. Please try again.';
+    status.textContent = 'This feature is not available. Try again later.';
     status.classList.add('is-error');
-    toast('Donation message could not be emailed.', true);
+    toast('This feature is not available. Try again later.');
   } finally {
     send.disabled = false;
     send.textContent = 'Send message';
@@ -391,41 +391,9 @@ function mobileBrowser() {
     window.matchMedia?.('(max-width: 700px)').matches;
 }
 
-async function signIn() {
-  const button = $('gc-google-signin');
-  if (button) {
-    button.disabled = true;
-    button.querySelector('span').textContent = 'Connecting…';
-  }
-  try {
-    await loadFirebaseSdk();
-    const provider = new authSdk.GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: 'select_account' });
-    if (mobileBrowser()) {
-      await authSdk.signInWithRedirect(auth, provider);
-      return;
-    }
-    try {
-      await authSdk.signInWithPopup(auth, provider);
-    } catch (error) {
-      if (['auth/popup-blocked', 'auth/operation-not-supported-in-this-environment', 'auth/web-storage-unsupported'].includes(error.code)) {
-        await authSdk.signInWithRedirect(auth, provider);
-        return;
-      }
-      throw error;
-    }
-  } catch (error) {
-    console.error('Glass Chess Google sign-in failed:', error);
-    toast(authErrorMessage(error), true);
-  } finally {
-    if (button) {
-      button.disabled = false;
-      const span = button.querySelector('span');
-      if (span) span.textContent = 'Sign in with Google';
-    }
-  }
+function signIn() {
+  toast('This feature is not available right now. Try again later.');
 }
-
 function profileRef(uid) {
   return firestoreSdk.doc(db, 'users', uid, 'profile', 'settings');
 }
