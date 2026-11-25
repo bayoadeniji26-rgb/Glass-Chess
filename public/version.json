@@ -1,12 +1,12 @@
 {
-  "version": "2026.11.25.1",
-  "name": "Glass Chess FLIP Motion & Move Quality Badges",
+  "version": "2026.11.25.2",
+  "name": "Glass Chess Single-Piece Motion Polish",
   "updatedAt": "2026-11-25",
   "notes": [
-    "180 ms hardware-accelerated FLIP movement for clicks, Stockfish, premoves and one-step history replay",
-    "Castling animates king and rook together; captures and en passant fade over 100 ms",
-    "Promotion piece appears after the pawn reaches its destination",
-    "Legal pointer drag-and-drop moves snap immediately",
-    "Compact move-quality symbols appear on the reviewed move without cluttering other squares"
+    "Move animation now travels with the original piece element instead of a cloned ghost",
+    "One composited transform animation with subtle lift and settle easing",
+    "Castling moves both original pieces together; captures fade using the original captured piece",
+    "Promotion reveals the new piece only after the pawn reaches its square",
+    "Undo and one-step history replay animate the actual piece back to its previous square"
   ]
 }
