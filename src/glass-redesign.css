@@ -565,8 +565,12 @@ html, body {
   }
 }
 
-/* Release refresh is driven by actual manifest, worker and page verification events. */
-.gc-update-track,.gc-update-progress-row{display:none!important}
+/* Required-update flow: stage-based progress, never a fabricated percentage. */
 .gc-update-banner{gap:12px}
 .gc-update-copy small{max-width:330px;line-height:1.4}
-.gc-update-stage{margin-top:14px}
+.gc-update-track{display:block;height:8px;margin:18px 0 0;overflow:hidden;border-radius:999px;background:rgba(255,255,255,.10)}
+.gc-update-track span{display:block;width:0;height:100%;border-radius:inherit;background:linear-gradient(90deg,#b9a5ff,#8fc5ff,#e9cf93);box-shadow:0 0 17px rgba(185,165,255,.38);transition:width .35s ease}
+.gc-update-progress-row{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:9px;color:#aeb9ce;font-size:10px}
+.gc-update-progress-row strong{color:#eee8ff;font-size:9px;letter-spacing:.09em}
+.gc-update-dialog{width:min(440px,100%)}
+#gc-update-now{min-width:112px}

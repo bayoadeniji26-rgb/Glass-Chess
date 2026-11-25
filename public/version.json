@@ -1,13 +1,10 @@
 {
-  "version": "2026.11.25.8",
-  "name": "Glass Chess Auth & Donation Message Update",
+  "version": "2026.11.25.9",
+  "name": "Glass Chess Required Update Experience",
   "updatedAt": "2026-11-25",
   "notes": [
-    "Google sign-in readiness checks now require Firebase web app authentication values and no longer block sign-in when Storage bucket setup is deferred",
-    "Google sign-in shows specific Firebase setup and OAuth/domain error guidance",
-    "Donate opens a message and suggested-amount dialog with a separate Cash App payment link",
-    "Donation notes are preconfigured to use the connected EmailJS Gmail service and donation template",
-    "Download PNG and Copy PNG are repositioned clear of the floating Glass Hub Tools orb",
-    "Guests can continue playing without a Google account and local saves remain available"
+    "Restored the required update banner and full-screen update flow",
+    "Added truthful stage-based progress, service-worker activation, release verification, and automatic reload",
+    "Cloud save data remains local until account-backed cloud sync is enabled"
   ]
 }

@@ -1,20 +1,23 @@
 import { readFile } from 'node:fs/promises';
 
-const [versionSource, manifestSource, indexSource] = await Promise.all([
+const [versionSource, manifestSource, indexSource, workerSource] = await Promise.all([
   readFile(new URL('../src/version.js', import.meta.url), 'utf8'),
   readFile(new URL('../public/version.json', import.meta.url), 'utf8'),
-  readFile(new URL('../index.html', import.meta.url), 'utf8')
+  readFile(new URL('../index.html', import.meta.url), 'utf8'),
+  readFile(new URL('../public/sw.js', import.meta.url), 'utf8')
 ]);
 
 const sourceVersion = versionSource.match(/APP_VERSION\s*=\s*['"]([^'"]+)['"]/)?.[1];
 const manifestVersion = JSON.parse(manifestSource).version;
 const htmlVersion = indexSource.match(/name="glass-chess-version" content="([^"]+)"/)?.[1];
+const workerVersion = workerSource.match(/CACHE_NAME\s*=\s*['"]glass-chess-shell-v([^'"]+)['"]/)?.[1]?.replaceAll('-', '.');
 
-if (!sourceVersion || sourceVersion !== manifestVersion || sourceVersion !== htmlVersion) {
+if (!sourceVersion || sourceVersion !== manifestVersion || sourceVersion !== htmlVersion || sourceVersion !== workerVersion) {
   throw new Error(
     'Release version mismatch: src/version.js=' + (sourceVersion || 'missing') +
     ', public/version.json=' + (manifestVersion || 'missing') +
-    ', index.html=' + (htmlVersion || 'missing')
+    ', index.html=' + (htmlVersion || 'missing') +
+    ', public/sw.js=' + (workerVersion || 'missing')
   );
 }
 
