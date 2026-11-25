@@ -1,14 +1,14 @@
 {
-  "version": "2026.11.25.4",
+  "version": "2026.11.25.5",
   "name": "Glass Chess King Pawn & Personal Save",
   "updatedAt": "2026-11-25",
   "notes": [
-    "Hint now validates the live FEN, requests Stockfish within a five-second watchdog, and shows visible errors",
-    "Hint origin and destination squares glow with a directional board arrow",
-    "PNG export actions are kept directly beside board controls",
-    "Added custom background images and player/opponent profile pictures",
-    "Added King Pawn, a board-aware chess advisor connected to the live FEN and PGN",
-    "Added IndexedDB autosave and portable JSON save export/import for images, chat, settings and games",
-    "Cloud sync adapter hooks are available but require a configured secure backend"
+    "Hint validates the live FEN, displays a five-second timeout error and shows the suggested SAN move",
+    "Hint highlights its origin and destination squares and draws a direction arrow",
+    "PNG board export and clipboard copy controls sit directly beside the board controls",
+    "Custom uploaded backgrounds and player/opponent profile pictures save locally",
+    "King Pawn answers chess topics, reads the current FEN and PGN, and can connect to a secure chess AI adapter",
+    "IndexedDB autosaves settings, images, games, chat and supports portable JSON save import/export",
+    "Cloud sync hooks are ready for a configured database adapter; automatic aunt-to-Mac sync is not enabled without a backend"
   ]
 }
