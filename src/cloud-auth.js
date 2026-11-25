@@ -319,6 +319,10 @@ async function pushCloudState(state) {
       content: String(item.content || '').slice(0, 3000),
       fen: String(item.fen || '').slice(0, 120),
       pgn: String(item.pgn || '').slice(0, 10000),
+      turn: item.turn === 'b' ? 'b' : 'w',
+      inCheck: Boolean(item.inCheck),
+      checkState: String(item.checkState || '').slice(0, 80),
+      material: item.material && typeof item.material === 'object' ? item.material : {},
       at: String(item.at || '')
     })),
     localStorage: state.localStorage || {},
