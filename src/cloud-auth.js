@@ -415,7 +415,8 @@ function mergeCloudAndLocal(remote, local) {
 function applyCloudProfileToApp(profile) {
   profileAvatarUrl = profile.avatarUrl || profile.photoURL || profileAvatarUrl;
   renderAuth();
-  window.GlassChessKingPawn?.applyCloudProfile?.(profile);
+  Promise.resolve(window.GlassChessKingPawn?.applyCloudProfile?.(profile))
+    .catch(error => console.warn('Cloud profile could not be applied to the local workspace:', error));
 }
 
 function stopCloudObservers() {
@@ -589,7 +590,8 @@ async function syncOnSignIn(user) {
     cloudGames = remote.games.slice();
     renderVault();
     const remoteHasContent = remote.games.length || remote.chatLog.length ||
-      Object.keys(remote.localStorage || {}).length || remote.backgroundImage || remote.activePgn;
+      Object.keys(remote.localStorage || {}).length || remote.backgroundImage || remote.activePgn ||
+      remote.profileAvatarUrl || remote.avatars?.player || remote.avatars?.opponent;
     if (remoteHasContent) {
       const merged = mergeCloudAndLocal(remote, local);
       await saveEngine.replaceData(merged);
