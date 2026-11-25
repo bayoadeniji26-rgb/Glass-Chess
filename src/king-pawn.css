@@ -11,7 +11,7 @@
 .gc-player-avatar:focus-visible { outline: 2px solid #8ddbf7; outline-offset: 2px; }
 
 #gc-hint-status {
-  width: min(100%, 720px); min-height: 34px; margin: 5px auto 0; padding: 7px 11px;
+  position: fixed; left: 50%; bottom: 16px; z-index: 2147483000; transform: translateX(-50%);\n  width: min(calc(100vw - 36px), 720px); min-height: 34px; margin: 0; padding: 7px 11px;
   border: 1px solid rgba(115,215,245,.42); border-radius: 10px;
   color: #dff8ff; background: rgba(21,125,157,.16); font-size: 12px;
 }
@@ -128,6 +128,7 @@ body.gc-custom-background #gc-floating-hub .gc-hub-drawer {
 #gc-save-toast.gc-toast-error { border-color: rgba(255,99,99,.75); color: #ffdada; }
 @media (max-width: 600px) {
   #gc-king-pawn { left: 10px; bottom: 10px; }
+  #gc-hint-status { bottom: 68px; width: calc(100vw - 20px); }
   #gc-king-pawn-panel { left: 10px; bottom: 68px; width: calc(100vw - 20px); }
   #gc-export-toolbar { width: 100%; }
 }
