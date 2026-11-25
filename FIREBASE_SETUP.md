@@ -68,12 +68,9 @@ To email submitted messages to your inbox:
 2. Create an EmailJS email template. Set the template's **To Email** field directly to the inbox where you want to receive donation notes. Do not make this a user-editable field.
 3. Put these variables in the template body: `{{from_name}}`, `{{reply_to}}`, `{{donation_amount}}`, `{{message}}`, `{{cashapp_tag}}`, `{{submitted_at}}`, and `{{source_url}}`.
 4. In EmailJS Account, copy your **Public Key**. From Email Services, copy the **Service ID**. From Email Templates, copy the **Template ID**.
-5. Add these build-time variables in Render → Glass-Chess-PRO → Environment:
-   - `VITE_EMAILJS_SERVICE_ID`
-   - `VITE_EMAILJS_TEMPLATE_ID`
-   - `VITE_EMAILJS_PUBLIC_KEY`
-6. In EmailJS security settings, restrict allowed origins to your live Glass Chess domain (and localhost only when testing). Redeploy the Render Static Site.
+5. Glass Chess now includes the current EmailJS **Service ID**, **Template ID**, and **Public Key** as browser defaults, so you do not need to add these three values to Render for this configuration. Optional `VITE_EMAILJS_*` build variables override the defaults if you change EmailJS services or templates.
+6. In EmailJS security settings, restrict allowed origins to your live Glass Chess domain (and localhost only when testing). Save the settings, then redeploy the Render Static Site if you changed code or build variables.
 
 The browser sends the message to EmailJS's documented `/api/v1.0/email/send` endpoint using the public key. Keep your EmailJS private key and any SMTP password out of Vite variables and out of GitHub. See the [EmailJS send API](https://www.emailjs.com/docs/rest-api/send/) and [SDK send reference](https://www.emailjs.com/docs/sdk/send/).
 
-The app can display the donation form before EmailJS is configured, but it cannot deliver messages to your inbox until these three values are added and the template's recipient is set.
+The current public EmailJS identifiers are preconfigured in `src/cloud-auth.js`. Message delivery still depends on the EmailJS service being active, the template's **To Email** field pointing to the intended inbox, the template containing all listed variables, and the live Glass Chess domain being allowed in EmailJS security settings.
