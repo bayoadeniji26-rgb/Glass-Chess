@@ -29,7 +29,9 @@ const firebaseConfig = {
 };
 
 const $ = id => document.getElementById(id);
-const hasFirebaseConfig = Object.values(firebaseConfig).every(value => String(value).trim());
+const FIREBASE_AUTH_FIELDS = ['apiKey', 'authDomain', 'projectId', 'appId'];
+const missingFirebaseFields = FIREBASE_AUTH_FIELDS.filter(key => !String(firebaseConfig[key] || '').trim());
+const hasFirebaseConfig = missingFirebaseFields.length === 0;
 let appSdk, authSdk, firestoreSdk, storageSdk;
 let app, auth, db, storage;
 let activeUser = null;
@@ -338,7 +340,11 @@ function renderAuth() {
 
 async function loadFirebaseSdk() {
   if (firebaseReady) return;
-  if (!hasFirebaseConfig) throw new Error('Google sign-in is ready in the interface, but Firebase is not configured yet. Add the VITE_FIREBASE_* values from your Firebase web app to Render.');
+  if (!hasFirebaseConfig) {
+    throw new Error('Google sign-in is not configured yet. Missing Firebase web-app values: ' +
+      missingFirebaseFields.map(key => 'VITE_FIREBASE_' + key.replace(/[A-Z]/g, letter => '_' + letter).toUpperCase()).join(', ') +
+      '. Copy them from Firebase Console → Project settings → Your apps → Web app, then add them to Render and redeploy.');
+  }
   const [appModule, authModule, firestoreModule, storageModule] = await Promise.all([
     import(/* @vite-ignore */ FIREBASE_CDN + 'firebase-app.js'),
     import(/* @vite-ignore */ FIREBASE_CDN + 'firebase-auth.js'),
@@ -351,7 +357,7 @@ async function loadFirebaseSdk() {
   storageSdk = storageModule;
   app = appSdk.getApps().length ? appSdk.getApp() : appSdk.initializeApp(firebaseConfig);
   auth = authSdk.getAuth(app);
-  storage = storageSdk.getStorage(app);
+  storage = firebaseConfig.storageBucket ? storageSdk.getStorage(app) : null;
 
   // Keep Firestore's IndexedDB offline persistence enabled. Firebase currently
   // marks this function obsolete but still exports it; the cache continues to
@@ -426,6 +432,7 @@ function hashId(value) {
 async function uploadProfileAsset(uid, name, value) {
   if (!value) return '';
   if (/^https?:\/\//i.test(value)) return value;
+  if (!storage) return '';
   if (!/^data:image\/(png|jpeg|webp);base64,/i.test(value)) return '';
   const cacheKey = uid + ':' + name;
   const previous = uploadedAssets.get(cacheKey);
