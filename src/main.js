@@ -1475,7 +1475,8 @@ async function hint() {
       setEngineStatus(engine.ready ? "Stockfish 19 ready" : "Stockfish recovering…");
       console.error("Stockfish Hint failed:", error);
     }
-    void engine.stop().catch(() => {});
+    // Do not release the control until the previous UCI search has settled.
+    await engine.stop().catch(() => {});
   } finally {
     if (watchdog !== null) window.clearTimeout(watchdog);
     if (token === gameToken) {
