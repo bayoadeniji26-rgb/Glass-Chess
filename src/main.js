@@ -1830,6 +1830,8 @@ function installGlassChessPremiumBridge() {
       render();
     },
     rebuild(initialFen, moves) {
+      // Validate the complete remote/replay line before touching the live board.
+      calculatePositionHistory(initialFen, moves);
       const previousHistory = game.history({ verbose: true });
       const sameMove = (a, b) => a && b && a.from === b.from && a.to === b.to &&
         (a.promotion || undefined) === (b.promotion || undefined);
@@ -1860,6 +1862,9 @@ function installGlassChessPremiumBridge() {
       return calculatePositionHistory(initialFen, moveList);
     },
     loadPgn(pgn) {
+      // Parse on an isolated instance first so invalid PGN cannot partially replace the live game.
+      const validatedPgn = new Chess();
+      validatedPgn.loadPgn(pgn);
       thinking = false;
       gameToken++;
       positionGeneration++;
