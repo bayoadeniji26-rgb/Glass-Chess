@@ -378,7 +378,11 @@ async function syncOnSignIn(user, generation) {
     await loadSupabase();
     if (!isCurrentAccount()) return;
     saveEngine.setCloudAdapter(cloudAdapter);
-    const [remote, local] = await Promise.all([cloudAdapter.pull(), saveEngine.getCommittedData()]);
+    const remote = await cloudAdapter.pull();
+    if (!isCurrentAccount()) return;
+    // Read local data after the network round-trip so moves made while the
+    // cloud record was loading are included in the merge, not overwritten.
+    const local = await saveEngine.getCommittedData();
     if (!isCurrentAccount()) return;
     if (remote) {
       cloudProfile = remote;
