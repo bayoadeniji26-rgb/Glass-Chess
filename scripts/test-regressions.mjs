@@ -22,6 +22,8 @@ for (const puzzle of DAILY_PUZZLES) {
 assert.equal(normalizePuzzleAnswer('  FORTY-TWO! '), 'forty two');
 assert.equal(isPuzzleAnswerCorrect(DAILY_PUZZLES[1], 'forty-two'), true);
 assert.equal(isPuzzleAnswerCorrect(DAILY_PUZZLES[1], '41'), false);
+assert.equal(isPuzzleAnswerCorrect(DAILY_PUZZLES[27], 'SHORTER'), true);
+assert.equal(isPuzzleAnswerCorrect(DAILY_PUZZLES[45], '0.05'), true);
 assert.equal(getPuzzleDayIndex('2026-11-25', '2026-11-25'), 1);
 assert.equal(getPuzzleDayIndex('2026-11-25', '2026-11-26'), 2);
 assert.equal(getPuzzleDayIndex('2026-11-25', '2026-12-14'), 20);
