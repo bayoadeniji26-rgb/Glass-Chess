@@ -136,6 +136,7 @@ function handleClerkUser(user) {
   } : null;
   const nextKey = activeUser ? activeUser.id + ':' + String(activeUser.emailVerified) : 'guest';
   renderAuth();
+  window.dispatchEvent(new CustomEvent('glasschess:auth-change'));
   if (nextKey === authStateKey) return;
   authStateKey = nextKey;
   if (!activeUser) {
