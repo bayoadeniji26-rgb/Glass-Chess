@@ -100,6 +100,6 @@ assert.match(puzzleCss, /\.gc-daily-square\.is-legal::after/, 'Legal-move indica
 assert.match(puzzleCss, /\.gc-daily-square\.is-capture::after/, 'Capture indicators must be rendered above the square backgrounds.');
 
 const cloudAuthSource = readFileSync(new URL('../src/clerk-auth.js', import.meta.url), 'utf8');
-assert.match(puzzleUi, /saveEngine\\.saveData/, 'Daily puzzle progress must be persisted in the account save payload.');
+assert.match(puzzleUi, /saveEngine\.saveData/, 'Daily puzzle progress must be persisted in the account save payload.');
 assert.match(puzzleUi, /dailyPuzzleProgress/, 'Daily puzzle progress must have a stable cloud-save key.');
 assert.match(cloudAuthSource, /applyCloudProgress/, 'A restored cloud profile must restore daily puzzle progress.');
