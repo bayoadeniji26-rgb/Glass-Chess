@@ -669,14 +669,14 @@ function updateGameStatus() {
 function getSignedInDisplayName() {
   const user = window.GlassChessCloud?.user;
   if (!user) return "Anonymous";
-  const candidate = user.displayName || user.username || String(user.email || "").split("@")[0];
-  const cleaned = String(candidate || "").replace(/[<>]/g, "").trim().slice(0, 24);
-  return cleaned || "Glass Chess player";
+  const candidate = user.displayName || user.username || "";
+  const cleaned = String(candidate).replace(/[<>]/g, "").trim().slice(0, 24);
+  return cleaned || "Anonymous";
 }
 
 function normalizeSeatName(value, fallback = "Anonymous") {
   const cleaned = String(value || "").replace(/[<>]/g, "").trim().slice(0, 24);
-  return !cleaned || cleaned.toLowerCase() === "player" ? fallback : cleaned;
+  return cleaned || fallback;
 }
 
 function formatSeatRating(player) {
