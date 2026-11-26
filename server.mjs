@@ -52,15 +52,22 @@ const publicRoom = room => ({
   draw: room.game.isDraw(),
   gameOver: room.game.isGameOver(),
   resigned: room.resigned,
-  lastMove: room.lastMove || null,\n  invitationExpiresAt: room.invitationExpiresAt || null,\n  result: room.resigned ? `${room.resigned === 'w' ? 'Black' : 'White'} wins by resignation` :
+  lastMove: room.lastMove || null,
+  invitationExpiresAt: room.invitationExpiresAt || null,
+  result: room.resigned ? `${room.resigned === 'w' ? 'Black' : 'White'} wins by resignation` :
     room.game.isCheckmate() ? `${room.game.turn() === 'w' ? 'Black' : 'White'} wins by checkmate` :
     room.game.isDraw() ? 'Draw' : 'In progress'
 });
 
 function codeAvailable() {
+  const alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   let code;
   do {
-    code = randomBytes(4).toString('hex').slice(0, 6).toUpperCase();
+    code = '';
+    while (code.length < 8) {
+      const byte = randomBytes(1)[0];
+      if (byte < 248) code += alphabet[byte % alphabet.length];
+    }
   } while (rooms.has(code));
   return code;
 }
@@ -105,14 +112,20 @@ function removeSocketFromRoom(socket) {
   const room = rooms.get(code);
   if (room) {
     for (const side of ['w', 'b']) {
-      if (room.players[side]?.id === socket.id) room.players[side] = null;
+      if (room.players[side]?.id === socket.id) {
+        if (room.players[side].playerId) activePlayers.delete(room.players[side].playerId);
+        room.players[side] = null;
+      }
     }
     room.spectators.delete(socket.id);
     broadcast(room);
     if (!room.players.w && !room.players.b && room.spectators.size === 0) {
       setTimeout(() => {
         const current = rooms.get(code);
-        if (current && !current.players.w && !current.players.b && current.spectators.size === 0) {\n          for (const player of Object.values(current.players)) if (player?.playerId) activePlayers.delete(player.playerId);\n          rooms.delete(code);\n        }
+        if (current && !current.players.w && !current.players.b && current.spectators.size === 0) {
+          for (const player of Object.values(current.players)) if (player?.playerId) activePlayers.delete(player.playerId);
+          rooms.delete(code);
+        }
       }, 60000);
     }
   }
@@ -182,6 +195,11 @@ io.on('connection', socket => {
     const code = cleanCode(payload.code);
     const room = rooms.get(code);
     if (!room) return done({ ok: false, error: 'Room not found. Check the code.' });
+    if (room.invitationExpiresAt && Date.now() > room.invitationExpiresAt && !room.players.b) {
+      rooms.delete(code);
+      if (room.players.w?.playerId) activePlayers.delete(room.players.w.playerId);
+      return done({ ok: false, error: 'This invitation has expired. Ask your friend to create a new one.' });
+    }
     if (room.players.w?.id === socket.id) return done({ ok: true, code, role: 'w', state: publicRoom(room) });
     if (room.players.b?.id === socket.id) return done({ ok: true, code, role: 'b', state: publicRoom(room) });
     const playerId = cleanPlayerId(payload.playerId);
@@ -190,8 +208,11 @@ io.on('connection', socket => {
       return done({ ok: false, error: 'This browser is already assigned to the other seat. Open the invite on a different device or browser profile.' });
     }
     if (room.players.b) return done({ ok: false, error: 'That room already has two players. Join as a spectator instead.' });
+    if (activePlayers.has(playerId)) return done({ ok: false, error: 'You are already in an online game.' });
     removeSocketFromRoom(socket);
     room.players.b = { id: socket.id, playerId, name: cleanName(payload.name) };
+    room.invitationExpiresAt = null;
+    activePlayers.set(playerId, code);
     socket.join(code);
     socket.data.roomCode = code;
     socket.data.role = 'b';
