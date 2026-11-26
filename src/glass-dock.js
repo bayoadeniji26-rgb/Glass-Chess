@@ -16,6 +16,7 @@ import "./glass-dock.css";
     { id: "review", label: "Review", icon: "↺" },
     { id: "custom", label: "Customize", icon: "◈" },
     { id: "onlineplus", label: "Online", icon: "♟" },
+    { id: "game-lab", label: "Game Lab", icon: "♜" },
     { id: "advanced-lab", label: "Advanced", icon: "⚙" }
   ];
 
