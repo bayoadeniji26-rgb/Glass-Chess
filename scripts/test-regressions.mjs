@@ -95,6 +95,7 @@ const onlineClient = readFileSync(new URL('../src/onlineplus.js', import.meta.ur
 assert.match(onlineServer, /INVITE_TTL_MS = Math\.max\(100, Number\(process\.env\.GC_INVITE_TTL_MS\) \|\| 15 \* 60 \* 1000\)/, 'Private invitations must expire after fifteen minutes by default.');
 assert.match(onlineServer, /function scheduleInviteExpiry/, 'Unused invitations must be cleaned up automatically.');
 assert.match(onlineServer, /function scheduleRoomCleanup/, 'Ended rooms must be removed after a bounded retention period.');
+assert.match(onlineServer, /function releasePlayerLock[\s\S]*?activePlayers\.get\(playerId\) === roomCode/, 'A stale room cleanup must not clear a newer player lock.');
 assert.match(onlineServer, /activePlayers\.set\(whitePlayer\.playerId, code\)/, 'Matched players must be locked against a second active game.');
 assert.match(onlineServer, /activePlayers\.has\(playerId\)/, 'A player already in a game must not enter another room.');
 assert.match(onlineServer, /expectedPly/, 'The authoritative server must reject stale move submissions.');
@@ -111,6 +112,12 @@ assert.match(onlineClient, /searchParams\.set\('room', online\.code\)/, 'Friend 
 assert.match(onlineClient, /window\.location\.search/, 'Invite links must be parsed when the friend opens them.');
 
 const mainUi = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+const workspaceUi = readFileSync(new URL('../src/glass-workspace.js', import.meta.url), 'utf8');
+const workspaceCss = readFileSync(new URL('../src/glass-workspace.css', import.meta.url), 'utf8');
+const toolsUi = readFileSync(new URL('../src/glass-dock.js', import.meta.url), 'utf8');
+const toolsCss = readFileSync(new URL('../src/glass-dock.css', import.meta.url), 'utf8');
+const boardUi = readFileSync(new URL('../src/glass-final-ui.js', import.meta.url), 'utf8');
+const gameplaySuiteUi = readFileSync(new URL('../src/gameplay-suite.js', import.meta.url), 'utf8');
 const authUi = readFileSync(new URL('../src/clerk-auth.js', import.meta.url), 'utf8');
 const appHtml = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 assert.match(mainUi, /function getSignedInDisplayName/, 'Human seat labels must use the signed-in account display name.');
@@ -141,6 +148,24 @@ assert.match(onlineClient, /if \(roomCode && socket\?\.connected\) \{\s*try \{ a
 assert.match(onlineClient, /localStorage\.removeItem\('glass-chess-online-room-code'\)/, 'Leaving online mode must clear the saved room-resume pointer.');
 assert.match(onlineClient, /url\.searchParams\.delete\('room'\)/, 'Leaving an invite room must remove the auto-join URL parameter.');
 assert.match(onlineClient, /async function startDailyChallenge\(\)[\s\S]*?leaveRoom\(\{ restoreMode: false \}\)/, 'Starting a solo daily challenge must also exit online mode.');
+
+assert.match(workspaceUi, /data-workspace-open="play"[\s\S]*?data-workspace-open="analysis"[\s\S]*?data-workspace-open="tools"/, 'Workspace navigation must have Play, Analysis and Tools as its three destinations.');
+assert.doesNotMatch(workspaceUi, /data-workspace-open="settings"/, 'Settings must not appear as a duplicate top-level destination.');
+assert.match(workspaceUi, /if \(window\.GlassChessTools\?\.toggle\) window\.GlassChessTools\.toggle\(\)/, 'The top-bar Tools control must open the Glass Tools panel.');
+assert.match(workspaceUi, /glasschess:tools-state/, 'The Tools control must track whether the Tools panel is open.');
+assert.match(mainUi, /gc-side-disclosure gc-side-settings/, 'Board and move settings must be collapsed inside the Play panel.');
+assert.match(mainUi, /gc-side-disclosure gc-side-actions/, 'Secondary game actions must be grouped away from the board.');
+assert.match(mainUi, /clear\.hidden = true/, 'Clear Hint must be hidden until a hint is available.');
+assert.match(toolsUi, /label: "Overview"[\s\S]*?label: "Train"[\s\S]*?label: "Review"[\s\S]*?label: "Customize"[\s\S]*?label: "Online"[\s\S]*?label: "Game Lab"[\s\S]*?label: "Advanced"/, 'Tools must include Online, Game Lab and Advanced feature tabs.');
+assert.match(gameplaySuiteUi, /tab\.dataset\.tab = 'game-lab'/, 'Game Lab must remain connected to the Tools navigation.');
+assert.match(toolsUi, /tab\.click\(\)/, 'A Tools tab must activate its feature view.');
+assert.match(toolsUi, /glasschess:toggle-tools/, 'Tools must remain available from the fullscreen launcher.');
+assert.match(toolsCss, /body:not\(\.gc-tools-single-launcher\)[\s\S]*?\.gc-hub-orb\s*\{\s*display: none !important/, 'The floating Tools orb must be hidden in normal play.');
+assert.match(toolsCss, /\.gc-tabs\s*\{\s*display: none !important/, 'Tools must not render two competing tab bars.');
+assert.match(boardUi, /data-gc-analysis-focus/, 'The compact board toolbar must retain Focus.');
+assert.match(boardUi, /data-gc-stage-fullscreen/, 'The compact board toolbar must retain Fullscreen.');
+assert.doesNotMatch(boardUi, /id="gc-final-size"/, 'The compact board toolbar must not expose a second board-size selector.');
+
 
 
 console.log('50 legal daily chess puzzles and regression suite passed.');
