@@ -1,12 +1,12 @@
 {
-  "version": "2026.11.26.13",
+  "version": "2026.11.26.14",
   "name": "Glass Chess Required Update",
   "updatedAt": "2026-11-26",
   "notes": [
-    "Fixes Tools popup sizing so it uses the available screen height",
-    "Makes the feature area scroll independently while keeping controls clickable",
-    "Removes the obsolete purple floating launcher and its reserved bottom gap",
-    "Compacts the Tools category shortcuts and removes the sticky tab overlap",
-    "Preserves existing chess, Stockfish, training and online features"
+    "Makes Live Engine Lab start automatically instead of waiting for an Analyze click",
+    "Keeps live evaluation updated as the board position changes",
+    "Runs the Live Engine Lab in a dedicated Stockfish worker so it does not block player moves or computer turns",
+    "Adds pause and resume controls and safely suppresses live hints during training puzzles",
+    "Preserves the Glass Chess Tools popup layout and click-target fixes"
   ]
 }
