@@ -125,6 +125,8 @@ assert.match(mainUi, /onlineSession\?\.isOnline\?\.\(\) \|\| onlineSession\?\.is
 assert.match(mainUi, /exitOnlineSession\?\.\(\{ restoreMode: false \}\)/, 'Starting an offline game must leave online mode before resetting the board.');
 assert.match(onlineClient, /isMatchmaking\(\) \{ return matchmakingActive \|\| onlineRequestActive; \}/, 'The main game must detect matchmaking and pending room joins.');
 assert.match(onlineClient, /exitOnlineSession\(options = \{\}\) \{ return leaveRoom\(options\); \}/, 'Online Plus must expose a reusable online-session exit action.');
+assert.match(onlineClient, /let onlineRequestActive = false;[\s\S]*?let offlineIntent = false;/, 'Pending create and join requests must be tracked until they finish or are cancelled.');
+assert.match(onlineClient, /generation !== onlineRequestGeneration \|\| offlineIntent/, 'Late room-create and room-join responses must be ignored after the user starts offline play.');
 assert.match(onlineClient, /offlineIntent \|\| \(!matchmakingActive && !online\.code\)/, 'Late match-found events must not re-enter online mode after cancellation.');
 assert.match(onlineClient, /if \(wasSearching && socket\?\.connected\)[\s\S]*?queue:cancel/, 'Leaving online mode must cancel an active matchmaking queue.');
 assert.match(onlineClient, /if \(roomCode && socket\?\.connected\)[\s\S]*?room:leave/, 'Leaving online mode must leave an active room on the server.');
