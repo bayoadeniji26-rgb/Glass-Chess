@@ -762,7 +762,9 @@ async function leaveRoom({ restoreMode = true } = {}) {
   if (wasSearching && socket?.connected) {
     try { socket.emit('queue:cancel'); } catch {}
   }
-  if (roomCode && socket?.connected) {
+  if ((roomCode || wasSearching || hadPendingRequest) && socket?.connected) {
+    // This is ordered after the queue/join request on the same socket, so it also
+    // cleans up a room that was created just before the offline switch.
     try { socket.emit('room:leave'); } catch {}
   }
 
