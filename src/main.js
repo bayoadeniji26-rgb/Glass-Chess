@@ -1287,6 +1287,18 @@ async function newGame() {
 async function startGame() {
   const request = ++startRequestToken;
   const requestedMode = $("mode").value;
+
+  // Online play is handled by the existing Online + Club room/matchmaking UI.
+  // Do not pass "online" into the local chess engine as a game mode.
+  if (requestedMode === "online") {
+    if (typeof window.GlassChessTools?.openOnline === "function") {
+      window.GlassChessTools.openOnline();
+    } else {
+      document.querySelector('#gc-premium .gc-tabs [data-tab="onlineplus"]')?.click();
+    }
+    return;
+  }
+
   const chosen = $("color").value;
   const requestedColor = chosen === "random"
     ? (Math.random() < 0.5 ? "white" : "black")
