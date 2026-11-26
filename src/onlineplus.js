@@ -492,10 +492,21 @@ function showRoomState(snapshot) {
   root.querySelector('#gc-plus-room-people').textContent = `${Number(snapshot.spectators || 0)} spectators`;
   renderRoomButtons();
   window.setTimeout(() => { online.syncing = false; }, 0);
-  if (snapshot.checkmate || snapshot.resigned || snapshot.abandoned) {
+  if (snapshot.gameOver || snapshot.resigned || snapshot.abandoned) {
     if (snapshot.checkmate) awardAchievement('first-mate');
     showVictory(snapshot.result || 'Game over');
   }
+}
+
+function handleExpiredRoom(payload = {}) {
+  if (!online.code || payload.code !== online.code) return;
+  const message = payload.reason === 'invitation-expired'
+    ? 'This invitation expired. Create a new room to challenge a friend.'
+    : 'This online room expired and has been closed. Start a new match.';
+  void leaveRoom({ restoreMode: true }).then(() => {
+    root.querySelector('#gc-plus-room-status').textContent = message;
+    toast('Online room closed.');
+  });
 }
 
 function makeSocket() {
@@ -513,8 +524,20 @@ function makeSocket() {
     if (online.code && online.resumeToken) {
       root.querySelector('#gc-plus-room-status').textContent = 'Reconnecting to your game…';
       socket.timeout(7000).emit('room:resume', { code: online.code, playerId: CLIENT_ID, resumeToken: online.resumeToken }, (timeoutError, result) => {
-        if (timeoutError || !result?.ok) {
-          root.querySelector('#gc-plus-room-status').textContent = result?.error || 'Could not restore the online game. Your session may have expired.';
+        if (timeoutError) {
+          root.querySelector('#gc-plus-room-status').textContent = 'The reconnect request timed out. Your saved session is being kept for another attempt.';
+          renderRoomButtons();
+          return;
+        }
+        if (!result?.ok) {
+          const message = result?.error || 'Could not restore the online game.';
+          if (/no longer be resumed|invalid or expired|room not found/i.test(message)) {
+            void leaveRoom({ restoreMode: true }).then(() => {
+              root.querySelector('#gc-plus-room-status').textContent = message;
+            });
+          } else {
+            root.querySelector('#gc-plus-room-status').textContent = message;
+          }
           renderRoomButtons();
           return;
         }
@@ -546,11 +569,12 @@ function makeSocket() {
     renderRoomButtons();
   });
   socket.on('room:state', snapshot => showRoomState(snapshot));
+  socket.on('room:expired', handleExpiredRoom);
   socket.on('match:found', result => {
     // A cancelled search or an offline-game request can race with a late match event.
     // Do not let that stale event put the board back into online mode.
     if (offlineIntent || (!matchmakingActive && !online.code)) {
-      try { socket?.emit('room:leave'); } catch {}
+      void emitAck('room:leave').catch(() => {});
       return;
     }
     if (online.code) return; // The queue acknowledgement already applied this match.
@@ -575,6 +599,7 @@ function emitAck(event, payload = {}) {
 }
 
 function applyRoomJoin(result) {
+  lastCheckToastPly = 0;
   offlineIntent = false;
   online.code = result.code;
   online.role = result.role;
@@ -614,7 +639,7 @@ async function findMatch() {
     const result = await emitAck('queue:join', { name: getPublicPlayerName(), playerId: CLIENT_ID });
     if (generation !== matchmakingGeneration || offlineIntent) {
       if (result?.matched && socket?.connected) {
-        try { socket.emit('room:leave'); } catch {}
+        try { await emitAck('room:leave'); } catch {}
       }
       return;
     }
@@ -639,7 +664,8 @@ async function findMatch() {
 async function cancelMatch() {
   if (!matchmakingActive) return;
   ++matchmakingGeneration;
-  try { if (socket?.connected) socket.emit('queue:cancel'); } catch {}
+  try { if (socket?.connected) await emitAck('queue:cancel'); }
+  catch (error) { root.querySelector('#gc-plus-room-status').textContent = error.message; }
   matchmakingActive = false;
   root.querySelector('#gc-plus-room-status').textContent = 'Matchmaking cancelled.';
   renderRoomButtons();
@@ -658,7 +684,7 @@ async function createRoom() {
     const result = await emitAck('room:create', { name: getPublicPlayerName(), playerId: CLIENT_ID });
     if (generation !== onlineRequestGeneration || offlineIntent) {
       if (result?.code && socket?.connected) {
-        try { socket.emit('room:leave'); } catch {}
+        try { await emitAck('room:leave'); } catch {}
       }
       return;
     }
@@ -701,7 +727,7 @@ async function joinRoom(spectate = false) {
     const result = await emitAck(spectate ? 'room:spectate' : 'room:join', { code, name: getPublicPlayerName(), playerId: CLIENT_ID });
     if (generation !== onlineRequestGeneration || offlineIntent) {
       if (result?.code && socket?.connected) {
-        try { socket.emit('room:leave'); } catch {}
+        try { await emitAck('room:leave'); } catch {}
       }
       return;
     }
@@ -758,14 +784,12 @@ async function leaveRoom({ restoreMode = true } = {}) {
   ++onlineRequestGeneration;
   onlineRequestActive = false;
 
-  // Cancel both queue searches and active rooms without delaying the offline board.
+  // Cancel both queue searches and active rooms before allowing local play.
   if (wasSearching && socket?.connected) {
-    try { socket.emit('queue:cancel'); } catch {}
+    try { await emitAck('queue:cancel'); } catch {}
   }
-  if ((roomCode || wasSearching || hadPendingRequest) && socket?.connected) {
-    // This is ordered after the queue/join request on the same socket, so it also
-    // cleans up a room that was created just before the offline switch.
-    try { socket.emit('room:leave'); } catch {}
+  if (roomCode && socket?.connected) {
+    try { await emitAck('room:leave'); } catch {}
   }
 
   try {
@@ -782,6 +806,7 @@ async function leaveRoom({ restoreMode = true } = {}) {
   online.resumeToken = '';
   online.lastState = null;
   online.syncing = false;
+  lastCheckToastPly = 0;
   matchmakingActive = false;
   onlineRequestActive = false;
   api.setReplayLock(false);
