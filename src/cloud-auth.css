@@ -316,3 +316,88 @@ body.gc-custom-background #gc-floating-hub .gc-hub-drawer {
 }
 
 #gc-auth-menu button[hidden] { display: none !important; }
+
+
+/* Header controls share one measured height and stay reachable at laptop widths. */
+.topbar {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  gap: clamp(5px, .65vw, 11px) !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+.topbar::-webkit-scrollbar { display: none; }
+#gc-top-actions {
+  flex: 0 0 auto !important;
+  min-width: 0 !important;
+  margin-left: 0 !important;
+  gap: 6px !important;
+}
+#gc-top-actions button,
+#gc-workspace-actions button,
+#gc-daily-puzzle,
+#new-game {
+  box-sizing: border-box !important;
+  display: inline-flex !important;
+  flex: 0 0 auto !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  max-height: 36px !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  vertical-align: middle;
+}
+#gc-top-actions #gc-contact {
+  border-color: rgba(205,216,244,.24);
+  color: #e8eefb;
+  background: rgba(255,255,255,.075);
+}
+#gc-top-actions #gc-contact:hover {
+  border-color: rgba(185,165,255,.5);
+  color: #f5f0ff;
+  background: rgba(185,165,255,.12);
+  transform: translateY(-1px);
+}
+#gc-top-actions #gc-donate { padding-inline: 14px; }
+#gc-workspace-actions { flex: 0 0 auto; margin-left: auto !important; }
+#new-game { padding-inline: 12px !important; }
+
+.gc-donation-amount-field[hidden],
+.gc-donation-copy-row[hidden],
+#gc-donation-cashapp[hidden] { display: none !important; }
+.gc-donation-copy-row { display:flex; justify-content:flex-end; margin-top:-2px; }
+#gc-donation-copy-cashapp {
+  min-height:30px; padding:0 10px; border:1px solid rgba(0,214,50,.25);
+  border-radius:9px; color:#9cebad; background:rgba(0,214,50,.06);
+  font:700 10px/1 system-ui,sans-serif; cursor:pointer;
+}
+#gc-donation-copy-cashapp:hover { background:rgba(0,214,50,.13); }
+.gc-donation-overlay.is-contact .gc-donation-mark {
+  color:#e4eaff; background:rgba(145,165,220,.14);
+}
+.gc-donation-overlay.is-contact .gc-donation-actions { grid-template-columns:1fr; }
+.gc-donation-overlay.is-contact .gc-donation-actions button {
+  color:#151c2b; border-color:rgba(180,196,237,.55); background:#dce5fb;
+}
+.gc-donation-overlay.is-contact .gc-donation-actions button:hover { background:#edf2ff; }
+
+@media (max-width: 760px) {
+  .topbar { gap:4px !important; padding-inline:8px !important; }
+  #gc-top-actions { gap:3px !important; }
+  #gc-top-actions button,
+  #gc-workspace-actions button,
+  #gc-daily-puzzle,
+  #new-game { height:30px !important; min-height:30px !important; max-height:30px !important; padding-inline:7px !important; font-size:9px !important; }
+  #gc-top-actions #gc-donate { padding-inline:9px !important; }
+}
+@media (max-width: 420px) {
+  #gc-top-actions button,
+  #gc-workspace-actions button,
+  #gc-daily-puzzle,
+  #new-game { height:28px !important; min-height:28px !important; max-height:28px !important; padding-inline:6px !important; font-size:8px !important; }
+}
