@@ -86,9 +86,16 @@ queue.enqueue(playerA);
 assert.equal(queue.remove('socket-a'), true, 'Player should be able to cancel matchmaking.');
 assert.equal(queue.size, 0, 'Cancelled matchmaking should remove its ticket.');
 
+const selfTestSource = readFileSync(new URL('../src/self-test.js', import.meta.url), 'utf8');
+assert.doesNotMatch(selfTestSource, /if \(!api\.engineReady\) return makeResult[^\n]*true/, 'An uninitialized Stockfish engine must not make the engine test pass without searching.');
+assert.match(selfTestSource, /api\.search\(beforeFen, 3\)/, 'The in-app engine test must actually request a Stockfish move.');
+
 const onlineServer = readFileSync(new URL('../server.mjs', import.meta.url), 'utf8');
 const onlineClient = readFileSync(new URL('../src/onlineplus.js', import.meta.url), 'utf8');
-assert.match(onlineServer, /INVITE_TTL_MS = 15 \* 60 \* 1000/, 'Private invitations must expire after fifteen minutes if unused.');
+assert.match(onlineServer, /INVITE_TTL_MS = Math\.max\(100, Number\(process\.env\.GC_INVITE_TTL_MS\) \|\| 15 \* 60 \* 1000\)/, 'Private invitations must expire after fifteen minutes by default.');
+assert.match(onlineServer, /function scheduleInviteExpiry/, 'Unused invitations must be cleaned up automatically.');
+assert.match(onlineServer, /function scheduleRoomCleanup/, 'Ended rooms must be removed after a bounded retention period.');
+assert.match(onlineServer, /function releasePlayerLock[\s\S]*?activePlayers\.get\(playerId\) === roomCode/, 'A stale room cleanup must not clear a newer player lock.');
 assert.match(onlineServer, /activePlayers\.set\(whitePlayer\.playerId, code\)/, 'Matched players must be locked against a second active game.');
 assert.match(onlineServer, /activePlayers\.has\(playerId\)/, 'A player already in a game must not enter another room.');
 assert.match(onlineServer, /expectedPly/, 'The authoritative server must reject stale move submissions.');
@@ -98,6 +105,8 @@ assert.match(onlineServer, /isCheckmate: room\.game\.isCheckmate\(\)/, 'Moves mu
 assert.match(onlineClient, /https:\/\/glass-chess-sqk0\.onrender\.com/, 'Online play must default to the deployed Glass Chess server.');
 assert.match(onlineClient, /queue:join/, 'The client must support joining matchmaking.');
 assert.match(onlineClient, /queue:cancel/, 'The client must support cancelling matchmaking.');
+assert.match(onlineClient, /socket\.on\('room:expired', handleExpiredRoom\)/, 'Clients must clear sessions when the server expires a room.');
+assert.match(onlineClient, /if \(snapshot\.gameOver \|\| snapshot\.resigned \|\| snapshot\.abandoned\)/, 'The online result dialog must show draws as well as wins.');
 assert.match(onlineClient, /match:found/, 'The client must join automatically when a match is found.');
 assert.match(onlineClient, /searchParams\.set\('room', online\.code\)/, 'Friend invites must create shareable room links.');
 assert.match(onlineClient, /window\.location\.search/, 'Invite links must be parsed when the friend opens them.');
@@ -134,15 +143,15 @@ assert.match(onlineClient, /exitOnlineSession\(options = \{\}\) \{ return leaveR
 assert.match(onlineClient, /let onlineRequestActive = false;[\s\S]*?let offlineIntent = false;/, 'Pending create and join requests must be tracked until they finish or are cancelled.');
 assert.match(onlineClient, /generation !== onlineRequestGeneration \|\| offlineIntent/, 'Late room-create and room-join responses must be ignored after the user starts offline play.');
 assert.match(onlineClient, /offlineIntent \|\| \(!matchmakingActive && !online\.code\)/, 'Late match-found events must not re-enter online mode after cancellation.');
-assert.match(onlineClient, /if \(wasSearching && socket\?\.connected\)[\s\S]*?queue:cancel/, 'Leaving online mode must cancel an active matchmaking queue.');
-assert.match(onlineClient, /if \(roomCode && socket\?\.connected\)[\s\S]*?room:leave/, 'Leaving online mode must leave an active room on the server.');
+assert.match(onlineClient, /if \(wasSearching && socket\?\.connected\) \{\s*try \{ await emitAck\('queue:cancel'\); \} catch \{\}/, 'Leaving online mode must cancel an active matchmaking queue.');
+assert.match(onlineClient, /if \(roomCode && socket\?\.connected\) \{\s*try \{ await emitAck\('room:leave'\); \} catch \{\}/, 'Leaving online mode must leave an active room on the server.');
 assert.match(onlineClient, /localStorage\.removeItem\('glass-chess-online-room-code'\)/, 'Leaving online mode must clear the saved room-resume pointer.');
 assert.match(onlineClient, /url\.searchParams\.delete\('room'\)/, 'Leaving an invite room must remove the auto-join URL parameter.');
 assert.match(onlineClient, /async function startDailyChallenge\(\)[\s\S]*?leaveRoom\(\{ restoreMode: false \}\)/, 'Starting a solo daily challenge must also exit online mode.');
 
 assert.match(workspaceUi, /data-workspace-open="play"[\s\S]*?data-workspace-open="analysis"[\s\S]*?data-workspace-open="tools"/, 'Workspace navigation must have Play, Analysis and Tools as its three destinations.');
 assert.doesNotMatch(workspaceUi, /data-workspace-open="settings"/, 'Settings must not appear as a duplicate top-level destination.');
-assert.match(workspaceUi, /window\.GlassChessTools\?\.toggle\(\)/, 'The top-bar Tools control must open the Glass Tools panel.');
+assert.match(workspaceUi, /if \(window\.GlassChessTools\?\.toggle\) window\.GlassChessTools\.toggle\(\)/, 'The top-bar Tools control must open the Glass Tools panel.');
 assert.match(workspaceUi, /glasschess:tools-state/, 'The Tools control must track whether the Tools panel is open.');
 assert.match(mainUi, /gc-side-disclosure gc-side-settings/, 'Board and move settings must be collapsed inside the Play panel.');
 assert.match(mainUi, /gc-side-disclosure gc-side-actions/, 'Secondary game actions must be grouped away from the board.');
@@ -211,7 +220,6 @@ assert.match(supportUi, /lastEmailRequestAt/, 'Message submissions must respect 
 
 const firstRunGuide = readFileSync(new URL('../src/first-run-guide.js', import.meta.url), 'utf8');
 const firstRunCss = readFileSync(new URL('../src/first-run-guide.css', import.meta.url), 'utf8');
-const appHtml = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 assert.match(firstRunGuide, /glass-chess-first-run-v1/, 'The first-run guide must remember when the welcome flow was completed.');
 assert.match(firstRunGuide, /data-guide-action="play"/, 'The welcome flow must offer a direct path to Play.');
 assert.match(firstRunGuide, /data-guide-action="puzzle"/, 'The welcome flow must offer a direct path to Daily Puzzle.');
