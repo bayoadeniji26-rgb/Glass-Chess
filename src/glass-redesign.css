@@ -540,7 +540,7 @@ html, body {
 
 @media (prefers-reduced-motion: reduce) {
   .gc-update-banner, .gc-update-overlay, .gc-update-track span,
-  #gc-floating-hub .gc-hub-orb, #gc-premium .gc-view {
+  #gc-premium .gc-view {
     transition: none !important;
     animation: none !important;
   }
