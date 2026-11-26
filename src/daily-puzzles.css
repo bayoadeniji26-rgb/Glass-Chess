@@ -31,7 +31,7 @@
 .gc-daily-promotion{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:7px;margin:10px auto 0}
 .gc-daily-promotion[hidden],.gc-daily-hint[hidden]{display:none}
 .gc-daily-promotion strong{width:100%;text-align:center;color:#ead9bd;font-size:12px}
-.gc-daily-promotion button,.gc-daily-actions button,.gc-daily-navigation button{appearance:none;border:1px solid #ffffff26;border-radius:9px;padding:9px 12px;color:#f5f1e9;background:#ffffff0d;font:700 12px inherit;cursor:pointer}
+.gc-daily-promotion button,.gc-daily-actions button,.gc-daily-navigation button{appearance:none;border:1px solid #ffffff26;border-radius:9px;padding:9px 12px;color:#f5f1e9;background:#ffffff0d;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer}
 .gc-daily-promotion button{color:#201b15;background:#c9a77c}
 .gc-daily-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px}
 .gc-daily-actions span{color:#9ba6b7;font-size:10px}
