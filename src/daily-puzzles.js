@@ -3,8 +3,6 @@ import { DAILY_PUZZLES, getPuzzleDayIndex, isPuzzleAnswerCorrect } from './daily
 export { DAILY_PUZZLES, getPuzzleDayIndex, isPuzzleAnswerCorrect, normalizePuzzleAnswer } from './daily-puzzle-data.js';
 
 const STORAGE_KEY = 'glass-chess-daily-puzzles-v1';
-const CATEGORIES = new Set(['Logic', 'Math & Sequence', 'Spatial', 'Word & Cipher', 'Deduction']);
-
 function localDateKey(date = new Date()) {
   return date.getFullYear() + '-' +
     String(date.getMonth() + 1).padStart(2, '0') + '-' +
@@ -28,7 +26,8 @@ function readProgress() {
       return defaults;
     }
     const computedDay = getPuzzleDayIndex(saved.startedOn, today);
-    const maxDay = Math.max(1, Math.min(50, Math.max(computedDay, Number(saved.maxDay) || 1)));
+    const previousMax = Number.isInteger(Number(saved.maxDay)) ? Number(saved.maxDay) : 1;
+    const maxDay = Math.max(1, Math.min(50, Math.max(computedDay, previousMax)));
     return {
       ...defaults,
       ...saved,
@@ -54,6 +53,7 @@ function mountDailyPuzzles() {
   if (!header) return;
 
   let progress = readProgress();
+  saveProgress(progress);
   const openButton = document.createElement('button');
   openButton.id = 'gc-daily-puzzle';
   openButton.type = 'button';
@@ -108,6 +108,7 @@ function mountDailyPuzzles() {
 
   function renderPuzzle() {
     progress = readProgress();
+    saveProgress(progress);
     const puzzle = currentPuzzle();
     hintVisible = false;
     const completed = progress.completedDays.includes(puzzle.day);
