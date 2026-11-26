@@ -1,4 +1,4 @@
-const CACHE_NAME='glass-chess-shell-v2026-11-26-7';
+const CACHE_NAME='glass-chess-shell-v2026-11-26-8';
 const APP_CACHE_PREFIX='glass-chess-shell-';
 const PRECACHE=[
   '/',
