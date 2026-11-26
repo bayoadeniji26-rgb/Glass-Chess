@@ -25,6 +25,7 @@ import './glass-final-ui.css';
   let queued = false;
   let focusMode = false;
   let settings = loadSettings();
+  let sizeBeforeFocus = settings.size;
   let lastTheme = '';
 
   function syncToolsButton() {
@@ -118,7 +119,7 @@ import './glass-final-ui.css';
       </div>`;
     const boardFrame = board.closest('.board-frame');
     stage.insertBefore(toolbar, boardFrame || board);
-    let sizeBeforeFocus = settings.size;
+
 
     toolbar.querySelector('[data-gc-analysis-focus]').addEventListener('click', () => {
       focusMode = !focusMode;
