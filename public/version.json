@@ -1,11 +1,11 @@
 {
-  "version": "2026.11.25.15",
+  "version": "2026.11.25.16",
   "name": "Glass Chess Required Update",
   "updatedAt": "2026-11-25",
   "notes": [
-    "Rebuilds the daily chess puzzle board with responsive square sizing and reliable move markers",
-    "Adds working previous and next puzzle navigation across all 50 tactical puzzles",
-    "Configures the production Supabase public client settings for authenticated cloud saves",
-    "Keeps private per-account row-level security and local guest saves"
+    "Rebuilds the daily chess puzzle board with responsive sizing and working navigation",
+    "Syncs daily puzzle progress with private account saves across devices",
+    "Configures the production Supabase public client for Clerk-authenticated cloud saves",
+    "Preserves local puzzle progress when upgrading from the previous release"
   ]
 }
