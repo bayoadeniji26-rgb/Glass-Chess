@@ -550,7 +550,7 @@ function makeSocket() {
     // A cancelled search or an offline-game request can race with a late match event.
     // Do not let that stale event put the board back into online mode.
     if (offlineIntent || (!matchmakingActive && !online.code)) {
-      void emitAck('room:leave').catch(() => {});
+      try { socket?.emit('room:leave'); } catch {}
       return;
     }
     if (online.code) return; // The queue acknowledgement already applied this match.
@@ -614,7 +614,7 @@ async function findMatch() {
     const result = await emitAck('queue:join', { name: getPublicPlayerName(), playerId: CLIENT_ID });
     if (generation !== matchmakingGeneration || offlineIntent) {
       if (result?.matched && socket?.connected) {
-        try { await emitAck('room:leave'); } catch {}
+        try { socket.emit('room:leave'); } catch {}
       }
       return;
     }
@@ -639,8 +639,7 @@ async function findMatch() {
 async function cancelMatch() {
   if (!matchmakingActive) return;
   ++matchmakingGeneration;
-  try { if (socket?.connected) await emitAck('queue:cancel'); }
-  catch (error) { root.querySelector('#gc-plus-room-status').textContent = error.message; }
+  try { if (socket?.connected) socket.emit('queue:cancel'); } catch {}
   matchmakingActive = false;
   root.querySelector('#gc-plus-room-status').textContent = 'Matchmaking cancelled.';
   renderRoomButtons();
@@ -659,7 +658,7 @@ async function createRoom() {
     const result = await emitAck('room:create', { name: getPublicPlayerName(), playerId: CLIENT_ID });
     if (generation !== onlineRequestGeneration || offlineIntent) {
       if (result?.code && socket?.connected) {
-        try { await emitAck('room:leave'); } catch {}
+        try { socket.emit('room:leave'); } catch {}
       }
       return;
     }
@@ -702,7 +701,7 @@ async function joinRoom(spectate = false) {
     const result = await emitAck(spectate ? 'room:spectate' : 'room:join', { code, name: getPublicPlayerName(), playerId: CLIENT_ID });
     if (generation !== onlineRequestGeneration || offlineIntent) {
       if (result?.code && socket?.connected) {
-        try { await emitAck('room:leave'); } catch {}
+        try { socket.emit('room:leave'); } catch {}
       }
       return;
     }
@@ -759,12 +758,12 @@ async function leaveRoom({ restoreMode = true } = {}) {
   ++onlineRequestGeneration;
   onlineRequestActive = false;
 
-  // Cancel both queue searches and active rooms before allowing local play.
+  // Cancel both queue searches and active rooms without delaying the offline board.
   if (wasSearching && socket?.connected) {
-    try { await emitAck('queue:cancel'); } catch {}
+    try { socket.emit('queue:cancel'); } catch {}
   }
   if (roomCode && socket?.connected) {
-    try { await emitAck('room:leave'); } catch {}
+    try { socket.emit('room:leave'); } catch {}
   }
 
   try {
