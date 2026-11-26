@@ -7,6 +7,7 @@
     "Adds descriptive Tools category cards linked to the existing feature tabs",
     "Adds Play Online to the Play menu and opens the existing Online + Club area",
     "Automatically closes the Play drawer when Start Game is selected",
+    "Keeps Tools reachable during fullscreen focus mode",
     "Preserves the existing game systems, settings, training modules and all 50 daily puzzles"
   ]
 }
