@@ -1,16 +1,11 @@
 {
-  "version": "2026.11.26.10",
+  "version": "2026.11.26.11",
   "name": "Glass Chess Required Update",
   "updatedAt": "2026-11-26",
   "notes": [
-    "Uses only the registered Glass Chess account name for human player labels",
-    "Shows Anonymous when a player has no registered name",
-    "Never derives a player name from an email address",
-    "Shows signed-in names on human-versus-human seats and Anonymous for guest players",
-    "Keeps Stockfish nameplates exclusive to games against the computer",
-    "Automatically exits online rooms and matchmaking before starting Pass and Play, computer, or analysis games",
-    "Clears saved room auto-resume state and blocks late matchmaking events from re-entering online mode",
-    "Reorganizes the workspace into Play, Analysis and Tools panels with a cleaner board toolbar",
-    "Groups secondary settings and game actions into expandable sections and provides working Tools tabs"
+    "Restores the original working Play, Analysis and Settings navigation",
+    "Restores the complete Glass Hub and all original Tools shortcuts and feature tabs",
+    "Preserves all chess, online, training, appearance, settings and Game Lab modules",
+    "Preserves all 50 daily chess puzzles and saved daily puzzle progress"
   ]
 }
