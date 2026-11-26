@@ -19,5 +19,7 @@ jobs:
         run: npm ci
       - name: Check release version
         run: npm run check:version
+      - name: Run logic regression tests
+        run: npm test
       - name: Build production site
         run: npm run build

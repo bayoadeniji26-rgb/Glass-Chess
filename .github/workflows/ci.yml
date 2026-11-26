@@ -25,5 +25,7 @@ jobs:
         run: npm ci
       - name: Validate release version consistency
         run: npm run check:version
+      - name: Run logic regression tests
+        run: npm test
       - name: Build production app
         run: npm run build

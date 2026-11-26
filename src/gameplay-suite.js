@@ -1,4 +1,5 @@
 import { Chess } from 'chess.js';
+import { remainingSeconds } from './gameplay-timers.js';
 import './gameplay-suite.css';
 
 const HISTORY_KEY = 'glass-chess-match-history-v1';
@@ -74,6 +75,7 @@ let retryActive = false;
 let activePuzzle = null;
 let rushTimer = null;
 let rushSeconds = 60;
+let rushDeadline = 0;
 let rushScore = 0;
 let activeDrill = null;
 let lastArrowOrientation = null;
@@ -84,6 +86,15 @@ let inspectedFullHistory = null;
 let currentStartFen = START_FEN;
 let cachedMatchSaved = '';
 let lastAutoReviewKey = '';
+let personaWaitTimer = null;
+let personaWaitDeadline = null;
+
+function clearPersonaWait() {
+  if (personaWaitTimer !== null) window.clearInterval(personaWaitTimer);
+  if (personaWaitDeadline !== null) window.clearTimeout(personaWaitDeadline);
+  personaWaitTimer = null;
+  personaWaitDeadline = null;
+}
 
 function safeHistory() {
   try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]').slice(0,100); }
@@ -1201,10 +1212,17 @@ function startRush() {
   stopReview();
   rushScore=0;rushSeconds=60;loadNextPuzzle();
   const host=document.getElementById('gcl-rush-clock');host.hidden=false;updateRushScore();
-  rushTimer=window.setInterval(()=>{rushSeconds--;updateRushScore();if(rushSeconds<=0)stopRush();},1000);
+  rushDeadline=performance.now()+60000;
+  rushTimer=window.setInterval(tickRushTimer,200);
+}
+function tickRushTimer() {
+  if(!rushTimer)return;
+  rushSeconds=remainingSeconds(rushDeadline,performance.now());
+  updateRushScore();
+  if(rushSeconds<=0)stopRush();
 }
 function stopRush() {
-  if(rushTimer)clearInterval(rushTimer);rushTimer=null;activePuzzle=null;
+  if(rushTimer)clearInterval(rushTimer);rushTimer=null;rushDeadline=0;activePuzzle=null;
   document.getElementById('gcl-puzzle-status').textContent='Puzzle Rush finished · '+rushScore+' solved.';
 }
 
@@ -1275,8 +1293,15 @@ function buildControls() {
   $id('gcl-editor-analysis').addEventListener('click',()=>applyEditor('analysis'));
   $id('gcl-persona').addEventListener('change',updatePersonaNote);
   $id('gcl-persona-apply').addEventListener('click',()=>void applyPersona());
-  if(api.engineReady)window.setTimeout(()=>void applyPersona(),350);
-  else {const personaWait=window.setInterval(()=>{if(api.engineReady){window.clearInterval(personaWait);void applyPersona();}},650);}
+  clearPersonaWait();
+  if(api.engineReady)window.setTimeout(()=>{if(root?.isConnected)void applyPersona();},350);
+  else {
+    personaWaitTimer=window.setInterval(()=>{
+      if(!root?.isConnected){clearPersonaWait();return;}
+      if(api.engineReady){clearPersonaWait();void applyPersona();}
+    },650);
+    personaWaitDeadline=window.setTimeout(clearPersonaWait,20000);
+  }
   $id('gcl-match-filter').addEventListener('input',renderMatchHistory);
   $id('gcl-puzzle-start').addEventListener('click',startPuzzle);
   $id('gcl-puzzle-next').addEventListener('click',startPuzzle);
@@ -1355,7 +1380,7 @@ function render() {
   lastArrowOrientation=orient;
   document.getElementById('gcl-eval-bar')?.setAttribute('data-orientation',orient);
 }
-function unmount(){stopClock();stopRush();stopReview();}
+function unmount(){clearPersonaWait();stopClock();stopRush();stopReview();}
 
 export function mountGameplaySuite(chessApi,premiumRoot) {
   if(!chessApi||!premiumRoot||window.GlassChessGameplaySuite)return;

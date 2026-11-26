@@ -1,5 +1,7 @@
 import { Chess } from "chess.js";
 import { engine } from "./engine.js";
+import { calculatePositionHistory, isFlagFallDraw } from "./chess-position-tools.js";
+import "./micro-polish.css";
 import "./features.css";
 import { createBoardEffects } from "./board-effects.js";
 
@@ -99,6 +101,7 @@ let moveClassifications = new Map();
 let skipNextMoveAnimation = false;
 let suppressNextBoardClick = false;
 let activeBoardDrag = null;
+let keyboardFocusSquare = null;
 let activeHintMove = null;
 const MOVE_QUALITY = {
   Brilliant: { key: "brilliant", symbol: "!!" }, Great: { key: "great", symbol: "!" },
@@ -423,6 +426,34 @@ function boardIsFlipped() {
   return flipped;
 }
 
+function setBoardFocus(square, shouldFocus = false) {
+  if (!board || !/^[a-h][1-8]$/.test(String(square || ""))) return;
+  keyboardFocusSquare = square;
+  for (const cell of board.querySelectorAll("[data-square]")) {
+    cell.tabIndex = cell.dataset.square === square ? 0 : -1;
+  }
+  if (shouldFocus) board.querySelector('[data-square="' + square + '"]')?.focus();
+}
+
+function handleBoardSquareKeydown(event, square) {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    handleSquare(square);
+    return;
+  }
+  if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
+  event.preventDefault();
+  const reverse = boardIsFlipped();
+  let file = square.charCodeAt(0) - 97;
+  let rank = Number(square[1]);
+  if (event.key === "ArrowLeft") file += reverse ? 1 : -1;
+  if (event.key === "ArrowRight") file += reverse ? -1 : 1;
+  if (event.key === "ArrowUp") rank += reverse ? -1 : 1;
+  if (event.key === "ArrowDown") rank += reverse ? 1 : -1;
+  if (file < 0 || file > 7 || rank < 1 || rank > 8) return;
+  setBoardFocus(String.fromCharCode(97 + file) + rank, true);
+}
+
 // ============================================
 // BOARD RENDERING
 // ============================================
@@ -508,9 +539,22 @@ function renderBoard() {
         badge.setAttribute("aria-label", currentReview.label + " move");
         element.appendChild(badge);
       }
+      if (!keyboardFocusSquare) keyboardFocusSquare = reverse ? "h1" : "a8";
       element.setAttribute("role", "button");
-      element.setAttribute("aria-label", square);
-      element.onclick = () => handleSquare(square);
+      element.tabIndex = square === keyboardFocusSquare ? 0 : -1;
+      const pieceName = piece
+        ? ({ p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" }[piece.type])
+        : "empty";
+      element.setAttribute("aria-label", piece
+        ? square + ", " + (piece.color === "w" ? "white " : "black ") + pieceName
+        : square + ", empty");
+      element.setAttribute("aria-pressed", selected === square ? "true" : "false");
+      element.onfocus = () => setBoardFocus(square);
+      element.onkeydown = event => handleBoardSquareKeydown(event, square);
+      element.onclick = () => {
+        setBoardFocus(square);
+        handleSquare(square);
+      };
       board.appendChild(element);
     }
   }
@@ -1413,7 +1457,7 @@ function resign() {
 
 function finishOnTime(loserSide) {
   if (!["w", "b"].includes(loserSide) || isGameOver()) return false;
-  const draw = game.isInsufficientMaterial();
+  const draw = isFlagFallDraw(game.fen(), loserSide);
   const winningName = loserSide === "w" ? "Black" : "White";
   gameTermination = draw
     ? { type: "timeout_draw", draw: true, winner: null, loser: loserSide }
@@ -1466,7 +1510,8 @@ function downloadPGN() {
   link.click();
   link.remove();
 
-  URL.revokeObjectURL(url);
+  // Give the browser time to begin the download before releasing the blob URL.
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 // ============================================
@@ -1785,6 +1830,8 @@ function installGlassChessPremiumBridge() {
       render();
     },
     rebuild(initialFen, moves) {
+      // Validate the complete remote/replay line before touching the live board.
+      calculatePositionHistory(initialFen, moves);
       const previousHistory = game.history({ verbose: true });
       const sameMove = (a, b) => a && b && a.from === b.from && a.to === b.to &&
         (a.promotion || undefined) === (b.promotion || undefined);
@@ -1812,23 +1859,12 @@ function installGlassChessPremiumBridge() {
       else if (undoneMove && motionSnapshot) void boardEffects.animateMove(motionSnapshot);
     },
     calculatePositions(initialFen, moveList) {
-      const savedMoves = game.history({ verbose: true });
-      const result = [];
-      suppressGameCallbacks = true;
-      try {
-        game.load(initialFen);
-        result.push(game.fen());
-        for (const move of moveList) {
-          game.move({ from: move.from, to: move.to, promotion: move.promotion });
-          result.push(game.fen());
-        }
-        game.load(initialFen);
-        for (const move of savedMoves) game.move({ from: move.from, to: move.to, promotion: move.promotion });
-      } finally { suppressGameCallbacks = false; }
-      render();
-      return result;
+      return calculatePositionHistory(initialFen, moveList);
     },
     loadPgn(pgn) {
+      // Parse on an isolated instance first so invalid PGN cannot partially replace the live game.
+      const validatedPgn = new Chess();
+      validatedPgn.loadPgn(pgn);
       thinking = false;
       gameToken++;
       positionGeneration++;
@@ -1906,20 +1942,24 @@ function installGlassChessPremiumBridge() {
       resigned = false;
       winner = "";
     }
-    if (window.GlassChessPremium && typeof window.GlassChessPremium.onReset === 'function') {
-      window.GlassChessPremium.onReset(game.fen());
+    if (!suppressGameCallbacks) {
+      if (window.GlassChessPremium && typeof window.GlassChessPremium.onReset === 'function') {
+        window.GlassChessPremium.onReset(game.fen());
+      }
+      window.GlassChessGameplaySuite?.onReset?.(game.fen());
+      window.GlassChessAdvancedLab?.onReset?.(game.fen());
     }
-    window.GlassChessGameplaySuite?.onReset?.(game.fen());
-    window.GlassChessAdvancedLab?.onReset?.(game.fen());
     return result;
   };
 
   const originalUndo = game.undo.bind(game);
   game.undo = function (...args) {
     const result = originalUndo(...args);
-    if (result && !suppressGameCallbacks) positionGeneration++;
-    if (result && window.GlassChessPremium && typeof window.GlassChessPremium.onUndo === 'function') {
-      window.GlassChessPremium.onUndo(game.history({ verbose: true }), game.fen());
+    if (result && !suppressGameCallbacks) {
+      positionGeneration++;
+      if (window.GlassChessPremium && typeof window.GlassChessPremium.onUndo === 'function') {
+        window.GlassChessPremium.onUndo(game.history({ verbose: true }), game.fen());
+      }
     }
     return result;
   };

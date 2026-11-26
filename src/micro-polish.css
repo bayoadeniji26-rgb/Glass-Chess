@@ -1,0 +1,28 @@
+/* Small interaction polish: consistent focus, press, hover, and stable counters. */
+:where(button, select, input, textarea, [role="button"]):focus-visible {
+  outline: 3px solid rgba(201,167,124,.82);
+  outline-offset: 3px;
+}
+:where(button, .panel, .eval-card, .move-card) {
+  transition: transform 150ms ease, border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+}
+button:active { transform: scale(.985); }
+button:disabled { cursor: not-allowed; opacity: .58; }
+#evaluation, .eval-card strong, .gc-move-clock, .gc-xp-count, .gc-streak-count, .gc-daily-progress-line {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+@media (hover:hover) and (pointer:fine) {
+  .panel:hover { border-color: rgba(255,255,255,.15); }
+  .board-controls button:hover, .icon-button:hover, .primary-button:hover {
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
