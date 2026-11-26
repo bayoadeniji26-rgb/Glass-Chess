@@ -348,6 +348,8 @@ function renderAuth() {
   if (!signInButton || !pill) return;
   signInButton.hidden = Boolean(activeUser);
   pill.hidden = !activeUser;
+  const verifyAction = $('gc-auth-menu')?.querySelector('[data-action="verify"]');
+  if (verifyAction) verifyAction.hidden = !activeUser?.email || Boolean(activeUser.emailVerified);
   if (!activeUser) return;
   const image = profileAvatarUrl || activeUser.photoURL || '';
   const avatar = $('gc-user-avatar');
