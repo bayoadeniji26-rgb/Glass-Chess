@@ -8,7 +8,7 @@ const CASHAPP_TAG = '$RaphaelAboy';
 const CASHAPP_URL = 'https://cash.app/$RaphaelAboy';
 const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID || 'service_3l9tc2a';
 const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || 'template_qwi52h9';
-const EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'aKuTsseHTnwR-RWg';
+const EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'aKuTsseHTnwR-RWgG';
 
 const $ = id => document.getElementById(id);
 let supportMode = 'donate';
@@ -30,6 +30,9 @@ function describeEmailDeliveryError(statusCode, detail, error) {
   }
   if (statusCode === 429) {
     return 'EmailJS is receiving messages too quickly. Please wait a few seconds and try again.';
+  }
+  if (/public key.{0,40}invalid|invalid.{0,40}public key/.test(lower)) {
+    return 'EmailJS rejected the Public Key. Copy the complete Public Key from https://dashboard.emailjs.com/admin/account and update VITE_EMAILJS_PUBLIC_KEY in Render > Glass-Chess-PRO > Environment, then redeploy.';
   }
   if (statusCode === 400) {
     return 'EmailJS rejected the message configuration. Check the service, template, public key, and required template fields.' + (raw ? ' Details: ' + raw : '');

@@ -1,11 +1,11 @@
 {
-  "version": "2026.11.26.3",
+  "version": "2026.11.26.4",
   "name": "Glass Chess Required Update",
   "updatedAt": "2026-11-26",
   "notes": [
-    "Improves Contact and Donate email field mapping for standard EmailJS contact templates",
-    "Shows actionable EmailJS delivery errors instead of a generic unavailable message",
-    "Adds a first-time welcome flow with Play, Daily Puzzle, and a short interactive guide",
-    "Keeps the 50 distinct real chess puzzles and replay support"
+    "Corrects the full EmailJS public key and provides a specific invalid-key error explanation",
+    "Fits the account, game, analysis, settings, donate, contact, puzzle, guide, and new-game controls in one compact desktop header",
+    "Keeps responsive compact sizing for medium desktop widths",
+    "Includes the first-time player guide and contact form improvements"
   ]
 }

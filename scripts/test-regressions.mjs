@@ -107,6 +107,11 @@ assert.match(supportCss, /height: 36px !important/, 'Top-bar actions must use a 
 assert.match(supportCss, /overflow-x: auto !important/, 'Top-bar controls must remain reachable when the viewport is narrow.');
 assert.match(supportCss, /\.gc-donation-overlay\.is-contact \.gc-donation-actions/, 'Contact mode must have contact-specific presentation.');
 assert.match(supportCss, /#gc-copy-cashapp-dialog/, 'The Cash App copy button inside the donation dialog must be styled.');
+assert.match(supportUi, /EMAILJS_PUBLIC_KEY = import\.meta\.env\.VITE_EMAILJS_PUBLIC_KEY \|\| 'aKuTsseHTnwR-RWgG'/, 'The EmailJS fallback public key must include its final character.');
+assert.match(supportUi, /public key\.\{0,40\}invalid/, 'Invalid EmailJS public keys must produce a specific explanation.');
+assert.match(supportCss, /flex-wrap: nowrap !important/, 'Desktop navigation must remain in a single row.');
+assert.match(supportCss, /@media \(max-width: 1500px\) and \(min-width: 761px\)/, 'The header must compact controls for medium desktop widths.');
+
 
 assert.match(supportUi, /name: senderName/, 'EmailJS receives the standard Contact Us sender-name field.');
 assert.match(supportUi, /email: email \|\| ''/, 'EmailJS receives the standard Contact Us reply address field.');
