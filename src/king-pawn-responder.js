@@ -3,7 +3,7 @@
  * It applies a strict chess-only boundary, supports a secure optional server adapter,
  * and always falls back to the local chess knowledge + Stockfish path.
  */
-const CHESS_TERMS = /\b(chess|chessboard|chaturanga|fen|pgn|uci|stockfish|en passant|castl(?:e|ing)?|checkmate|stalemate|promotion|promote|pawn|rook|bishop|knight|king|queen|opening|endgame|gambit|grandmaster|fide|elo|rating|blitz|bullet|rapid|tournament|chess clock|algebraic notation|zugzwang|tempo|fork|pin|skewer|discovered attack|back.?rank|opposition|lucena|philidor|sicilian|ruy lopez|italian game|french defense|caro.?kann|queens gambit|london system|king.?s indian)\b/i;
+const CHESS_TERMS = /\b(chess|chessboard|chaturanga|fen|pgn|uci|stockfish|en passant|castl(?:e|ing)?|checkmate|stalemate|promotion|promote|pawn|rook|bishop|knight|king|queen|opening|endgame|gambit|grandmaster|fide|elo|rating|blitz|bullet|rapid|tournament|chess clock|algebraic notation|zugzwang|tempo|fork|pin|skewer|discovered attack|back.?rank|opposition|lucena|philidor|sicilian|ruy lopez|italian game|french defense|caro.?kann|queens gambit|london system|king.?s indian|magnus carlsen|bobby fischer|garry kasparov|judit polgar|capablanca|anand|karpov|mikhail tal)\b/i;
 const CHESS_QUESTION_PATTERNS = [
   /\bwhen\s+(?:was|is|did)\s+(?:the\s+game\s+of\s+)?chess\s+(?:made|invented|created|begin|start)/i,
   /\bwho\s+(?:invented|made|created)\s+chess\b/i,
