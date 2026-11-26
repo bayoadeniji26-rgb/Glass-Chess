@@ -165,11 +165,16 @@ export class SaveEngine {
     this.cloudAdapter = adapter;
   }
 
+  async getCommittedData() {
+    // Read only after every accepted write has settled. Cloud snapshots and
+    // exports must never race an import, profile restore, or queued local save.
+    await this.writeQueue;
+    return this.loadData();
+  }
+
   async saveToCloud() {
     if (!this.cloudAdapter) throw new Error('Cloud sync is not configured. Export a save file to move data between devices.');
-    // Wait for all writes already accepted by this tab before taking the cloud snapshot.
-    await this.writeQueue;
-    const snapshot = await this.loadData();
+    const snapshot = await this.getCommittedData();
     return this.cloudAdapter.push(snapshot);
   }
 
