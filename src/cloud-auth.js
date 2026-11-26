@@ -143,7 +143,7 @@ function openDonationDialog(mode = 'donate') {
     ? (isContact
       ? 'Your message will be emailed to the recipient configured in the EmailJS template. No donation is required.'
       : 'Your message will be emailed to the recipient configured in the EmailJS template. Payment happens separately in Cash App.')
-    : 'Email delivery needs EmailJS configuration before messages can be sent. Cash App is available for donations.';
+    : (isContact ? 'Message delivery is temporarily unavailable. Please try again later.' : 'Email delivery needs configuration. Cash App is still available for donations.');
   $('gc-donation-message').focus();
 }
 
