@@ -602,13 +602,13 @@ async function findMatch() {
   const generation = ++matchmakingGeneration;
   online.previousMode = api.mode;
   online.previousColor = api.playerColor;
+  matchmakingActive = true;
+  renderRoomButtons();
+  root.querySelector('#gc-plus-room-status').textContent = 'Looking for another player… Keep this page open. You can cancel at any time.';
   try {
     if (!socket?.connected) makeSocket();
     await waitForSocket();
     if (generation !== matchmakingGeneration || offlineIntent) return;
-    matchmakingActive = true;
-    renderRoomButtons();
-    root.querySelector('#gc-plus-room-status').textContent = 'Looking for another player… Keep this page open. You can cancel at any time.';
     const result = await emitAck('queue:join', { name: getPublicPlayerName(), playerId: CLIENT_ID });
     if (generation !== matchmakingGeneration || offlineIntent) {
       if (result?.matched && socket?.connected) {
