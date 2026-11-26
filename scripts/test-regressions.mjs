@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { Chess } from 'chess.js';
 import { DAILY_PUZZLES, getPuzzleDayIndex } from '../src/daily-puzzle-data.js';
@@ -87,3 +88,13 @@ assert.equal(remainingSeconds(60000, 60001), 0);
 assert.throws(() => remainingSeconds(Number.NaN, 0), /finite numbers/);
 
 console.log('50 legal daily chess puzzles and regression suite passed.');
+
+const puzzleUi = readFileSync(new URL('../src/daily-puzzles.js', import.meta.url), 'utf8');
+const puzzleCss = readFileSync(new URL('../src/daily-puzzles.css', import.meta.url), 'utf8');
+assert.match(puzzleUi, /data-action="next"/, 'Daily puzzles must include a Next button.');
+assert.match(puzzleUi, /data-action="previous"/, 'Daily puzzles must include a Previous button.');
+assert.match(puzzleUi, /puzzleDay\+\+/, 'Next must advance to the next puzzle.');
+assert.match(puzzleUi, /puzzleDay--/, 'Previous must return to the previous puzzle.');
+assert.match(puzzleCss, /grid-template-rows:repeat\(8,minmax\(0,1fr\)\)/, 'The puzzle board must explicitly size all eight rows.');
+assert.match(puzzleCss, /\.gc-daily-square\.is-legal::after/, 'Legal-move indicators must be rendered above the square backgrounds.');
+assert.match(puzzleCss, /\.gc-daily-square\.is-capture::after/, 'Capture indicators must be rendered above the square backgrounds.');
