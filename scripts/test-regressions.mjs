@@ -16,7 +16,7 @@ assert.ok(new Set(DAILY_PUZZLES.flatMap(puzzle => puzzle.themes.split(' '))).siz
 assert.ok(new Set(DAILY_PUZZLES.map(puzzle => puzzle.solution.length)).size >= 4, 'The catalog must include varied multi-move solution lengths.');
 for (const puzzle of DAILY_PUZZLES) {
   assert.ok(puzzle.title && puzzle.hint && puzzle.explanation && puzzle.sourceUrl, 'Missing puzzle content or attribution on Day ' + puzzle.day);
-  assert.match(puzzle.fen, /\\s[wb]\\s/, 'Missing side to move on Day ' + puzzle.day);
+  assert.match(puzzle.fen, /\s[wb]\s/, 'Missing side to move on Day ' + puzzle.day);
   assert.ok(puzzle.solution.length >= 2 && puzzle.solution.length % 2 === 0, 'Each puzzle must include a full solver/opponent line on Day ' + puzzle.day);
   const game = new Chess(puzzle.fen);
   for (const [index, moveText] of puzzle.solution.entries()) {
