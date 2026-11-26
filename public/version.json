@@ -1,13 +1,13 @@
 {
-  "version": "2026.11.26.5",
+  "version": "2026.11.26.6",
   "name": "Glass Chess Required Update",
   "updatedAt": "2026-11-26",
   "notes": [
     "Adds Quick Match matchmaking with automatic opponent pairing and cancellation",
-    "Adds shareable private friend invitations with eight-character codes and fifteen-minute expiry",
-    "Prevents duplicate queue entries and blocks a player from joining multiple active rooms",
-    "Keeps move legality and board state authoritative on the online server, with expected-ply checks",
-    "Broadcasts server-derived move notation and capture, check, checkmate, and castling effects",
-    "Connects online play to the hosted Glass Chess multiplayer server"
+    "Adds shareable private friend invitations with cryptographically random eight-character codes",
+    "Validates every online move against the server position and requires an expected move number",
+    "Adds server-issued reconnect credentials and a 30-second disconnect recovery window",
+    "Adds a JSON health endpoint for the online server and bounds HTTP fallback responses",
+    "Adds automated Socket.IO integration coverage for matchmaking, challenges, moves, and reconnects"
   ]
 }
