@@ -107,3 +107,21 @@ assert.match(supportCss, /height: 36px !important/, 'Top-bar actions must use a 
 assert.match(supportCss, /overflow-x: auto !important/, 'Top-bar controls must remain reachable when the viewport is narrow.');
 assert.match(supportCss, /\.gc-donation-overlay\.is-contact \.gc-donation-actions/, 'Contact mode must have contact-specific presentation.');
 assert.match(supportCss, /#gc-copy-cashapp-dialog/, 'The Cash App copy button inside the donation dialog must be styled.');
+
+assert.match(supportUi, /name: senderName/, 'EmailJS receives the standard Contact Us sender-name field.');
+assert.match(supportUi, /email: email \|\| ''/, 'EmailJS receives the standard Contact Us reply address field.');
+assert.match(supportUi, /title: emailSubject/, 'EmailJS receives the standard Contact Us subject field.');
+assert.match(supportUi, /function describeEmailDeliveryError/, 'Email delivery failures must provide an actionable explanation.');
+assert.doesNotMatch(supportUi, /This feature is not available\. Try again later\./, 'Message failures must not be hidden behind a generic unavailable message.');
+assert.match(supportUi, /lastEmailRequestAt/, 'Message submissions must respect the EmailJS rate limit.');
+
+const firstRunGuide = readFileSync(new URL('../src/first-run-guide.js', import.meta.url), 'utf8');
+const firstRunCss = readFileSync(new URL('../src/first-run-guide.css', import.meta.url), 'utf8');
+const appHtml = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+assert.match(firstRunGuide, /glass-chess-first-run-v1/, 'The first-run guide must remember when the welcome flow was completed.');
+assert.match(firstRunGuide, /data-guide-action="play"/, 'The welcome flow must offer a direct path to Play.');
+assert.match(firstRunGuide, /data-guide-action="puzzle"/, 'The welcome flow must offer a direct path to Daily Puzzle.');
+assert.match(firstRunGuide, /data-guide-action="tour"/, 'The welcome flow must offer an interactive quick tour.');
+assert.match(firstRunGuide, /keepFocusInside/, 'The welcome dialog must keep keyboard focus inside.');
+assert.match(firstRunCss, /\.gc-first-run-overlay\[hidden\]/, 'The guide must support a properly hidden state.');
+assert.match(appHtml, /src="\/src\/first-run-guide\.js"/, 'The first-run guide must load in the application.');

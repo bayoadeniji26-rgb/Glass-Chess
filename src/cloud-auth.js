@@ -13,6 +13,32 @@ const EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'aKuTsseHT
 const $ = id => document.getElementById(id);
 let supportMode = 'donate';
 let lastSupportOpener = null;
+let lastEmailRequestAt = 0;
+
+function describeEmailDeliveryError(statusCode, detail, error) {
+  const raw = String(detail || error?.message || '').replace(/[<>]/g, '').trim().slice(0, 220);
+  const lower = raw.toLowerCase();
+
+  if (statusCode === 422 && /recipient|address|email/.test(lower)) {
+    return 'EmailJS rejected the destination email address. In EmailJS, open template_qwi52h9 and check that its “To Email” field contains your inbox address, then save the template.';
+  }
+  if (statusCode === 401 || statusCode === 403) {
+    return 'EmailJS refused this website. Check the Public Key in the Glass Chess settings and add glass-chess-pro.onrender.com to the allowed origins in EmailJS.';
+  }
+  if (statusCode === 404) {
+    return 'EmailJS could not find the configured service or template. Check service_3l9tc2a and template_qwi52h9 in the EmailJS dashboard.';
+  }
+  if (statusCode === 429) {
+    return 'EmailJS is receiving messages too quickly. Please wait a few seconds and try again.';
+  }
+  if (statusCode === 400) {
+    return 'EmailJS rejected the message configuration. Check the service, template, public key, and required template fields.' + (raw ? ' Details: ' + raw : '');
+  }
+  if (!statusCode) {
+    return 'Glass Chess could not reach EmailJS. Check your internet connection or browser privacy/ad-blocking settings, then try again.' + (raw ? ' Details: ' + raw : '');
+  }
+  return 'EmailJS could not send this message (HTTP ' + statusCode + ').' + (raw ? ' Details: ' + raw : ' Please check the EmailJS dashboard.');
+}
 
 function toast(message, isError = false) {
   let node = $('gc-save-toast');
@@ -141,9 +167,9 @@ function openDonationDialog(mode = 'donate') {
   $('gc-donation-status').classList.remove('is-error');
   $('gc-donation-status').textContent = EMAILJS_SERVICE_ID && EMAILJS_TEMPLATE_ID && EMAILJS_PUBLIC_KEY
     ? (isContact
-      ? 'Your message will be emailed to the recipient configured in the EmailJS template. No donation is required.'
-      : 'Your message will be emailed to the recipient configured in the EmailJS template. Payment happens separately in Cash App.')
-    : (isContact ? 'Message delivery is temporarily unavailable. Please try again later.' : 'Email delivery needs configuration. Cash App is still available for donations.');
+      ? 'Messages go to the inbox configured in EmailJS. No donation is required.'
+      : 'Your note goes to the inbox configured in EmailJS. Payment happens separately in Cash App.')
+    : 'Email delivery needs its EmailJS service ID, template ID, and public key configured before messages can be sent.';
   $('gc-donation-message').focus();
 }
 
@@ -157,7 +183,7 @@ async function sendDonationMessage() {
     return;
   }
   if (!EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID || !EMAILJS_PUBLIC_KEY) {
-    status.textContent = 'This feature is not available. Try again later.';
+    status.textContent = 'Message delivery is not configured yet. Check the EmailJS service ID, template ID, and public key in the Glass Chess deployment settings.';
     status.classList.add('is-error');
     return;
   }
@@ -183,19 +209,37 @@ async function sendDonationMessage() {
     $('gc-donation-custom-amount').focus();
     return;
   }
+  const now = Date.now();
+  if (now - lastEmailRequestAt < 1100) {
+    status.textContent = 'Please wait a moment before sending another message.';
+    status.classList.add('is-error');
+    return;
+  }
+  lastEmailRequestAt = now;
   send.disabled = true;
   send.textContent = 'Sending…';
   status.classList.remove('is-error');
   status.textContent = 'Sending your message securely through the configured email service…';
+  const senderName = $('gc-donation-name').value.trim() || 'Glass Chess visitor';
+  const submittedAt = new Date().toLocaleString();
+  const emailSubject = supportMode === 'contact'
+    ? 'Glass Chess contact message · ' + $('gc-donation-topic').value
+    : 'Glass Chess donation message';
   const templateParams = {
-    from_name: $('gc-donation-name').value.trim() || 'Glass Chess visitor',
+    // Standard EmailJS Contact Us template fields.
+    name: senderName,
+    email: email || '',
+    title: emailSubject,
+    time: submittedAt,
+    // Keep descriptive aliases for templates already created for Glass Chess.
+    from_name: senderName,
     reply_to: email || '',
     donation_amount: supportMode === 'contact' ? 'No donation — contact message' : (selectedAmount === 'Other amount' ? String.fromCharCode(36) + Number(customAmount).toFixed(2) : selectedAmount),
     message_type: $('gc-donation-topic').value,
-    subject: supportMode === 'contact' ? 'Glass Chess contact message' : 'Glass Chess donation message',
+    subject: emailSubject,
     message,
     cashapp_tag: CASHAPP_TAG,
-    submitted_at: new Date().toLocaleString(),
+    submitted_at: submittedAt,
     source_url: window.location.origin
   };
   try {
@@ -211,7 +255,9 @@ async function sendDonationMessage() {
     });
     if (!response.ok) {
       const detail = await response.text().catch(() => '');
-      throw new Error(detail.slice(0, 300) || 'The email service rejected the message.');
+      const deliveryError = new Error(detail.slice(0, 300) || 'The email service rejected the message.');
+      deliveryError.statusCode = response.status;
+      throw deliveryError;
     }
     status.textContent = supportMode === 'contact'
       ? 'Message sent! Thanks for reaching out.'
@@ -220,9 +266,14 @@ async function sendDonationMessage() {
     form.reset();
     $('gc-donation-custom-amount').hidden = true;
   } catch (error) {
-    status.textContent = 'This feature is not available. Try again later.';
+    const problem = describeEmailDeliveryError(error?.statusCode || 0, error?.message || '', error);
+    status.textContent = problem;
     status.classList.add('is-error');
-    toast('This feature is not available. Try again later.');
+    toast('Message not sent. See the form for the reason.', true);
+    console.error('Glass Chess message delivery failed:', {
+      status: error?.statusCode || 'network',
+      message: String(error?.message || 'Unknown error').slice(0, 220)
+    });
   } finally {
     send.disabled = false;
     send.textContent = 'Send message';

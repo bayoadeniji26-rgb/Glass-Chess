@@ -1,11 +1,11 @@
 {
-  "version": "2026.11.26.2",
+  "version": "2026.11.26.3",
   "name": "Glass Chess Required Update",
   "updatedAt": "2026-11-26",
   "notes": [
-    "Allows completed daily puzzles to be replayed and reset for practice",
-    "Adds independent Contact and Donate actions with message topics",
-    "Moves Cash App copy into the Donate dialog and evens top-bar control sizing",
-    "Keeps all 50 distinct Lichess CC0 puzzles and full opponent reply lines"
+    "Improves Contact and Donate email field mapping for standard EmailJS contact templates",
+    "Shows actionable EmailJS delivery errors instead of a generic unavailable message",
+    "Adds a first-time welcome flow with Play, Daily Puzzle, and a short interactive guide",
+    "Keeps the 50 distinct real chess puzzles and replay support"
   ]
 }
