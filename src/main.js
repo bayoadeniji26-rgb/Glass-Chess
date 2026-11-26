@@ -101,6 +101,7 @@ let moveClassifications = new Map();
 let skipNextMoveAnimation = false;
 let suppressNextBoardClick = false;
 let activeBoardDrag = null;
+let keyboardFocusSquare = null;
 let activeHintMove = null;
 const MOVE_QUALITY = {
   Brilliant: { key: "brilliant", symbol: "!!" }, Great: { key: "great", symbol: "!" },
@@ -425,6 +426,34 @@ function boardIsFlipped() {
   return flipped;
 }
 
+function setBoardFocus(square, shouldFocus = false) {
+  if (!board || !/^[a-h][1-8]$/.test(String(square || ""))) return;
+  keyboardFocusSquare = square;
+  for (const cell of board.querySelectorAll("[data-square]")) {
+    cell.tabIndex = cell.dataset.square === square ? 0 : -1;
+  }
+  if (shouldFocus) board.querySelector('[data-square="' + square + '"]')?.focus();
+}
+
+function handleBoardSquareKeydown(event, square) {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    handleSquare(square);
+    return;
+  }
+  if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
+  event.preventDefault();
+  const reverse = boardIsFlipped();
+  let file = square.charCodeAt(0) - 97;
+  let rank = Number(square[1]);
+  if (event.key === "ArrowLeft") file += reverse ? 1 : -1;
+  if (event.key === "ArrowRight") file += reverse ? -1 : 1;
+  if (event.key === "ArrowUp") rank += reverse ? -1 : 1;
+  if (event.key === "ArrowDown") rank += reverse ? 1 : -1;
+  if (file < 0 || file > 7 || rank < 1 || rank > 8) return;
+  setBoardFocus(String.fromCharCode(97 + file) + rank, true);
+}
+
 // ============================================
 // BOARD RENDERING
 // ============================================
@@ -510,9 +539,22 @@ function renderBoard() {
         badge.setAttribute("aria-label", currentReview.label + " move");
         element.appendChild(badge);
       }
+      if (!keyboardFocusSquare) keyboardFocusSquare = reverse ? "h1" : "a8";
       element.setAttribute("role", "button");
-      element.setAttribute("aria-label", square);
-      element.onclick = () => handleSquare(square);
+      element.tabIndex = square === keyboardFocusSquare ? 0 : -1;
+      const pieceName = piece
+        ? ({ p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" }[piece.type])
+        : "empty";
+      element.setAttribute("aria-label", piece
+        ? square + ", " + (piece.color === "w" ? "white " : "black ") + pieceName
+        : square + ", empty");
+      element.setAttribute("aria-pressed", selected === square ? "true" : "false");
+      element.onfocus = () => setBoardFocus(square);
+      element.onkeydown = event => handleBoardSquareKeydown(event, square);
+      element.onclick = () => {
+        setBoardFocus(square);
+        handleSquare(square);
+      };
       board.appendChild(element);
     }
   }
