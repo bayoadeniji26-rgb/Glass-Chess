@@ -11,13 +11,12 @@ import "./glass-dock.css";
   ];
 
   const categories = [
-    { id: "home", label: "Overview", icon: "⌂" },
-    { id: "train", label: "Train", icon: "▤" },
-    { id: "review", label: "Review", icon: "↺" },
-    { id: "custom", label: "Customize", icon: "◈" },
-    { id: "onlineplus", label: "Online", icon: "♟" },
-    { id: "game-lab", label: "Game Lab", icon: "♜" },
-    { id: "advanced-lab", label: "Advanced", icon: "⚙" }
+    { id: "analysis", label: "Analysis", icon: "◉", terms: ["analysis", "evaluation", "best move", "captures", "engine"] },
+    { id: "play", label: "Play & online", icon: "♟", terms: ["online", "room", "invite", "friend", "spectat", "game mode", "play"] },
+    { id: "progress", label: "Progress", icon: "✦", terms: ["profile", "rating", "statistic", "achievement", "mission", "xp", "streak"] },
+    { id: "learn", label: "Learn", icon: "▤", terms: ["puzzle", "opening", "lesson", "daily challenge", "game of the day"] },
+    { id: "style", label: "Appearance", icon: "◈", terms: ["theme", "piece", "avatar", "banner", "customiz", "sound", "animation"] },
+    { id: "settings", label: "Settings", icon: "⚙", terms: ["setting", "preference", "option", "personality"] }
   ];
 
   function findPanel() {
@@ -34,7 +33,7 @@ import "./glass-dock.css";
     button.className = `gc-hub-icon-button ${className}`.trim();
     button.setAttribute("aria-label", label);
     button.title = label;
-    button.innerHTML = `<span aria-hidden="true">${icon}</span><small>${label === "Show all tools" ? "All" : label}</small>`;
+    button.innerHTML = `<span aria-hidden="true">${icon}</span>`;
     return button;
   }
 
@@ -49,10 +48,11 @@ import "./glass-dock.css";
         <header class="gc-hub-header">
           <div class="gc-hub-brand">
             <span class="gc-hub-brand-mark" aria-hidden="true">♛</span>
-            <span><strong>Tools</strong><small>Training, online play, progress and settings</small></span>
+            <span><strong>Glass Hub</strong><small>All your chess tools, together</small></span>
           </div>
           <div class="gc-hub-header-actions">
-            <button class="gc-hub-close" type="button" aria-label="Close tools" title="Close">×</button>
+            <button class="gc-hub-density" type="button" aria-pressed="false" title="Toggle compact layout">↕</button>
+            <button class="gc-hub-close" type="button" aria-label="Close Glass Hub" title="Close">×</button>
           </div>
         </header>
         <nav class="gc-hub-shortcuts" aria-label="Quick sections"></nav>
@@ -74,6 +74,7 @@ import "./glass-dock.css";
     const content = dock.querySelector(".gc-hub-content");
     const shortcuts = dock.querySelector(".gc-hub-shortcuts");
     const scroll = dock.querySelector(".gc-hub-scroll");
+    const density = dock.querySelector(".gc-hub-density");
 
     // Move the existing right-hand panel; do not clone it, so its buttons and app logic keep working.
     const anchor = document.createElement("div");
@@ -92,33 +93,35 @@ import "./glass-dock.css";
       }
     }
 
-    function viewFor(id) {
-      return Array.from(panel.querySelectorAll("[data-view]")).find(view => view.dataset.view === id) || null;
-    }
+    const headingNodes = () => Array.from(panel.querySelectorAll("h1,h2,h3,h4,.eyebrow,[data-section-title]"));
+    const findHeading = terms => headingNodes().find(node => {
+      const text = (node.textContent || "").trim().toLowerCase();
+      return text && terms.some(term => text.includes(term));
+    });
 
-    function tabFor(id) {
-      return Array.from(panel.querySelectorAll("[data-tab]")).find(tab => tab.dataset.tab === id) || null;
+    function goTo(target) {
+      if (!target) return;
+      openHub();
+      requestAnimationFrame(() => {
+        const top = target.getBoundingClientRect().top - scroll.getBoundingClientRect().top + scroll.scrollTop - 14;
+        scroll.scrollTo({ top: Math.max(0, top), behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+        target.classList.remove("gc-hub-target-flash");
+        void target.offsetWidth;
+        target.classList.add("gc-hub-target-flash");
+      });
     }
 
     function buildShortcuts() {
       shortcuts.replaceChildren();
+      const all = iconButton("Show all tools", "⌂", "gc-hub-shortcut-all");
+      all.addEventListener("click", () => scroll.scrollTo({ top: 0, behavior: "smooth" }));
+      shortcuts.appendChild(all);
       for (const item of categories) {
-        const view = viewFor(item.id);
-        const tab = tabFor(item.id);
-        if (!view || !tab) continue;
+        const target = findHeading(item.terms);
+        if (!target) continue;
         const button = iconButton(item.label, item.icon, "gc-hub-shortcut");
         button.dataset.section = item.id;
-        button.setAttribute("aria-pressed", String(view.classList.contains("active")));
-        button.classList.toggle("active", view.classList.contains("active"));
-        button.addEventListener("click", () => {
-          tab.click();
-          shortcuts.querySelectorAll("[data-section]").forEach(shortcut => {
-            const selected = shortcut.dataset.section === item.id;
-            shortcut.classList.toggle("active", selected);
-            shortcut.setAttribute("aria-pressed", String(selected));
-          });
-          scroll.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
-        });
+        button.addEventListener("click", () => goTo(target));
         shortcuts.appendChild(button);
       }
     }
@@ -127,46 +130,37 @@ import "./glass-dock.css";
       dock.classList.add("gc-hub-open");
       orb.setAttribute("aria-expanded", "true");
       drawer.setAttribute("aria-hidden", "false");
-      orb.setAttribute("aria-label", "Close Tools");
-      orb.title = "Close Tools";
-      publishToolsState(true);
+      orb.setAttribute("aria-label", "Close Glass Hub");
+      orb.title = "Close Glass Hub";
     }
 
     function closeHub() {
       dock.classList.remove("gc-hub-open");
       orb.setAttribute("aria-expanded", "false");
       drawer.setAttribute("aria-hidden", "true");
-      orb.setAttribute("aria-label", "Open Tools");
-      orb.title = "Open Tools";
-      publishToolsState(false);
-    }
-
-    function toggleHub() {
-      if (dock.classList.contains("gc-hub-open")) closeHub();
-      else openHub();
+      orb.setAttribute("aria-label", "Open Glass Hub");
+      orb.title = "Open Glass Hub";
     }
 
     window.GlassChessTools = {
       open: openHub,
       close: closeHub,
-      toggle: toggleHub,
-      isOpen: () => dock.classList.contains("gc-hub-open")
+      toggle: () => dock.classList.contains("gc-hub-open") ? closeHub() : openHub()
     };
-    window.addEventListener("glasschess:toggle-tools", toggleHub);
-    orb.addEventListener("click", toggleHub);
+    orb.addEventListener("click", () => dock.classList.contains("gc-hub-open") ? closeHub() : openHub());
     backdrop.addEventListener("click", closeHub);
     close.addEventListener("click", closeHub);
-    publishToolsState(false);
+    density.addEventListener("click", () => {
+      const enabled = dock.classList.toggle("gc-hub-compact");
+      density.setAttribute("aria-pressed", String(enabled));
+      density.title = enabled ? "Use comfortable spacing" : "Toggle compact layout";
+    });
     document.addEventListener("keydown", event => {
       if (event.key === "Escape" && dock.classList.contains("gc-hub-open")) closeHub();
     });
 
-    // The hub strip is the Tools tab navigation, not a scroll-only shortcut.
+    // Rebuild quick links if Online Plus adds its controls after the initial page render.
     buildShortcuts();
-    panel.addEventListener("click", event => {
-      if (event.target.closest("[data-tab]")) requestAnimationFrame(buildShortcuts);
-    });
-    // Online + Club and Advanced tabs mount after the core suite.
     const observer = new MutationObserver(() => buildShortcuts());
     observer.observe(panel, { childList: true, subtree: true });
     window.setTimeout(() => observer.disconnect(), 12000);
