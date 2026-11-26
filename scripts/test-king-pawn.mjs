@@ -50,6 +50,13 @@ assert.equal(
   'A short follow-up must not inherit an unrelated topic.'
 );
 assert.equal(
+  isChessQuestion('Tell me more?', {
+    recentConversation: [{ role: 'user', content: 'How does castling work?' }]
+  }),
+  true,
+  'Question-mark follow-ups should keep the chess context too.'
+);
+assert.equal(
   isChessQuestion('What should I do now?', { fen: START_FEN }),
   true,
   'Move/plan questions inside an active board session should be accepted.'
