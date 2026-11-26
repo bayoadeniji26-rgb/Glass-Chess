@@ -206,6 +206,7 @@ assert.match(appHtml, /src="\/src\/first-run-guide\.js"/, 'The first-run guide m
 
 
 const workspaceUi = readFileSync(new URL('../src/glass-workspace.js', import.meta.url), 'utf8');
+const workspaceCss = readFileSync(new URL('../src/glass-workspace.css', import.meta.url), 'utf8');
 const toolsUi = readFileSync(new URL('../src/glass-dock.js', import.meta.url), 'utf8');
 const toolsCss = readFileSync(new URL('../src/glass-dock.css', import.meta.url), 'utf8');
 assert.match(workspaceUi, /onlineOption\.value = 'online'/, 'Play must offer Online beside its offline game modes.');
@@ -217,4 +218,4 @@ assert.match(toolsUi, /description:/, 'Tools categories must provide descriptive
 assert.doesNotMatch(toolsUi, /gc-hub-orb/, 'The old floating Tools orb must be removed.');
 assert.match(toolsCss, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/, 'Tools categories must use an organized card grid.');
 assert.doesNotMatch(toolsCss, /gc-hub-orb/, 'The Tools stylesheet must not style the removed floating orb.');
-assert.match(workspaceUi, /gc-tools-single-launcher #gc-workspace-actions/, 'The top-bar Tools action must remain reachable in fullscreen focus mode.');
+assert.match(workspaceCss, /gc-tools-single-launcher #gc-workspace-actions/, 'The top-bar Tools action must remain reachable in fullscreen focus mode.');
