@@ -9,8 +9,9 @@ const HOST = process.env.HOST || '0.0.0.0';
 const rooms = new Map();
 const matchmaking = new MatchmakingQueue();
 const activePlayers = new Map();
-const INVITE_TTL_MS = 15 * 60 * 1000;
+const INVITE_TTL_MS = Math.max(100, Number(process.env.GC_INVITE_TTL_MS) || 15 * 60 * 1000);
 const DISCONNECT_GRACE_MS = 30 * 1000;
+const ENDED_ROOM_TTL_MS = Math.max(100, Number(process.env.GC_ENDED_ROOM_TTL_MS) || 60 * 60 * 1000);
 const RATE_LIMITS = {
   'queue:join': { limit: 3, windowMs: 10000 },
   'room:create': { limit: 5, windowMs: 60000 },
@@ -108,7 +109,49 @@ function codeAvailable() {
   return code;
 }
 
+function expireRoom(room, reason = 'expired') {
+  if (!room || rooms.get(room.code) !== room) return false;
+  if (room.inviteTimer) clearTimeout(room.inviteTimer);
+  if (room.cleanupTimer) clearTimeout(room.cleanupTimer);
+  for (const player of Object.values(room.players || {})) {
+    if (player?.disconnectTimer) clearTimeout(player.disconnectTimer);
+    if (player?.playerId) activePlayers.delete(player.playerId);
+  }
+  const members = [...(io.sockets.adapter.rooms.get(room.code) || [])];
+  for (const socketId of members) {
+    const client = io.sockets.sockets.get(socketId);
+    if (!client) continue;
+    client.emit('room:expired', { code: room.code, reason });
+    client.leave(room.code);
+    if (client.data.roomCode === room.code) {
+      client.data.roomCode = null;
+      client.data.role = null;
+    }
+  }
+  rooms.delete(room.code);
+  return true;
+}
+
+function scheduleRoomCleanup(room, reason = 'game-ended') {
+  if (!room || rooms.get(room.code) !== room) return;
+  if (room.cleanupTimer) clearTimeout(room.cleanupTimer);
+  room.cleanupTimer = setTimeout(() => expireRoom(room, reason), ENDED_ROOM_TTL_MS);
+  room.cleanupTimer.unref?.();
+}
+
+function scheduleInviteExpiry(room) {
+  if (!room?.invitationExpiresAt) return;
+  if (room.inviteTimer) clearTimeout(room.inviteTimer);
+  room.inviteTimer = setTimeout(() => {
+    if (rooms.get(room.code) === room && !room.players.b) expireRoom(room, 'invitation-expired');
+  }, Math.max(0, room.invitationExpiresAt - Date.now()));
+  room.inviteTimer.unref?.();
+}
+
 function broadcast(room) {
+  if (room.abandoned || room.resigned || room.game.isGameOver()) {
+    scheduleRoomCleanup(room, 'game-ended');
+  }
   io.to(room.code).emit('room:state', publicRoom(room));
 }
 
@@ -185,11 +228,8 @@ function removeSocketFromRoom(socket, { disconnected = false } = {}) {
     }
     room.spectators.delete(socket.id);
     broadcast(room);
-    if (!room.players.w && !room.players.b && room.spectators.size === 0) {
-      setTimeout(() => {
-        const current = rooms.get(code);
-        if (current && !current.players.w && !current.players.b && current.spectators.size === 0) rooms.delete(code);
-      }, 60000).unref?.();
+    if ((!room.players.w || !room.players.w.connected) && (!room.players.b || !room.players.b.connected) && room.spectators.size === 0) {
+      scheduleRoomCleanup(room, 'empty-room');
     }
   }
   socket.leave(code);
@@ -276,9 +316,12 @@ io.on('connection', socket => {
       game: new Chess(),
       resigned: null,
       abandoned: null,
-      invitationExpiresAt: Date.now() + INVITE_TTL_MS
+      invitationExpiresAt: Date.now() + INVITE_TTL_MS,
+      inviteTimer: null,
+      cleanupTimer: null
     };
     rooms.set(code, room);
+    scheduleInviteExpiry(room);
     activePlayers.set(playerId, code);
     socket.join(code);
     socket.data.roomCode = code;
@@ -293,9 +336,8 @@ io.on('connection', socket => {
     const room = rooms.get(code);
     if (!room) return done({ ok: false, error: 'Room not found. Check the code.' });
     if (room.abandoned) return done({ ok: false, error: 'This game has already ended.' });
-    if (room.invitationExpiresAt && Date.now() > room.invitationExpiresAt && !room.players.b) {
-      rooms.delete(code);
-      if (room.players.w?.playerId) activePlayers.delete(room.players.w.playerId);
+    if (room.invitationExpiresAt && Date.now() >= room.invitationExpiresAt && !room.players.b) {
+      expireRoom(room, 'invitation-expired');
       return done({ ok: false, error: 'This invitation has expired. Ask your friend to create a new one.' });
     }
     if (room.players.w?.id === socket.id) return done({ ok: true, code, role: 'w', state: publicRoom(room) });
@@ -311,6 +353,8 @@ io.on('connection', socket => {
     removeSocketFromRoom(socket);
     const resumeToken = issueResumeToken();
     room.players.b = { id: socket.id, playerId, name: cleanName(payload.name), connected: true, resumeTokenHash: hashResumeToken(resumeToken).toString('hex') };
+    if (room.inviteTimer) clearTimeout(room.inviteTimer);
+    room.inviteTimer = null;
     room.invitationExpiresAt = null;
     activePlayers.set(playerId, code);
     socket.join(code);
@@ -395,6 +439,8 @@ io.on('connection', socket => {
     if (!room || !side || room.ownerPlayerId !== room.players[side].playerId) return done({ ok: false, error: 'Only the room creator can start a rematch.' });
     if (!room.resigned && !room.abandoned && !room.game.isGameOver()) return done({ ok: false, error: 'Finish the current game before starting a rematch.' });
     if (!room.players.w?.connected || !room.players.b?.connected) return done({ ok: false, error: 'Both players must be connected to start a rematch.' });
+    if (room.cleanupTimer) clearTimeout(room.cleanupTimer);
+    room.cleanupTimer = null;
     room.game = new Chess();
     room.resigned = null;
     room.abandoned = null;
@@ -434,6 +480,9 @@ io.on('connection', socket => {
         socket.data.role = null;
         broadcast(room);
       } else {
+        if (room.inviteTimer) clearTimeout(room.inviteTimer);
+        if (room.cleanupTimer) clearTimeout(room.cleanupTimer);
+        if (leavingPlayer.disconnectTimer) clearTimeout(leavingPlayer.disconnectTimer);
         rooms.delete(code);
         activePlayers.delete(leavingPlayer.playerId);
         socket.leave(code);
