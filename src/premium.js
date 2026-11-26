@@ -433,7 +433,8 @@ function onUndo(history, fen) {
   } finally { suppressTracking = false; }
   renderOpening();
   refreshReplayControls();
-  if (!puzzle?.active) scheduleLiveAnalysis(180);
+  liveAnalysisSuppressed = false;
+  scheduleLiveAnalysis(180);
 }
 
 function onLoadedGame(history, fen) {
@@ -501,10 +502,14 @@ async function createPuzzle() {
   liveAnalysisToken += 1;
   if (liveAnalysisTimer !== null) { clearTimeout(liveAnalysisTimer); liveAnalysisTimer = null; }
   liveAnalysisScheduled = false;
+  liveAnalysisRunning = false;
+  $('gc-engine-status').textContent = "Live analysis paused for puzzle";
+  $('gc-live-progress').textContent = "The engine will stay quiet while you solve the training puzzle.";
   if (liveAnalysisEngine?.activeSearch) {
     const stop = liveAnalysisEngine.stop();
     liveAnalysisStopPromise = Promise.all([liveAnalysisStopPromise, stop]).then(() => undefined).catch(() => {});
   }
+  syncLiveAnalysisControls();
   const token = ++puzzleToken, generation = api.generation, fen = api.fen;
   $('gc-puzzle-status').textContent = 'Stockfish is selecting a challenge move…';
   try {
