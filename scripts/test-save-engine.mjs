@@ -55,6 +55,24 @@ try {
   assert.equal(pushed.localStorage.lastScreen, 'latest-before-cloud',
     'The cloud adapter must receive the newest committed local profile.');
 
+  // getCommittedData must also wait for writes appended while an earlier
+  // queued write is still resolving.
+  let releaseEarlier;
+  let releaseLater;
+  engine.writeQueue = new Promise(resolve => { releaseEarlier = resolve; });
+  const stableSnapshot = engine.getCommittedData();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  engine.writeQueue = engine.writeQueue.then(() => new Promise(resolve => { releaseLater = resolve; }));
+  releaseEarlier();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(typeof releaseLater, 'function', 'The appended write should be queued behind the first write.');
+  let snapshotResolved = false;
+  stableSnapshot.then(() => { snapshotResolved = true; });
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(snapshotResolved, false, 'The snapshot must wait for writes appended during the first wait.');
+  releaseLater();
+  await stableSnapshot;
+
   // Import and restore must reject incomplete save envelopes rather than silently defaulting fields.
   await assert.rejects(
     engine.replaceData({ schema: 1, avatars: {} }),
