@@ -1,5 +1,5 @@
 import http from 'node:http';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { Server } from 'socket.io';
 import { Chess } from 'chess.js';
 import { MatchmakingQueue } from './src/matchmaking-queue.js';
@@ -10,9 +10,15 @@ const rooms = new Map();
 const matchmaking = new MatchmakingQueue();
 const activePlayers = new Map();
 const INVITE_TTL_MS = 15 * 60 * 1000;
+const DISCONNECT_GRACE_MS = 30 * 1000;
 const httpServer = http.createServer((req, res) => {
-  res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' });
-  res.end('Glass Chess online server is running.');
+  if (req.method === 'GET' && (req.url === '/healthz' || req.url === '/')) {
+    res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+    res.end(JSON.stringify({ ok: true, service: 'glass-chess-online', uptimeSeconds: Math.floor(process.uptime()) }));
+    return;
+  }
+  res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
+  res.end('Not found');
 });
 const io = new Server(httpServer, {
   cors: {
@@ -30,11 +36,19 @@ const cleanPlayerId = value => {
   const id = String(value || '').trim().toLowerCase();
   return /^[a-f0-9-]{32,36}$/.test(id) ? id : '';
 };
+const hashResumeToken = token => createHash('sha256').update(String(token || '')).digest();
+const issueResumeToken = () => randomBytes(32).toString('base64url');
+const isResumeTokenValid = (storedHash, token) => {
+  if (!storedHash || typeof token !== 'string' || token.length < 32) return false;
+  const stored = Buffer.from(storedHash, 'hex');
+  const supplied = hashResumeToken(token);
+  return stored.length === supplied.length && timingSafeEqual(stored, supplied);
+};
 const publicRoom = room => ({
   code: room.code,
   players: {
-    w: room.players.w ? { name: room.players.w.name, connected: true } : null,
-    b: room.players.b ? { name: room.players.b.name, connected: true } : null
+    w: room.players.w ? { name: room.players.w.name, connected: Boolean(room.players.w.connected) } : null,
+    b: room.players.b ? { name: room.players.b.name, connected: Boolean(room.players.b.connected) } : null
   },
   spectators: room.spectators.size,
   history: room.game.history({ verbose: true }).map(move => ({
@@ -54,7 +68,8 @@ const publicRoom = room => ({
   resigned: room.resigned,
   lastMove: room.lastMove || null,
   invitationExpiresAt: room.invitationExpiresAt || null,
-  result: room.resigned ? `${room.resigned === 'w' ? 'Black' : 'White'} wins by resignation` :
+  result: room.abandoned ? `${room.abandoned === 'w' ? 'White' : 'Black'} wins by disconnection` :
+    room.resigned ? `${room.resigned === 'w' ? 'Black' : 'White'} wins by resignation` :
     room.game.isCheckmate() ? `${room.game.turn() === 'w' ? 'Black' : 'White'} wins by checkmate` :
     room.game.isDraw() ? 'Draw' : 'In progress'
 });
@@ -83,16 +98,19 @@ function createMatchedRoom(firstSocket, firstPlayer, secondSocket, secondPlayer)
   const blackSocket = firstIsWhite ? secondSocket : firstSocket;
   const whitePlayer = firstIsWhite ? firstPlayer : secondPlayer;
   const blackPlayer = firstIsWhite ? secondPlayer : firstPlayer;
+  const whiteResumeToken = issueResumeToken();
+  const blackResumeToken = issueResumeToken();
   const room = {
     code,
     ownerId: whiteSocket.id,
     players: {
-      w: { id: whiteSocket.id, playerId: whitePlayer.playerId, name: whitePlayer.name },
-      b: { id: blackSocket.id, playerId: blackPlayer.playerId, name: blackPlayer.name }
+      w: { id: whiteSocket.id, playerId: whitePlayer.playerId, name: whitePlayer.name, connected: true, resumeTokenHash: hashResumeToken(whiteResumeToken).toString('hex') },
+      b: { id: blackSocket.id, playerId: blackPlayer.playerId, name: blackPlayer.name, connected: true, resumeTokenHash: hashResumeToken(blackResumeToken).toString('hex') }
     },
     spectators: new Map(),
     game: new Chess(),
-    resigned: null
+    resigned: null,
+    abandoned: null
   };
   rooms.set(code, room);
   activePlayers.set(whitePlayer.playerId, code);
@@ -103,10 +121,10 @@ function createMatchedRoom(firstSocket, firstPlayer, secondSocket, secondPlayer)
     client.data.role = role;
     client.data.matchmaking = false;
   }
-  return { room, whiteSocket, blackSocket };
+  return { room, whiteSocket, blackSocket, whiteResumeToken, blackResumeToken };
 }
 
-function removeSocketFromRoom(socket) {
+function removeSocketFromRoom(socket, { disconnected = false } = {}) {
   matchmaking.remove(socket.id);
   socket.data.matchmaking = false;
   const code = socket.data.roomCode;
@@ -114,8 +132,27 @@ function removeSocketFromRoom(socket) {
   const room = rooms.get(code);
   if (room) {
     for (const side of ['w', 'b']) {
-      if (room.players[side]?.id === socket.id) {
-        if (room.players[side].playerId) activePlayers.delete(room.players[side].playerId);
+      const player = room.players[side];
+      if (player?.id !== socket.id) continue;
+      if (disconnected) {
+        player.id = null;
+        player.connected = false;
+        player.disconnectedAt = Date.now();
+        if (player.disconnectTimer) clearTimeout(player.disconnectTimer);
+        const playerId = player.playerId;
+        player.disconnectTimer = setTimeout(() => {
+          const current = rooms.get(code);
+          const currentPlayer = current?.players[side];
+          if (!current || currentPlayer?.playerId !== playerId || currentPlayer.connected) return;
+          current.abandoned = side;
+          currentPlayer.disconnectTimer = null;
+          activePlayers.delete(playerId);
+          broadcast(current);
+        }, DISCONNECT_GRACE_MS);
+        player.disconnectTimer.unref?.();
+      } else {
+        if (player.disconnectTimer) clearTimeout(player.disconnectTimer);
+        activePlayers.delete(player.playerId);
         room.players[side] = null;
       }
     }
@@ -124,11 +161,8 @@ function removeSocketFromRoom(socket) {
     if (!room.players.w && !room.players.b && room.spectators.size === 0) {
       setTimeout(() => {
         const current = rooms.get(code);
-        if (current && !current.players.w && !current.players.b && current.spectators.size === 0) {
-          for (const player of Object.values(current.players)) if (player?.playerId) activePlayers.delete(player.playerId);
-          rooms.delete(code);
-        }
-      }, 60000);
+        if (current && !current.players.w && !current.players.b && current.spectators.size === 0) rooms.delete(code);
+      }, 60000).unref?.();
     }
   }
   socket.leave(code);
@@ -160,12 +194,10 @@ io.on('connection', socket => {
     const state = publicRoom(room);
     const joiningRole = socket.id === whiteSocket.id ? 'w' : 'b';
     const opponentRole = joiningRole === 'w' ? 'b' : 'w';
-    done({ ok: true, waiting: false, matched: true, code: room.code, role: joiningRole, state });
-    opponentSocket.emit('match:found', {
-      code: room.code,
-      role: opponentRole,
-      state
-    });
+    const joiningResumeToken = joiningRole === 'w' ? whiteResumeToken : blackResumeToken;
+    const opponentResumeToken = opponentRole === 'w' ? whiteResumeToken : blackResumeToken;
+    done({ ok: true, waiting: false, matched: true, code: room.code, role: joiningRole, resumeToken: joiningResumeToken, state });
+    opponentSocket.emit('match:found', { code: room.code, role: opponentRole, resumeToken: opponentResumeToken, state });
     broadcast(room);
   });
 
@@ -174,19 +206,45 @@ io.on('connection', socket => {
     socket.data.matchmaking = false;
     done({ ok: true, cancelled: removed });
   });
+
+  socket.on('room:resume', (payload = {}, done = () => {}) => {
+    const code = cleanCode(payload.code);
+    const room = rooms.get(code);
+    if (!room || room.abandoned) return done({ ok: false, error: 'This online game can no longer be resumed.' });
+    const playerId = cleanPlayerId(payload.playerId);
+    const side = ['w', 'b'].find(candidate => room.players[candidate]?.playerId === playerId);
+    const player = side ? room.players[side] : null;
+    if (!player || !isResumeTokenValid(player.resumeTokenHash, payload.resumeToken)) {
+      return done({ ok: false, error: 'The reconnect session is invalid or expired. Ask your opponent for a new invitation.' });
+    }
+    if (player.id && player.id !== socket.id) return done({ ok: false, error: 'This player is already connected in another session.' });
+    if (player.disconnectTimer) clearTimeout(player.disconnectTimer);
+    player.disconnectTimer = null;
+    player.id = socket.id;
+    player.connected = true;
+    player.disconnectedAt = null;
+    socket.join(code);
+    socket.data.roomCode = code;
+    socket.data.role = side;
+    done({ ok: true, code, role: side, resumeToken: payload.resumeToken, state: publicRoom(room) });
+    broadcast(room);
+  });
+
   socket.on('room:create', (payload = {}, done = () => {}) => {
     removeSocketFromRoom(socket);
     const playerId = cleanPlayerId(payload.playerId);
     if (!playerId) return done({ ok: false, error: 'A valid local player identity is required. Refresh the page and try again.' });
     if (activePlayers.has(playerId)) return done({ ok: false, error: 'You are already in an online game.' });
     const code = codeAvailable();
+    const resumeToken = issueResumeToken();
     const room = {
       code,
       ownerId: socket.id,
-      players: { w: { id: socket.id, playerId, name: cleanName(payload.name) }, b: null },
+      players: { w: { id: socket.id, playerId, name: cleanName(payload.name), connected: true, resumeTokenHash: hashResumeToken(resumeToken).toString('hex') }, b: null },
       spectators: new Map(),
       game: new Chess(),
       resigned: null,
+      abandoned: null,
       invitationExpiresAt: Date.now() + INVITE_TTL_MS
     };
     rooms.set(code, room);
@@ -194,7 +252,7 @@ io.on('connection', socket => {
     socket.join(code);
     socket.data.roomCode = code;
     socket.data.role = 'w';
-    done({ ok: true, code, role: 'w', state: publicRoom(room) });
+    done({ ok: true, code, role: 'w', resumeToken, state: publicRoom(room) });
     broadcast(room);
   });
 
@@ -217,13 +275,14 @@ io.on('connection', socket => {
     if (room.players.b) return done({ ok: false, error: 'That room already has two players. Join as a spectator instead.' });
     if (activePlayers.has(playerId)) return done({ ok: false, error: 'You are already in an online game.' });
     removeSocketFromRoom(socket);
-    room.players.b = { id: socket.id, playerId, name: cleanName(payload.name) };
+    const resumeToken = issueResumeToken();
+    room.players.b = { id: socket.id, playerId, name: cleanName(payload.name), connected: true, resumeTokenHash: hashResumeToken(resumeToken).toString('hex') };
     room.invitationExpiresAt = null;
     activePlayers.set(playerId, code);
     socket.join(code);
     socket.data.roomCode = code;
     socket.data.role = 'b';
-    done({ ok: true, code, role: 'b', state: publicRoom(room) });
+    done({ ok: true, code, role: 'b', resumeToken, state: publicRoom(room) });
     broadcast(room);
   });
 
@@ -243,8 +302,8 @@ io.on('connection', socket => {
   socket.on('game:move', (payload = {}, done = () => {}) => {
     const room = rooms.get(cleanCode(payload.code || socket.data.roomCode));
     if (!room || socket.data.roomCode !== room.code) return done({ ok: false, error: 'You are not in that room.' });
-    if (room.resigned || room.game.isGameOver()) return done({ ok: false, error: 'This game has ended.' });
-    if (Number.isInteger(payload.expectedPly) && payload.expectedPly !== room.game.history().length) {
+    if (room.abandoned || room.resigned || room.game.isGameOver()) return done({ ok: false, error: 'This game has ended.' });
+    if (!Number.isInteger(payload.expectedPly) || payload.expectedPly !== room.game.history().length) {
       return done({ ok: false, error: 'The position changed. Sync the board before trying again.' });
     }
     if (typeof payload.expectedFen === 'string' && payload.expectedFen && payload.expectedFen !== room.game.fen()) {
@@ -286,6 +345,7 @@ io.on('connection', socket => {
   socket.on('room:resign', (done = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
     if (!room) return done({ ok: false, error: 'You are not in a room.' });
+    if (room.abandoned || room.resigned || room.game.isGameOver()) return done({ ok: false, error: 'This game has already ended.' });
     const side = ['w', 'b'].find(candidate => room.players[candidate]?.id === socket.id);
     if (!side) return done({ ok: false, error: 'Only players can resign.' });
     room.resigned = side;
@@ -319,7 +379,7 @@ io.on('connection', socket => {
     done({ ok: true });
   });
 
-  socket.on('disconnect', () => removeSocketFromRoom(socket));
+  socket.on('disconnect', () => removeSocketFromRoom(socket, { disconnected: true }));
 });
 
 httpServer.listen(PORT, HOST, () => {
