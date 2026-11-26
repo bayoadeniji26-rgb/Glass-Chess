@@ -5,7 +5,7 @@ import {
   getPuzzleDayIndex,
   isPuzzleAnswerCorrect,
   normalizePuzzleAnswer
-} from '../src/daily-puzzles.js';
+} from '../src/daily-puzzle-data.js';
 import { calculatePositionHistory } from '../src/chess-position-tools.js';
 
 assert.equal(DAILY_PUZZLES.length, 50, 'The series must contain exactly 50 puzzles.');
