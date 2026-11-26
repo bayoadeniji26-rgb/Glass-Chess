@@ -94,8 +94,8 @@ try {
       ...process.env,
       PORT: String(port),
       HOST: '127.0.0.1',
-      GC_INVITE_TTL_MS: '1500',
-      GC_ENDED_ROOM_TTL_MS: '1200'
+      GC_INVITE_TTL_MS: '5000',
+      GC_ENDED_ROOM_TTL_MS: '1500'
     },
     stdio: ['ignore', 'pipe', 'pipe']
   });
@@ -226,6 +226,8 @@ try {
   const abandonedState = nextEvent(friendB, 'room:state', value => value?.abandoned === true);
   const endedRoomPromise = nextEvent(friendB, 'room:expired', value => value?.code === created.code, 4000);
   const leaveResult = await ack(friendA, 'room:leave');
+  const reusedIdentityRoom = await ack(friendA, 'room:create', { playerId: ids.friendA, name: 'New Friend Room' });
+  assert.equal(reusedIdentityRoom?.ok, true, 'A player who left a forfeited room may start a new room immediately.');
   assert.equal(leaveResult?.ok, true);
   const abandoned = await abandonedState;
   assert.match(abandoned.result, /Black wins by disconnection/, 'The opponent should win when White leaves an active game.');
@@ -245,6 +247,10 @@ try {
   // Ended rooms must be deleted after the retention window, not accumulate forever.
   const endedRoom = await endedRoomPromise;
   assert.equal(endedRoom.reason, 'game-ended');
+  const duplicateOwner = await connectClient(url);
+  const duplicateOwnerRoom = await ack(duplicateOwner, 'room:create', { playerId: ids.friendA, name: 'Duplicate Owner' });
+  assert.equal(duplicateOwnerRoom?.ok, false, 'Expiring an older room must not clear a newer active-player lock.');
+  assert.equal((await ack(friendA, 'room:leave'))?.ok, true, 'The replacement invitation should close cleanly.');
   const deletedRoomJoin = await ack(intruder, 'room:join', {
     code: created.code, playerId: '40000000-0000-4000-8000-000000000001', name: 'Late Guest'
   });
