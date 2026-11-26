@@ -1,11 +1,13 @@
 {
-  "version": "2026.11.26.4",
+  "version": "2026.11.26.6",
   "name": "Glass Chess Required Update",
   "updatedAt": "2026-11-26",
   "notes": [
-    "Corrects the full EmailJS public key and provides a specific invalid-key error explanation",
-    "Fits the account, game, analysis, settings, donate, contact, puzzle, guide, and new-game controls in one compact desktop header",
-    "Keeps responsive compact sizing for medium desktop widths",
-    "Includes the first-time player guide and contact form improvements"
+    "Adds Quick Match matchmaking with automatic opponent pairing and cancellation",
+    "Adds shareable private friend invitations with cryptographically random eight-character codes",
+    "Validates every online move against the server position and requires an expected move number",
+    "Adds server-issued reconnect credentials and a 30-second disconnect recovery window",
+    "Adds a JSON health endpoint for the online server and bounds HTTP fallback responses",
+    "Adds automated Socket.IO integration coverage for matchmaking, challenges, moves, and reconnects"
   ]
 }

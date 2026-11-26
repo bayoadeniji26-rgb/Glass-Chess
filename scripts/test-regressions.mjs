@@ -4,6 +4,7 @@ import { Chess } from 'chess.js';
 import { DAILY_PUZZLES, getPuzzleDayIndex } from '../src/daily-puzzle-data.js';
 import { calculatePositionHistory, isFlagFallDraw } from '../src/chess-position-tools.js';
 import { remainingSeconds } from '../src/gameplay-timers.js';
+import { MatchmakingQueue } from '../src/matchmaking-queue.js';
 
 const uci = move => move.from + move.to + (move.promotion || '');
 
@@ -69,6 +70,37 @@ assert.equal(remainingSeconds(60000, 1001), 59);
 assert.equal(remainingSeconds(60000, 59999), 1);
 assert.equal(remainingSeconds(60000, 60001), 0);
 assert.throws(() => remainingSeconds(Number.NaN, 0), /finite numbers/);
+
+
+const queue = new MatchmakingQueue();
+const playerA = { socketId: 'socket-a', playerId: 'player-a', name: 'Alice' };
+const playerB = { socketId: 'socket-b', playerId: 'player-b', name: 'Bob' };
+assert.equal(queue.enqueue(playerA).status, 'waiting', 'First player should wait in the queue.');
+assert.equal(queue.enqueue({ ...playerA, socketId: 'socket-a2' }).status, 'already_queued', 'A second tab must not queue the same player twice.');
+assert.equal(queue.size, 1, 'Duplicate identity must not create a second ticket.');
+const match = queue.enqueue(playerB);
+assert.equal(match.status, 'matched', 'Second distinct player should be paired.');
+assert.equal(match.opponent.playerId, 'player-a', 'Queue should pair the oldest waiting opponent.');
+assert.equal(queue.size, 0, 'Matched players must be removed from the queue.');
+queue.enqueue(playerA);
+assert.equal(queue.remove('socket-a'), true, 'Player should be able to cancel matchmaking.');
+assert.equal(queue.size, 0, 'Cancelled matchmaking should remove its ticket.');
+
+const onlineServer = readFileSync(new URL('../server.mjs', import.meta.url), 'utf8');
+const onlineClient = readFileSync(new URL('../src/onlineplus.js', import.meta.url), 'utf8');
+assert.match(onlineServer, /INVITE_TTL_MS = 15 \* 60 \* 1000/, 'Private invitations must expire after fifteen minutes if unused.');
+assert.match(onlineServer, /activePlayers\.set\(whitePlayer\.playerId, code\)/, 'Matched players must be locked against a second active game.');
+assert.match(onlineServer, /activePlayers\.has\(playerId\)/, 'A player already in a game must not enter another room.');
+assert.match(onlineServer, /expectedPly/, 'The authoritative server must reject stale move submissions.');
+assert.match(onlineServer, /room\.game\.move\(legalMove\)/, 'The server must validate moves with chess.js.');
+assert.match(onlineServer, /capturedPiece: applied\.captured/, 'Moves must include server-derived capture metadata.');
+assert.match(onlineServer, /isCheckmate: room\.game\.isCheckmate\(\)/, 'Moves must include server-derived checkmate metadata.');
+assert.match(onlineClient, /https:\/\/glass-chess-sqk0\.onrender\.com/, 'Online play must default to the deployed Glass Chess server.');
+assert.match(onlineClient, /queue:join/, 'The client must support joining matchmaking.');
+assert.match(onlineClient, /queue:cancel/, 'The client must support cancelling matchmaking.');
+assert.match(onlineClient, /match:found/, 'The client must join automatically when a match is found.');
+assert.match(onlineClient, /searchParams\.set\('room', online\.code\)/, 'Friend invites must create shareable room links.');
+assert.match(onlineClient, /window\.location\.search/, 'Invite links must be parsed when the friend opens them.');
 
 console.log('50 legal daily chess puzzles and regression suite passed.');
 

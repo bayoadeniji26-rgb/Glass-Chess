@@ -79,7 +79,7 @@ let api;
 let root;
 let state;
 let socket = null;
-let online = { code: '', role: '', side: '', lastState: null, syncing: false, previousMode: 'computer', previousColor: 'white' };
+let online = { code: '', role: '', side: '', resumeToken: '', lastState: null, syncing: false, previousMode: 'computer', previousColor: 'white' };
 let dailyChallenge = { active: false, solution: '', notation: '', solved: false, rewardEligible: false };
 let finishedFen = '';
 let pieceObserver = null;
@@ -87,6 +87,9 @@ let victoryKey = '';
 let victoryPresentationTimer = null;
 let previousVictoryFocus = null;
 let socketBound = false;
+let matchmakingActive = false;
+let toastTimer = null;
+let lastCheckToastPly = 0;
 
 function todayKey() {
   const d = new Date();
@@ -147,7 +150,8 @@ function toast(message) {
   if (!el) return;
   el.textContent = message;
   el.classList.add('show');
-  window.setTimeout(() => el.classList.remove('show'), 2500);
+  if (toastTimer !== null) window.clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => { el.classList.remove('show'); toastTimer = null; }, 2500);
 }
 
 function grantXP(amount, reason) {
@@ -262,6 +266,16 @@ function injectStyles() {
     .gc-piece-glyph.gc-piece-enter{animation:gc-piece-arrive .22s cubic-bezier(.2,.8,.2,1)}
     @keyframes gc-piece-arrive{from{opacity:.65;transform:translateY(-5px) scale(.84)}to{opacity:1;transform:translateY(0) scale(1)}}
     [data-square]:hover .gc-piece-glyph,.square:hover .gc-piece-glyph{transform:translateY(-2px) scale(1.07);filter:drop-shadow(0 5px 4px rgba(0,0,0,.35))}
+    #gc-premium .gc-plus-actions{min-width:0;align-items:stretch}
+    #gc-premium .gc-plus-actions>*{min-width:0;max-width:100%;box-sizing:border-box}
+    #gc-premium .gc-plus-actions button{min-height:38px;transition:transform .14s ease,background-color .16s ease,border-color .16s ease}
+    #gc-premium .gc-plus-actions button:not(:disabled):active{transform:translateY(1px) scale(.985)}
+    #gc-premium .gc-plus-field input,#gc-premium .gc-plus-field select{width:100%;min-width:0;max-width:100%;box-sizing:border-box}
+    #gc-premium .gc-plus-grid>*{min-width:0}
+    #gc-premium .gc-plus-chat p{animation:gc-chat-arrive .18s ease-out both}
+    @keyframes gc-chat-arrive{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
+    @media(max-width:520px){#gc-premium .gc-plus-grid{grid-template-columns:minmax(0,1fr)}}
+    @media(prefers-reduced-motion:reduce){#gc-premium .gc-plus-actions button{transition:none!important}#gc-premium .gc-plus-chat p{animation:none!important}}
     body.gc-no-piece-motion .gc-piece-glyph{transition:none!important;animation:none!important}
     body.gc-piece-royal .gc-piece-glyph[data-side="white"]{background:linear-gradient(160deg,#fffdf0 5%,#f3e2b5 42%,#9c8051 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;-webkit-text-stroke:.35px #fff1ca;filter:drop-shadow(0 2px 1px #5b503e) drop-shadow(0 5px 4px rgba(0,0,0,.34))}
     body.gc-piece-royal .gc-piece-glyph[data-side="black"]{background:linear-gradient(155deg,#56647a 0%,#1a2639 48%,#050a13 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;-webkit-text-stroke:.5px #c5a86a;filter:drop-shadow(0 2px 1px #000) drop-shadow(0 5px 4px rgba(0,0,0,.55))}
@@ -315,15 +329,17 @@ function mountTab() {
       <p class="gc-plus-small">Your name and avatar are shared with players in rooms you join. Profile XP and achievements stay on this device.</p>
     </div>
     <div class="gc-card"><div class="gc-row"><h4>Online multiplayer</h4><span class="gc-pill" id="gc-plus-connection">Offline</span></div>
-      <label class="gc-plus-field">Online server address<input id="gc-plus-server-url" value="http://localhost:3001" spellcheck="false"></label>
-      <div class="gc-plus-actions"><button class="primary" id="gc-plus-connect">Connect</button><button id="gc-plus-create-room">Create private room</button></div>
+      <label class="gc-plus-field" hidden>Online server address<input id="gc-plus-server-url" value="https://glass-chess-sqk0.onrender.com" spellcheck="false"></label>
+      <div class="gc-plus-actions"><button class="primary" id="gc-plus-find-match">Find an opponent</button><button id="gc-plus-cancel-match" disabled>Cancel search</button></div>
+      <p class="gc-plus-small">Quick Match pairs you with the next available player. This first version is casual, with no rating changes. You can cancel while searching.</p>
+      <div class="gc-plus-actions"><button id="gc-plus-create-room">Challenge a friend · Create link</button></div>
       <div class="gc-plus-grid"><label class="gc-plus-field">Room code<input id="gc-plus-room-code" maxlength="8" placeholder="ABC123"></label><div style="display:flex;align-items:end;gap:6px"><button id="gc-plus-join-room" style="flex:1">Join</button><button id="gc-plus-spectate" style="flex:1">Spectate</button></div></div>
       <div class="gc-plus-status" id="gc-plus-room-status">Connect to the online server, then create a room or enter a friend's code.</div>
       <div class="gc-plus-actions"><button id="gc-plus-copy-invite" disabled>Copy invitation link</button><button id="gc-plus-leave-room" disabled>Leave room</button><button id="gc-plus-resign" disabled>Resign</button></div>
-      <div class="gc-plus-small">Private rooms use server-validated legal moves. To play over the internet, the server must be hosted on a public HTTPS-compatible service. Localhost only reaches this computer.</div>
+      <div class="gc-plus-small">Private invitations work across the internet. Your friend opens the link and joins your game. Moves are checked by the Glass Chess game server.</div>
     </div>
     <div class="gc-card"><div class="gc-row"><h4>Room chat</h4><span class="gc-muted" id="gc-plus-room-people">No room</span></div><div class="gc-plus-chat" id="gc-plus-chat"><p class="gc-plus-small">Room chat appears here after you join.</p></div><div class="gc-plus-actions"><input id="gc-plus-chat-input" maxlength="240" placeholder="Message your room" aria-label="Room chat message"><button id="gc-plus-chat-send">Send</button></div></div>
-    <div class="gc-card"><div class="gc-row"><h4>Friends list</h4><span class="gc-pill" id="gc-plus-friend-count">0 friends</span></div><div class="gc-plus-actions"><input id="gc-plus-friend-input" maxlength="20" placeholder="Friend's display name"><button id="gc-plus-add-friend">Add friend</button></div><div id="gc-plus-friends" class="gc-results"><div class="gc-empty">Add a friend to start your local list.</div></div><p class="gc-plus-small">This is a saved contacts list on this device. Invitations are shared through your private room link; accounts and presence syncing are not enabled.</p></div>
+    <div class="gc-card"><div class="gc-row"><h4>Friends list</h4><span class="gc-pill" id="gc-plus-friend-count">0 friends</span></div><div class="gc-plus-actions"><input id="gc-plus-friend-input" maxlength="20" placeholder="Friend's display name"><button id="gc-plus-add-friend">Add friend</button></div><div id="gc-plus-friends" class="gc-results"><div class="gc-empty">Add a friend to start your local list.</div></div><p class="gc-plus-small">This is a saved contacts list on this device. You can invite friends with a private game link.</p></div>
     <div class="gc-card"><div class="gc-row"><h4>Daily missions</h4><span class="gc-pill" id="gc-plus-mission-date">Today</span></div><div id="gc-plus-missions"></div><div class="gc-plus-small">Complete missions to earn XP and unlock new chess-piece designs.</div></div>
     <div class="gc-card"><div class="gc-row"><h4>Game of the day</h4><span class="gc-pill">Daily challenge</span></div><div class="gc-stat" id="gc-plus-daily-title" style="font-size:18px">Find the forced mate</div><p class="gc-muted" id="gc-plus-daily-copy">White to move. Find the move that ends the game immediately.</p><div class="gc-plus-actions"><button class="primary" id="gc-plus-daily-start">Start today's challenge</button></div><div class="gc-plus-status" id="gc-plus-daily-status">One tactical challenge, refreshed each day.</div></div>
     <div class="gc-card"><div class="gc-row"><h4>Achievements</h4><span class="gc-pill" id="gc-plus-achievement-count">0 / ${ACHIEVEMENTS.length}</span></div><div id="gc-plus-achievements"></div></div>
@@ -424,6 +440,10 @@ function renderRoomButtons() {
   root.querySelector('#gc-plus-copy-invite').disabled = !active;
   root.querySelector('#gc-plus-leave-room').disabled = !online.code;
   root.querySelector('#gc-plus-resign').disabled = !online.code || online.role === 'spectator';
+  const find = root.querySelector('#gc-plus-find-match');
+  const cancel = root.querySelector('#gc-plus-cancel-match');
+  if (find) { find.disabled = matchmakingActive || Boolean(online.code); find.textContent = matchmakingActive ? 'Searching…' : 'Find an opponent'; }
+  if (cancel) cancel.disabled = !matchmakingActive;
   root.querySelector('#gc-plus-connection').textContent = socket?.connected ? 'Connected' : 'Offline';
 }
 
@@ -448,16 +468,20 @@ function showRoomState(snapshot) {
   } catch (error) {
     root.querySelector('#gc-plus-room-status').textContent = `Could not sync this game: ${error.message}`;
   }
-  api.setReplayLock(online.role === 'spectator' || Boolean(snapshot.gameOver || snapshot.resigned));
+  api.setReplayLock(online.role === 'spectator' || Boolean(snapshot.gameOver || snapshot.resigned || snapshot.abandoned));
   if (online.role === 'w' || online.role === 'b') api.setOnlineSide(online.role);
   api.setOnlineMatchActive?.(true);
   const white = snapshot.players?.w?.name || 'Waiting for White';
   const black = snapshot.players?.b?.name || 'Waiting for Black';
   root.querySelector('#gc-plus-room-status').textContent = `${online.role === 'spectator' ? 'Spectating' : `Playing as ${online.role === 'w' ? 'White' : 'Black'}`} · ${white} vs ${black} · ${snapshot.result}`;
+  if (snapshot.lastMove?.fx?.isCheck && snapshot.lastMove.ply !== lastCheckToastPly) {
+    lastCheckToastPly = snapshot.lastMove.ply;
+    toast(snapshot.lastMove.fx.isCheckmate ? 'Checkmate!' : 'Check!');
+  }
   root.querySelector('#gc-plus-room-people').textContent = `${Number(snapshot.spectators || 0)} spectators`;
   renderRoomButtons();
   window.setTimeout(() => { online.syncing = false; }, 0);
-  if (snapshot.checkmate || snapshot.resigned) {
+  if (snapshot.checkmate || snapshot.resigned || snapshot.abandoned) {
     if (snapshot.checkmate) awardAchievement('first-mate');
     showVictory(snapshot.result || 'Game over');
   }
@@ -471,11 +495,28 @@ function makeSocket() {
     try { socket.disconnect(); } catch {}
     socket = null;
   }
-  socket = io(url, { transports: ['websocket', 'polling'], reconnection: true, timeout: 8000 });
-  root.querySelector('#gc-plus-room-status').textContent = `Connecting to ${url}…`;
+  socket = io(url, { transports: ['websocket', 'polling'], reconnection: true, reconnectionAttempts: Infinity, reconnectionDelay: 500, reconnectionDelayMax: 5000, timeout: 8000 });
+  root.querySelector('#gc-plus-room-status').textContent = `Connecting to Glass Chess online…`;
   socket.on('connect', () => {
     root.querySelector('#gc-plus-connection').textContent = 'Connected';
-    if (!online.code) root.querySelector('#gc-plus-room-status').textContent = 'Connected. Create a room or enter a room code.';
+    if (online.code && online.resumeToken) {
+      root.querySelector('#gc-plus-room-status').textContent = 'Reconnecting to your game…';
+      socket.timeout(7000).emit('room:resume', { code: online.code, playerId: CLIENT_ID, resumeToken: online.resumeToken }, (timeoutError, result) => {
+        if (timeoutError || !result?.ok) {
+          root.querySelector('#gc-plus-room-status').textContent = result?.error || 'Could not restore the online game. Your session may have expired.';
+          renderRoomButtons();
+          return;
+        }
+        online.role = result.role;
+        online.side = result.role === 'w' || result.role === 'b' ? result.role : '';
+        online.lastState = result.state;
+        showRoomState(result.state);
+        root.querySelector('#gc-plus-room-status').textContent = 'Connection restored. Your game is synchronized.';
+        toast('Back in the game.');
+      });
+    } else if (!online.code) {
+      root.querySelector('#gc-plus-room-status').textContent = 'Connected. Create a room or enter a room code.';
+    }
     renderRoomButtons();
   });
   socket.on('connect_error', error => {
@@ -484,11 +525,24 @@ function makeSocket() {
     renderRoomButtons();
   });
   socket.on('disconnect', reason => {
+    if (matchmakingActive) {
+      matchmakingActive = false;
+      root.querySelector('#gc-plus-room-status').textContent = 'Connection lost while searching. Reconnect and try again.';
+    } else {
+      root.querySelector('#gc-plus-room-status').textContent = `Disconnected: ${reason}. Reconnect to continue.`;
+    }
     root.querySelector('#gc-plus-connection').textContent = 'Disconnected';
-    root.querySelector('#gc-plus-room-status').textContent = `Disconnected: ${reason}. Reconnect to continue.`;
     renderRoomButtons();
   });
   socket.on('room:state', snapshot => showRoomState(snapshot));
+  socket.on('match:found', result => {
+    matchmakingActive = false;
+    online.previousMode = api.mode;
+    online.previousColor = api.playerColor;
+    applyRoomJoin(result);
+    root.querySelector('#gc-plus-room-status').textContent = 'Opponent found! You are playing as ' + (result.role === 'w' ? 'White.' : 'Black.');
+    toast('Match found. Good luck!');
+  });
   socket.on('chat:message', addChatMessage);
   return socket;
 }
@@ -496,7 +550,11 @@ function makeSocket() {
 function emitAck(event, payload = {}) {
   return new Promise((resolve, reject) => {
     if (!socket?.connected) return reject(new Error('Not connected to the online server.'));
-    socket.emit(event, payload, result => result?.ok ? resolve(result) : reject(new Error(result?.error || 'The server rejected that request.')));
+    socket.timeout(6500).emit(event, payload, (timeoutError, result) => {
+      if (timeoutError) return reject(new Error('The online server did not respond. Check your connection and try again.'));
+      if (result?.ok) resolve(result);
+      else reject(new Error(result?.error || 'The server rejected that request.'));
+    });
   });
 }
 
@@ -504,7 +562,14 @@ function applyRoomJoin(result) {
   online.code = result.code;
   online.role = result.role;
   online.side = result.role === 'w' || result.role === 'b' ? result.role : '';
+  online.resumeToken = result.resumeToken || online.resumeToken || '';
   online.lastState = result.state;
+  if (online.resumeToken) {
+    try {
+      localStorage.setItem('glass-chess-online-room-code', online.code);
+      localStorage.setItem(`glass-chess-online-resume:${online.code}`, online.resumeToken);
+    } catch { /* Reconnection remains available for this page session. */ }
+  }
   api.stopSearch?.();
   api.setMode('local', false);
   if (online.side) api.setOnlineSide(online.side);
@@ -513,6 +578,41 @@ function applyRoomJoin(result) {
   root.querySelector('#gc-plus-room-code').value = result.code;
   root.querySelector('#gc-plus-chat').innerHTML = '';
   showRoomState(result.state);
+  renderRoomButtons();
+}
+
+async function findMatch() {
+  if (online.code) return;
+  try {
+    if (!socket?.connected) makeSocket();
+    await waitForSocket();
+    matchmakingActive = true;
+    renderRoomButtons();
+    root.querySelector('#gc-plus-room-status').textContent = 'Looking for another player… Keep this page open. You can cancel at any time.';
+    const result = await emitAck('queue:join', { name: state.name, playerId: CLIENT_ID });
+    if (result.matched) {
+      matchmakingActive = false;
+      online.previousMode = api.mode;
+      online.previousColor = api.playerColor;
+      applyRoomJoin(result);
+      toast('Opponent found. Game starting!');
+    } else {
+      matchmakingActive = true;
+      root.querySelector('#gc-plus-room-status').textContent = 'Searching for an opponent… You will be connected automatically when someone joins.';
+    }
+  } catch (error) {
+    matchmakingActive = false;
+    renderRoomButtons();
+    root.querySelector('#gc-plus-room-status').textContent = error.message;
+  }
+}
+
+async function cancelMatch() {
+  if (!matchmakingActive) return;
+  try { if (socket?.connected) await emitAck('queue:cancel'); }
+  catch (error) { root.querySelector('#gc-plus-room-status').textContent = error.message; }
+  matchmakingActive = false;
+  root.querySelector('#gc-plus-room-status').textContent = 'Matchmaking cancelled.';
   renderRoomButtons();
 }
 
@@ -583,7 +683,11 @@ function handleLocalMove(move) {
 async function leaveRoom() {
   if (!online.code) return;
   try { if (socket?.connected) await emitAck('room:leave'); } catch {}
-  online.code = ''; online.role = ''; online.side = ''; online.lastState = null;
+  try {
+    localStorage.removeItem(`glass-chess-online-resume:${online.code}`);
+    localStorage.removeItem('glass-chess-online-room-code');
+  } catch { /* Local storage may be disabled. */ }
+  online.code = ''; online.role = ''; online.side = ''; online.resumeToken = ''; online.lastState = null;
   api.setReplayLock(false);
   api.setOnlineMatchActive?.(false);
   api.setMode(online.previousMode || 'computer');
@@ -597,7 +701,7 @@ async function copyInvite() {
   if (!online.code) return;
   const url = new URL(window.location.href);
   url.searchParams.set('room', online.code);
-  url.searchParams.set('server', root.querySelector('#gc-plus-server-url').value.trim());
+  url.searchParams.delete('server');
   try {
     await navigator.clipboard.writeText(url.toString());
     toast('Invitation link copied. Send it to your friend.');
@@ -800,9 +904,8 @@ function bindUI() {
     state.banner = root.querySelector('#gc-plus-banner-select').value;
     saveState(); renderProfile(); toast('Player profile saved.');
   });
-  root.querySelector('#gc-plus-connect').addEventListener('click', () => {
-    try { makeSocket(); } catch (error) { root.querySelector('#gc-plus-room-status').textContent = error.message; }
-  });
+  root.querySelector('#gc-plus-find-match').addEventListener('click', findMatch);
+  root.querySelector('#gc-plus-cancel-match').addEventListener('click', cancelMatch);
   root.querySelector('#gc-plus-create-room').addEventListener('click', createRoom);
   root.querySelector('#gc-plus-join-room').addEventListener('click', () => joinRoom(false));
   root.querySelector('#gc-plus-spectate').addEventListener('click', () => joinRoom(true));
@@ -846,7 +949,27 @@ function bindUI() {
     serverInput.value = 'https://glass-chess-sqk0.onrender.com';
   }
 
-  if (room) root.querySelector('#gc-plus-room-code').value = room.toUpperCase();
+  if (room) {
+    root.querySelector('#gc-plus-room-code').value = room.toUpperCase();
+    window.setTimeout(() => {
+      root.querySelector('#gc-plus-room-status').textContent = 'Joining your friend’s invitation…';
+      void joinRoom(false);
+    }, 650);
+  } else {
+    try {
+      const savedCode = localStorage.getItem('glass-chess-online-room-code') || '';
+      const savedToken = savedCode ? localStorage.getItem(`glass-chess-online-resume:${savedCode}`) : '';
+      if (savedCode && savedToken) {
+        online.code = savedCode;
+        online.resumeToken = savedToken;
+        root.querySelector('#gc-plus-room-code').value = savedCode;
+        window.setTimeout(() => {
+          root.querySelector('#gc-plus-room-status').textContent = 'Restoring your previous online game…';
+          try { makeSocket(); } catch (error) { root.querySelector('#gc-plus-room-status').textContent = error.message; }
+        }, 250);
+      }
+    } catch { /* Local storage may be disabled. */ }
+  }
 }
 
 function buildDailyChallenge() {
