@@ -217,3 +217,4 @@ assert.match(toolsUi, /description:/, 'Tools categories must provide descriptive
 assert.doesNotMatch(toolsUi, /gc-hub-orb/, 'The old floating Tools orb must be removed.');
 assert.match(toolsCss, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/, 'Tools categories must use an organized card grid.');
 assert.doesNotMatch(toolsCss, /gc-hub-orb/, 'The Tools stylesheet must not style the removed floating orb.');
+assert.match(workspaceUi, /gc-tools-single-launcher #gc-workspace-actions/, 'The top-bar Tools action must remain reachable in fullscreen focus mode.');
