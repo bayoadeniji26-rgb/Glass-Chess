@@ -290,11 +290,15 @@ function mountDailyPuzzles() {
     action('hint').textContent = hint.hidden ? 'Hint' : 'Hide hint';
   });
   action('restart').addEventListener('click', () => {
-    if (solved) { feedback('This puzzle is already solved. Use Next puzzle to continue.', 'success'); return; }
     if (replyTimer) window.clearTimeout(replyTimer);
     replyTimer = null; replyPending = false; solutionIndex = 0; solutionSan = [];
     game = new Chess(puzzle.fen); boardSide = game.turn(); clearSelection(); pendingPromotion = [];
-    el('gc-daily-promotion').hidden = true; renderBoard(); feedback('Puzzle reset. Find the strongest move.');
+    solved = false;
+    el('gc-daily-promotion').hidden = true;
+    renderBoard();
+    feedback(progress.completedDays.includes(puzzle.day)
+      ? 'Practice reset. Your completed-puzzle progress remains saved.'
+      : 'Puzzle reset. Find the strongest move.');
   });
   action('previous').addEventListener('click', () => { if (puzzleDay > 1) { puzzleDay--; renderPuzzle(); } });
   action('next').addEventListener('click', () => { if (puzzleDay < DAILY_PUZZLES.length) { puzzleDay++; renderPuzzle(); } });
