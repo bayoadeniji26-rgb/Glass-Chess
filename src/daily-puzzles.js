@@ -37,7 +37,7 @@ function saveProgress(progress) {
     .catch(error => console.warn('Daily puzzle progress could not be added to the cloud save.', error));
 }
 function mergePuzzleProgress(local, remote) {
-  if (!remote || remote.version !== 3 || !/^\\d{4}-\\d{2}-\\d{2}$/.test(remote.startedOn || '')) return local;
+  if (!remote || remote.version !== 3 || !/^\d{4}-\d{2}-\d{2}$/.test(remote.startedOn || '')) return local;
   const startedOn = !local?.startedOn ? remote.startedOn
     : remote.startedOn < local.startedOn ? remote.startedOn : local.startedOn;
   const completedDays = [...new Set([...(local?.completedDays || []), ...(remote.completedDays || [])])]
