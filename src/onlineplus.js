@@ -494,6 +494,30 @@ function showRoomState(snapshot) {
   }
 }
 
+function handleExpiredRoom(payload = {}) {
+  if (!online.code || payload.code !== online.code) return;
+  const expiredCode = online.code;
+  try {
+    localStorage.removeItem(`glass-chess-online-resume:${expiredCode}`);
+    localStorage.removeItem('glass-chess-online-room-code');
+  } catch { /* Storage may be disabled. */ }
+  online.code = ''; online.role = ''; online.side = ''; online.resumeToken = '';
+  online.lastState = null; online.syncing = false;
+  lastCheckToastPly = 0;
+  api.setReplayLock(false);
+  api.setOnlineMatchActive?.(false);
+  api.setMode(online.previousMode || 'computer', false);
+  if (online.previousColor) api.setOnlineSide(online.previousColor === 'black' ? 'b' : 'w');
+  root.querySelector('#gc-plus-room-code').value = '';
+  root.querySelector('#gc-plus-room-people').textContent = 'No room';
+  root.querySelector('#gc-plus-room-status').textContent =
+    payload.reason === 'invitation-expired'
+      ? 'This invitation expired. Create a new room to challenge a friend.'
+      : 'This online room expired and has been closed. Start a new match.';
+  renderRoomButtons();
+  toast('Online room closed.');
+}
+
 function makeSocket() {
   const input = root.querySelector('#gc-plus-server-url');
   const url = input.value.trim().replace(/\/$/, '');
@@ -542,6 +566,7 @@ function makeSocket() {
     renderRoomButtons();
   });
   socket.on('room:state', snapshot => showRoomState(snapshot));
+  socket.on('room:expired', handleExpiredRoom);
   socket.on('match:found', result => {
     matchmakingActive = false;
     online.previousMode = api.mode;
@@ -566,6 +591,7 @@ function emitAck(event, payload = {}) {
 }
 
 function applyRoomJoin(result) {
+  lastCheckToastPly = 0;
   online.code = result.code;
   online.role = result.role;
   online.side = result.role === 'w' || result.role === 'b' ? result.role : '';
@@ -695,6 +721,7 @@ async function leaveRoom() {
     localStorage.removeItem('glass-chess-online-room-code');
   } catch { /* Local storage may be disabled. */ }
   online.code = ''; online.role = ''; online.side = ''; online.resumeToken = ''; online.lastState = null;
+  lastCheckToastPly = 0;
   api.setReplayLock(false);
   api.setOnlineMatchActive?.(false);
   api.setMode(online.previousMode || 'computer');
