@@ -16,6 +16,7 @@ const ids = {
 const START_FEN = new Chess().fen();
 const connected = [];
 let serverProcess;
+let serverOutput = '';
 
 async function reservePort() {
   const probe = createServer();
@@ -92,7 +93,6 @@ try {
     env: { ...process.env, PORT: String(port), HOST: '127.0.0.1' },
     stdio: ['ignore', 'pipe', 'pipe']
   });
-  let serverOutput = '';
   serverProcess.stdout.on('data', chunk => { serverOutput += chunk.toString(); });
   serverProcess.stderr.on('data', chunk => { serverOutput += chunk.toString(); });
 
@@ -238,6 +238,7 @@ try {
   console.log('Online integration tests passed: health, queue cancellation, duplicate identity guard, matchmaking, legal/stale move rejection, reconnect grace and token validation, friend invites, chat throttling, and forfeits.');
 } catch (error) {
   console.error(error);
+  if (serverOutput) console.error('Online server output:\n' + serverOutput);
   if (serverProcess && !serverProcess.killed) serverProcess.kill('SIGTERM');
   process.exitCode = 1;
 } finally {
