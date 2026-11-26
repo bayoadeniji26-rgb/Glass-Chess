@@ -509,7 +509,11 @@ async function createPuzzle() {
   $('gc-puzzle-status').textContent = 'Stockfish is selecting a challenge move…';
   try {
     const result = await api.search(fen, 13, () => {});
-    if (token !== puzzleToken || generation !== api.generation || fen !== api.fen || result.cancelled) return;
+    if (token !== puzzleToken || generation !== api.generation || fen !== api.fen || result.cancelled) {
+      liveAnalysisSuppressed = false;
+      scheduleLiveAnalysis(180);
+      return;
+    }
     const best = String(result?.bestMove || '').toLowerCase();
     if (!/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(best)) throw new Error('Stockfish did not return a legal move.');
     puzzle = { fen, best, active: true, hinted: false };
