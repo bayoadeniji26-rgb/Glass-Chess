@@ -1,6 +1,6 @@
 import { Chess } from "chess.js";
 import { engine } from "./engine.js";
-import { calculatePositionHistory } from "./chess-position-tools.js";
+import { calculatePositionHistory, isFlagFallDraw } from "./chess-position-tools.js";
 import "./micro-polish.css";
 import "./features.css";
 import { createBoardEffects } from "./board-effects.js";
@@ -1415,7 +1415,7 @@ function resign() {
 
 function finishOnTime(loserSide) {
   if (!["w", "b"].includes(loserSide) || isGameOver()) return false;
-  const draw = game.isInsufficientMaterial();
+  const draw = isFlagFallDraw(game.fen(), loserSide);
   const winningName = loserSide === "w" ? "Black" : "White";
   gameTermination = draw
     ? { type: "timeout_draw", draw: true, winner: null, loser: loserSide }
