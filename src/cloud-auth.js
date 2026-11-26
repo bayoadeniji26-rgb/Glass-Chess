@@ -13,6 +13,7 @@ const EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'aKuTsseHT
 const $ = id => document.getElementById(id);
 let supportMode = 'donate';
 let lastSupportOpener = null;
+let lastEmailRequestAt = 0;
 
 function describeEmailDeliveryError(statusCode, detail, error) {
   const raw = String(detail || error?.message || '').replace(/[<>]/g, '').trim().slice(0, 220);
@@ -208,6 +209,13 @@ async function sendDonationMessage() {
     $('gc-donation-custom-amount').focus();
     return;
   }
+  const now = Date.now();
+  if (now - lastEmailRequestAt < 1100) {
+    status.textContent = 'Please wait a moment before sending another message.';
+    status.classList.add('is-error');
+    return;
+  }
+  lastEmailRequestAt = now;
   send.disabled = true;
   send.textContent = 'Sending…';
   status.classList.remove('is-error');
