@@ -11,6 +11,8 @@ const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || 'templat
 const EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'aKuTsseHTnwR-RWg';
 
 const $ = id => document.getElementById(id);
+let supportMode = 'donate';
+let lastSupportOpener = null;
 
 function toast(message, isError = false) {
   let node = $('gc-save-toast');
@@ -47,15 +49,25 @@ function mountDonationDialog() {
         <input id="gc-donation-name" name="from_name" maxlength="80" autocomplete="name" placeholder="Name">
         <label for="gc-donation-email">Your email <span>(optional, for a reply)</span></label>
         <input id="gc-donation-email" name="reply_to" type="email" maxlength="160" autocomplete="email" placeholder="you@example.com">
-        <label for="gc-donation-amount">Donation amount</label>
-        <select id="gc-donation-amount" name="donation_amount">
-          <option value="Not specified">Choose an amount (optional)</option>
-          <option value="$3">$3</option><option value="$5">$5</option>
-          <option value="$10">$10</option><option value="$15">$15</option>
-          <option value="$20">$20</option><option value="$25">$25</option>
-          <option value="$50">$50</option><option value="Other amount">Other amount</option>
+        <div class="gc-donation-amount-field" id="gc-donation-amount-field">
+          <label for="gc-donation-amount">Donation amount</label>
+          <select id="gc-donation-amount" name="donation_amount">
+            <option value="Not specified">Choose an amount (optional)</option>
+            <option value="$3">$3</option><option value="$5">$5</option>
+            <option value="$10">$10</option><option value="$15">$15</option>
+            <option value="$20">$20</option><option value="$25">$25</option>
+            <option value="$50">$50</option><option value="Other amount">Other amount</option>
+          </select>
+          <input id="gc-donation-custom-amount" type="number" min="1" max="1000" step="1" placeholder="Enter amount in USD" hidden>
+        </div>
+        <label for="gc-donation-topic">What is this about?</label>
+        <select id="gc-donation-topic" name="message_type">
+          <option value="General message">General message</option>
+          <option value="Bug report">Bug report</option>
+          <option value="Feature suggestion">Feature suggestion</option>
+          <option value="Chess feedback">Chess feedback</option>
+          <option value="Other">Other</option>
         </select>
-        <input id="gc-donation-custom-amount" type="number" min="1" max="1000" step="1" placeholder="Enter amount in USD" hidden>
         <label for="gc-donation-message">Message <span>(sent to the Glass Chess creator)</span></label>
         <textarea id="gc-donation-message" name="message" rows="4" maxlength="1200" required placeholder="Write a thank-you, suggestion, or note about your donation…"></textarea>
         <input class="gc-donation-honeypot" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
@@ -66,12 +78,27 @@ function mountDonationDialog() {
           <button type="submit" id="gc-donation-send">Send message</button>
           <a href="${CASHAPP_URL}" target="_blank" rel="noopener noreferrer" id="gc-donation-cashapp">Continue to Cash App <span aria-hidden="true">↗</span></a>
         </div>
+        <div class="gc-donation-copy-row" id="gc-donation-copy-row">
+          <button type="button" id="gc-copy-cashapp-dialog">Copy ${CASHAPP_TAG}</button>
+        </div>
         <small class="gc-donation-footnote">Cash App: <strong>${CASHAPP_TAG}</strong>. Sending a message does not make a payment.</small>
       </form>
     </div>`;
   document.body.appendChild(modal);
-  const close = () => { modal.hidden = true; };
+  const close = () => {
+    modal.hidden = true;
+    modal.classList.remove('is-contact');
+    lastSupportOpener?.focus?.();
+  };
   $('gc-donation-close').addEventListener('click', close);
+  $('gc-copy-cashapp-dialog').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(CASHAPP_TAG);
+      toast('Copied ' + CASHAPP_TAG + ' to clipboard!');
+    } catch {
+      toast('Clipboard access is unavailable. Cash App tag: ' + CASHAPP_TAG, true);
+    }
+  });
   modal.addEventListener('click', event => { if (event.target === modal) close(); });
   $('gc-donation-cashapp').addEventListener('click', () => {
     // The link opens Cash App separately. Keep the message form open so it can still be sent.
@@ -88,14 +115,35 @@ function mountDonationDialog() {
   });
 }
 
-function openDonationDialog() {
+function openDonationDialog(mode = 'donate') {
   mountDonationDialog();
   const modal = $('gc-donation-dialog');
   if (!modal) return;
+  supportMode = mode === 'contact' ? 'contact' : 'donate';
+  lastSupportOpener = document.activeElement;
+  const isContact = supportMode === 'contact';
+  modal.classList.toggle('is-contact', isContact);
   modal.hidden = false;
+  modal.querySelector('.gc-donation-header small').textContent = isContact ? 'SEND A MESSAGE' : 'SUPPORT THE PROJECT';
+  $('gc-donation-title').textContent = isContact ? 'Contact Glass Chess' : 'Support Glass Chess';
+  modal.querySelector('.gc-donation-header p').textContent = isContact
+    ? 'Send a question, bug report, or idea directly to the creator.'
+    : 'Your contribution helps keep the board improving.';
+  modal.querySelector('.gc-donation-mark').textContent = isContact ? '✉' : '$';
+  $('gc-donation-amount-field').hidden = isContact;
+  $('gc-donation-cashapp').hidden = isContact;
+  $('gc-donation-copy-row').hidden = isContact;
+  $('gc-donation-amount').value = 'Not specified';
+  $('gc-donation-topic').value = 'General message';
+  $('gc-donation-message').placeholder = isContact
+    ? 'Tell me what is on your mind…'
+    : 'Write a thank-you, suggestion, or note about your donation…';
+  $('gc-donation-status').classList.remove('is-error');
   $('gc-donation-status').textContent = EMAILJS_SERVICE_ID && EMAILJS_TEMPLATE_ID && EMAILJS_PUBLIC_KEY
-    ? 'Your message will be emailed to the recipient configured in the EmailJS template. Payment is separate in Cash App.'
-    : 'Email delivery needs EmailJS configuration before messages can be sent. You can still continue to Cash App below.';
+    ? (isContact
+      ? 'Your message will be emailed to the recipient configured in the EmailJS template. No donation is required.'
+      : 'Your message will be emailed to the recipient configured in the EmailJS template. Payment happens separately in Cash App.')
+    : 'Email delivery needs EmailJS configuration before messages can be sent. Cash App is available for donations.';
   $('gc-donation-message').focus();
 }
 
@@ -129,7 +177,7 @@ async function sendDonationMessage() {
   }
   const selectedAmount = $('gc-donation-amount').value;
   const customAmount = $('gc-donation-custom-amount').value;
-  if (selectedAmount === 'Other amount' && (!Number.isFinite(Number(customAmount)) || Number(customAmount) < 1 || Number(customAmount) > 1000)) {
+  if (supportMode === 'donate' && selectedAmount === 'Other amount' && (!Number.isFinite(Number(customAmount)) || Number(customAmount) < 1 || Number(customAmount) > 1000)) {
     status.textContent = 'Enter an amount between $1 and $1,000.';
     status.classList.add('is-error');
     $('gc-donation-custom-amount').focus();
@@ -142,7 +190,9 @@ async function sendDonationMessage() {
   const templateParams = {
     from_name: $('gc-donation-name').value.trim() || 'Glass Chess visitor',
     reply_to: email || '',
-    donation_amount: selectedAmount === 'Other amount' ? String.fromCharCode(36) + Number(customAmount).toFixed(2) : selectedAmount,
+    donation_amount: supportMode === 'contact' ? 'No donation — contact message' : (selectedAmount === 'Other amount' ? String.fromCharCode(36) + Number(customAmount).toFixed(2) : selectedAmount),
+    message_type: $('gc-donation-topic').value,
+    subject: supportMode === 'contact' ? 'Glass Chess contact message' : 'Glass Chess donation message',
     message,
     cashapp_tag: CASHAPP_TAG,
     submitted_at: new Date().toLocaleString(),
@@ -163,8 +213,10 @@ async function sendDonationMessage() {
       const detail = await response.text().catch(() => '');
       throw new Error(detail.slice(0, 300) || 'The email service rejected the message.');
     }
-    status.textContent = 'Message sent! Thank you for supporting Glass Chess.';
-    toast('Your message was sent to the Glass Chess creator.');
+    status.textContent = supportMode === 'contact'
+      ? 'Message sent! Thanks for reaching out.'
+      : 'Message sent! Thank you for supporting Glass Chess.';
+    toast(supportMode === 'contact' ? 'Your message was sent to the Glass Chess creator.' : 'Your support message was sent.');
     form.reset();
     $('gc-donation-custom-amount').hidden = true;
   } catch (error) {
@@ -195,24 +247,18 @@ function mountDonationWidget() {
     donate.title = 'Support Glass Chess';
     donate.innerHTML = '<span aria-hidden="true">$</span> Donate';
     actions.appendChild(donate);
-    donate.addEventListener('click', () => openDonationDialog());
+    donate.addEventListener('click', () => openDonationDialog('donate'));
   }
-  if (!$('gc-copy-cashapp')) {
-    const copy = document.createElement('button');
-    copy.id = 'gc-copy-cashapp';
-    copy.type = 'button';
-    copy.title = 'Copy Cash App tag';
-    copy.textContent = 'Copy $RaphaelAboy';
-    actions.appendChild(copy);
-    copy.addEventListener('click', async () => {
-      try {
-        await navigator.clipboard.writeText(CASHAPP_TAG);
-        toast('Copied $RaphaelAboy to clipboard!');
-      } catch {
-        toast('Clipboard access is unavailable. Cash App tag: $RaphaelAboy', true);
-      }
-    });
+  if (!$('gc-contact')) {
+    const contact = document.createElement('button');
+    contact.id = 'gc-contact';
+    contact.type = 'button';
+    contact.title = 'Send a message to the Glass Chess creator';
+    contact.textContent = 'Contact';
+    actions.appendChild(contact);
+    contact.addEventListener('click', () => openDonationDialog('contact'));
   }
+  $('gc-copy-cashapp')?.remove();
   mountDonationDialog();
 }
 
