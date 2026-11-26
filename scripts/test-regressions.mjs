@@ -102,6 +102,20 @@ assert.match(onlineClient, /match:found/, 'The client must join automatically wh
 assert.match(onlineClient, /searchParams\.set\('room', online\.code\)/, 'Friend invites must create shareable room links.');
 assert.match(onlineClient, /window\.location\.search/, 'Invite links must be parsed when the friend opens them.');
 
+const mainUi = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+const authUi = readFileSync(new URL('../src/clerk-auth.js', import.meta.url), 'utf8');
+const appHtml = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+assert.match(mainUi, /function getSignedInDisplayName/, 'Human seat labels must use the signed-in account display name.');
+assert.match(mainUi, /normalizeSeatName/, 'Empty and legacy placeholder names must display as Anonymous.');
+assert.match(mainUi, /online\.getPlayers\?\.\(\)/, 'Online nameplates must use the authoritative room player names.');
+assert.match(mainUi, /Elo: Unrated/, 'The UI must not invent an Elo value when no rating is available.');
+assert.match(mainUi, /gameMode === "computer" && !isOnlineMatch/, 'Stockfish nameplates must be exclusive to computer games.');
+assert.match(onlineClient, /function getPublicPlayerName/, 'Online rooms must transmit the signed-in name or Anonymous.');
+assert.equal((onlineClient.match(/name: getPublicPlayerName\(\), playerId: CLIENT_ID/g) || []).length, 3, 'Matchmaking, room creation, and joining must use the account name.');
+assert.match(authUi, /glasschess:auth-change/, 'Account changes must refresh the board nameplates.');
+assert.match(appHtml, /id="opponent-name"/, 'The top player nameplate must have a separate name element.');
+assert.match(appHtml, /id="player-name"/, 'The bottom player nameplate must have a separate name element.');
+
 console.log('50 legal daily chess puzzles and regression suite passed.');
 
 const puzzleUi = readFileSync(new URL('../src/daily-puzzles.js', import.meta.url), 'utf8');
