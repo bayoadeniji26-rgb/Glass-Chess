@@ -1,5 +1,7 @@
 import { Chess } from "chess.js";
 import { engine } from "./engine.js";
+import { calculatePositionHistory } from "./chess-position-tools.js";
+import "./micro-polish.css";
 import "./features.css";
 import { createBoardEffects } from "./board-effects.js";
 
@@ -1466,7 +1468,8 @@ function downloadPGN() {
   link.click();
   link.remove();
 
-  URL.revokeObjectURL(url);
+  // Give the browser time to begin the download before releasing the blob URL.
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 // ============================================
@@ -1812,21 +1815,7 @@ function installGlassChessPremiumBridge() {
       else if (undoneMove && motionSnapshot) void boardEffects.animateMove(motionSnapshot);
     },
     calculatePositions(initialFen, moveList) {
-      const savedMoves = game.history({ verbose: true });
-      const result = [];
-      suppressGameCallbacks = true;
-      try {
-        game.load(initialFen);
-        result.push(game.fen());
-        for (const move of moveList) {
-          game.move({ from: move.from, to: move.to, promotion: move.promotion });
-          result.push(game.fen());
-        }
-        game.load(initialFen);
-        for (const move of savedMoves) game.move({ from: move.from, to: move.to, promotion: move.promotion });
-      } finally { suppressGameCallbacks = false; }
-      render();
-      return result;
+      return calculatePositionHistory(initialFen, moveList);
     },
     loadPgn(pgn) {
       thinking = false;
@@ -1906,20 +1895,24 @@ function installGlassChessPremiumBridge() {
       resigned = false;
       winner = "";
     }
-    if (window.GlassChessPremium && typeof window.GlassChessPremium.onReset === 'function') {
-      window.GlassChessPremium.onReset(game.fen());
+    if (!suppressGameCallbacks) {
+      if (window.GlassChessPremium && typeof window.GlassChessPremium.onReset === 'function') {
+        window.GlassChessPremium.onReset(game.fen());
+      }
+      window.GlassChessGameplaySuite?.onReset?.(game.fen());
+      window.GlassChessAdvancedLab?.onReset?.(game.fen());
     }
-    window.GlassChessGameplaySuite?.onReset?.(game.fen());
-    window.GlassChessAdvancedLab?.onReset?.(game.fen());
     return result;
   };
 
   const originalUndo = game.undo.bind(game);
   game.undo = function (...args) {
     const result = originalUndo(...args);
-    if (result && !suppressGameCallbacks) positionGeneration++;
-    if (result && window.GlassChessPremium && typeof window.GlassChessPremium.onUndo === 'function') {
-      window.GlassChessPremium.onUndo(game.history({ verbose: true }), game.fen());
+    if (result && !suppressGameCallbacks) {
+      positionGeneration++;
+      if (window.GlassChessPremium && typeof window.GlassChessPremium.onUndo === 'function') {
+        window.GlassChessPremium.onUndo(game.history({ verbose: true }), game.fen());
+      }
     }
     return result;
   };
