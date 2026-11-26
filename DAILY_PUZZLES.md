@@ -278,7 +278,7 @@ The first puzzle becomes Day 1 the first local calendar day this feature is open
 
 **Hint:** Add the letters E and R to the end.
 
-**Answer:** SHORT
+**Answer:** SHORTER
 
 **Explanation:** Add E and R to SHORT to make SHORTER.
 
