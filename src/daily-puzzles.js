@@ -1,6 +1,7 @@
 import { Chess } from 'chess.js';
 import './daily-puzzles.css';
 import { DAILY_PUZZLES, getPuzzleDayIndex } from './daily-puzzle-data.js';
+import { saveEngine } from './save-engine.js';
 
 const STORAGE_KEY = 'glass-chess-daily-chess-puzzles-v3';
 const FILES = 'abcdefgh';
@@ -30,7 +31,24 @@ function readProgress() {
 }
 function saveProgress(progress) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(progress)); }
-  catch (error) { console.warn('Daily puzzle progress could not be saved.', error); }
+  catch (error) { console.warn('Daily puzzle progress could not be saved locally.', error); }
+  void saveEngine.saveData({ localStorage: { dailyPuzzleProgress: progress } })
+    .then(() => window.GlassChessCloud?.queueSync?.())
+    .catch(error => console.warn('Daily puzzle progress could not be added to the cloud save.', error));
+}
+function mergePuzzleProgress(local, remote) {
+  if (!remote || remote.version !== 3 || !/^\\d{4}-\\d{2}-\\d{2}$/.test(remote.startedOn || '')) return local;
+  const startedOn = !local?.startedOn ? remote.startedOn
+    : remote.startedOn < local.startedOn ? remote.startedOn : local.startedOn;
+  const completedDays = [...new Set([...(local?.completedDays || []), ...(remote.completedDays || [])])]
+    .map(Number).filter(day => Number.isInteger(day) && day >= 1 && day <= DAILY_PUZZLES.length).sort((a,b) => a-b);
+  const revealedDays = [...new Set([...(local?.revealedDays || []), ...(remote.revealedDays || [])])]
+    .map(Number).filter(day => Number.isInteger(day) && day >= 1 && day <= DAILY_PUZZLES.length);
+  const attempts = { ...(local?.attempts || {}) };
+  for (const [day, count] of Object.entries(remote.attempts || {})) attempts[day] = Math.max(Number(attempts[day] || 0), Number(count || 0));
+  return { ...local, version: 3, startedOn, completedDays, revealedDays, attempts,
+    lastSolvedDay: Math.max(Number(local?.lastSolvedDay || 0), Number(remote.lastSolvedDay || 0)),
+    streak: Math.max(Number(local?.streak || 0), Number(remote.streak || 0)) };
 }
 const uci = move => move.from + move.to + (move.promotion || '');
 const moveInput = value => ({ from: value.slice(0, 2), to: value.slice(2, 4), ...(value[4] ? { promotion: value[4] } : {}) });
@@ -101,6 +119,19 @@ function mountDailyPuzzles() {
   const action = name => dialog.querySelector('[data-action="' + name + '"]');
   let puzzleDay = Math.min(DAILY_PUZZLES.length, getPuzzleDayIndex(progress.startedOn, localDateKey()));
   let puzzle = null, game = null, selectedSquare = null, legalMoves = [], pendingPromotion = [], solved = false, boardSide = 'w';
+
+  function applyCloudProgress(remote) {
+    const merged = mergePuzzleProgress(progress, remote);
+    if (JSON.stringify(merged) === JSON.stringify(progress)) return;
+    progress = merged;
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(progress)); } catch {}
+    updateProgressUI();
+    if (dialog.open) renderPuzzle();
+  }
+  window.GlassChessDailyPuzzles = { applyCloudProgress };
+  window.addEventListener('glasschess:cloud-profile', event => {
+    applyCloudProgress(event.detail?.profile?.localStorage?.dailyPuzzleProgress);
+  });
 
   function updateProgressUI() {
     const count = progress.completedDays.length;
