@@ -1,4 +1,5 @@
 import { Chess } from 'chess.js';
+import { remainingSeconds } from './gameplay-timers.js';
 import './gameplay-suite.css';
 
 const HISTORY_KEY = 'glass-chess-match-history-v1';
@@ -74,6 +75,7 @@ let retryActive = false;
 let activePuzzle = null;
 let rushTimer = null;
 let rushSeconds = 60;
+let rushDeadline = 0;
 let rushScore = 0;
 let activeDrill = null;
 let lastArrowOrientation = null;
@@ -1210,10 +1212,17 @@ function startRush() {
   stopReview();
   rushScore=0;rushSeconds=60;loadNextPuzzle();
   const host=document.getElementById('gcl-rush-clock');host.hidden=false;updateRushScore();
-  rushTimer=window.setInterval(()=>{rushSeconds--;updateRushScore();if(rushSeconds<=0)stopRush();},1000);
+  rushDeadline=performance.now()+60000;
+  rushTimer=window.setInterval(tickRushTimer,200);
+}
+function tickRushTimer() {
+  if(!rushTimer)return;
+  rushSeconds=remainingSeconds(rushDeadline,performance.now());
+  updateRushScore();
+  if(rushSeconds<=0)stopRush();
 }
 function stopRush() {
-  if(rushTimer)clearInterval(rushTimer);rushTimer=null;activePuzzle=null;
+  if(rushTimer)clearInterval(rushTimer);rushTimer=null;rushDeadline=0;activePuzzle=null;
   document.getElementById('gcl-puzzle-status').textContent='Puzzle Rush finished · '+rushScore+' solved.';
 }
 
