@@ -316,9 +316,9 @@ function mountTab() {
       <p class="gc-plus-small">Your name and avatar are shared with players in rooms you join. Profile XP and achievements stay on this device.</p>
     </div>
     <div class="gc-card"><div class="gc-row"><h4>Online multiplayer</h4><span class="gc-pill" id="gc-plus-connection">Offline</span></div>
-      <label class="gc-plus-field" hidden>Online server address<input id="gc-plus-server-url" value="http://localhost:3001" spellcheck="false"></label>
+      <label class="gc-plus-field" hidden>Online server address<input id="gc-plus-server-url" value="https://glass-chess-sqk0.onrender.com" spellcheck="false"></label>
       <div class="gc-plus-actions"><button class="primary" id="gc-plus-find-match">Find an opponent</button><button id="gc-plus-cancel-match" disabled>Cancel search</button></div>
-      <p class="gc-plus-small">Quick Match pairs you with the next available player. You can cancel while searching.</p>
+      <p class="gc-plus-small">Quick Match pairs you with the next available player. This first version is casual, with no rating changes. You can cancel while searching.</p>
       <div class="gc-plus-actions"><button id="gc-plus-create-room">Challenge a friend · Create link</button></div>
       <div class="gc-plus-grid"><label class="gc-plus-field">Room code<input id="gc-plus-room-code" maxlength="8" placeholder="ABC123"></label><div style="display:flex;align-items:end;gap:6px"><button id="gc-plus-join-room" style="flex:1">Join</button><button id="gc-plus-spectate" style="flex:1">Spectate</button></div></div>
       <div class="gc-plus-status" id="gc-plus-room-status">Connect to the online server, then create a room or enter a friend's code.</div>
@@ -460,7 +460,7 @@ function showRoomState(snapshot) {
   api.setOnlineMatchActive?.(true);
   const white = snapshot.players?.w?.name || 'Waiting for White';
   const black = snapshot.players?.b?.name || 'Waiting for Black';
-  root.querySelector('#gc-plus-room-status').textContent = `${online.role === 'spectator' ? 'Spectating' : `Playing as ${online.role === 'w' ? 'White' : 'Black'}`} · ${white} vs ${black} · ${snapshot.result}`;
+  root.querySelector('#gc-plus-room-status').textContent = `${online.role === 'spectator' ? 'Spectating' : `Playing as ${online.role === 'w' ? 'White' : 'Black'}`} · ${white} vs ${black} · ${snapshot.result}`;\n  if (snapshot.lastMove?.fx?.isCheck) toast(snapshot.lastMove.fx.isCheckmate ? 'Checkmate!' : 'Check!');
   root.querySelector('#gc-plus-room-people').textContent = `${Number(snapshot.spectators || 0)} spectators`;
   renderRoomButtons();
   window.setTimeout(() => { online.syncing = false; }, 0);
@@ -478,8 +478,8 @@ function makeSocket() {
     try { socket.disconnect(); } catch {}
     socket = null;
   }
-  socket = io(url, { transports: ['websocket', 'polling'], reconnection: true, timeout: 8000 });
-  root.querySelector('#gc-plus-room-status').textContent = `Connecting to ${url}…`;
+  socket = io(url, { transports: ['websocket', 'polling'], reconnection: true, reconnectionAttempts: Infinity, reconnectionDelay: 500, reconnectionDelayMax: 5000, timeout: 8000 });
+  root.querySelector('#gc-plus-room-status').textContent = `Connecting to Glass Chess online…`;
   socket.on('connect', () => {
     root.querySelector('#gc-plus-connection').textContent = 'Connected';
     if (!online.code) root.querySelector('#gc-plus-room-status').textContent = 'Connected. Create a room or enter a room code.';
