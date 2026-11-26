@@ -108,6 +108,7 @@ const workspaceCss = readFileSync(new URL('../src/glass-workspace.css', import.m
 const toolsUi = readFileSync(new URL('../src/glass-dock.js', import.meta.url), 'utf8');
 const toolsCss = readFileSync(new URL('../src/glass-dock.css', import.meta.url), 'utf8');
 const boardUi = readFileSync(new URL('../src/glass-final-ui.js', import.meta.url), 'utf8');
+const gameplaySuiteUi = readFileSync(new URL('../src/gameplay-suite.js', import.meta.url), 'utf8');
 const authUi = readFileSync(new URL('../src/clerk-auth.js', import.meta.url), 'utf8');
 const appHtml = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 assert.match(mainUi, /function getSignedInDisplayName/, 'Human seat labels must use the signed-in account display name.');
@@ -146,7 +147,8 @@ assert.match(workspaceUi, /glasschess:tools-state/, 'The Tools control must trac
 assert.match(mainUi, /gc-side-disclosure gc-side-settings/, 'Board and move settings must be collapsed inside the Play panel.');
 assert.match(mainUi, /gc-side-disclosure gc-side-actions/, 'Secondary game actions must be grouped away from the board.');
 assert.match(mainUi, /clear\.hidden = true/, 'Clear Hint must be hidden until a hint is available.');
-assert.match(toolsUi, /label: "Overview"[\s\S]*?label: "Train"[\s\S]*?label: "Review"[\s\S]*?label: "Customize"[\s\S]*?label: "Online"[\s\S]*?label: "Advanced"/, 'Tools must have one consistent set of feature tabs.');
+assert.match(toolsUi, /label: "Overview"[\s\S]*?label: "Train"[\s\S]*?label: "Review"[\s\S]*?label: "Customize"[\s\S]*?label: "Online"[\s\S]*?label: "Game Lab"[\\s\\S]*?label: "Advanced"/, 'Tools must include Online, Game Lab and Advanced feature tabs.');
+assert.match(gameplaySuiteUi, /tab\\.dataset\\.tab = 'game-lab'/, 'Game Lab must remain connected to the Tools navigation.');
 assert.match(toolsUi, /tab\.click\(\)/, 'A Tools tab must activate its feature view.');
 assert.match(toolsUi, /glasschess:toggle-tools/, 'Tools must remain available from the fullscreen launcher.');
 assert.match(toolsCss, /body:not\(\.gc-tools-single-launcher\)[\s\S]*?\.gc-hub-orb\s*\{\s*display: none !important/, 'The floating Tools orb must be hidden in normal play.');
