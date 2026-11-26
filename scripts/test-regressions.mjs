@@ -1,36 +1,45 @@
 import assert from 'node:assert/strict';
 import { Chess } from 'chess.js';
-import {
-  DAILY_PUZZLES,
-  getPuzzleDayIndex,
-  isPuzzleAnswerCorrect,
-  normalizePuzzleAnswer
-} from '../src/daily-puzzle-data.js';
+import { DAILY_PUZZLES, getPuzzleDayIndex } from '../src/daily-puzzle-data.js';
 import { calculatePositionHistory, isFlagFallDraw } from '../src/chess-position-tools.js';
 import { remainingSeconds } from '../src/gameplay-timers.js';
 
-assert.equal(DAILY_PUZZLES.length, 50, 'The series must contain exactly 50 puzzles.');
+const uci = move => move.from + move.to + (move.promotion || '');
+
+assert.equal(DAILY_PUZZLES.length, 50, 'The series must contain exactly 50 chess puzzles.');
 assert.deepEqual(DAILY_PUZZLES.map(puzzle => puzzle.day), Array.from({ length: 50 }, (_, index) => index + 1));
-assert.equal(new Set(DAILY_PUZZLES.map(puzzle => puzzle.prompt)).size, 50, 'Puzzle prompts must be distinct.');
-const counts = Object.fromEntries([...new Set(DAILY_PUZZLES.map(puzzle => puzzle.type))].map(type => [type, DAILY_PUZZLES.filter(puzzle => puzzle.type === type).length]));
-assert.deepEqual(counts, { 'Logic': 10, 'Math & Sequence': 10, 'Word & Cipher': 10, 'Spatial': 10, 'Deduction': 10 });
-const categories = new Set(['Logic', 'Math & Sequence', 'Spatial', 'Word & Cipher', 'Deduction']);
+assert.equal(new Set(DAILY_PUZZLES.map(puzzle => puzzle.fen)).size, 50, 'All 50 puzzle positions must be distinct.');
+
+const puzzleTypes = new Set(['Mate in 1', 'Knight fork', 'Back-rank mate']);
 for (const puzzle of DAILY_PUZZLES) {
-  assert.ok(categories.has(puzzle.type), 'Unknown category on Day ' + puzzle.day);
-  assert.ok(puzzle.title && puzzle.prompt && puzzle.hint && puzzle.answer && puzzle.explanation, 'Missing puzzle content on Day ' + puzzle.day);
-  assert.ok(isPuzzleAnswerCorrect(puzzle, puzzle.answer), 'Canonical answer rejected on Day ' + puzzle.day);
-  for (const alias of puzzle.accepted || []) {
-    assert.ok(isPuzzleAnswerCorrect(puzzle, alias), 'Accepted answer alias rejected on Day ' + puzzle.day + ': ' + alias);
+  assert.ok(puzzleTypes.has(puzzle.type), 'Unknown chess puzzle type on Day ' + puzzle.day);
+  assert.ok(puzzle.title && puzzle.hint && puzzle.explanation, 'Missing chess puzzle content on Day ' + puzzle.day);
+  assert.match(puzzle.fen, /\s[wb]\s/, 'Missing side to move on Day ' + puzzle.day);
+  assert.equal(puzzle.solution.length, 1, 'Each daily puzzle must have one answer move on Day ' + puzzle.day);
+
+  const game = new Chess(puzzle.fen);
+  const legalMove = game.moves({ verbose: true }).find(move => uci(move) === puzzle.solution[0]);
+  assert.ok(legalMove, 'Solution must be legal on Day ' + puzzle.day + ': ' + puzzle.solution[0]);
+  const played = game.move({ from: legalMove.from, to: legalMove.to, ...(legalMove.promotion ? { promotion: legalMove.promotion } : {}) });
+  assert.ok(played, 'The solution must apply on Day ' + puzzle.day);
+
+  if (puzzle.goal === 'mate') {
+    assert.equal(game.isCheckmate(), true, 'Mate puzzle must end in checkmate on Day ' + puzzle.day);
+  } else if (puzzle.goal === 'fork') {
+    assert.equal(game.isCheck(), true, 'Fork move must give check on Day ' + puzzle.day);
+    const target = game.get(puzzle.targetSquare);
+    assert.ok(target && target.type === 'q' && target.color === game.turn(), 'Fork must attack the opposing queen on Day ' + puzzle.day);
+    const knightSquare = puzzle.solution[0].slice(2, 4);
+    const knight = game.get(knightSquare);
+    assert.ok(knight && knight.type === 'n' && knight.color !== game.turn(), 'Forking knight must remain on the destination square on Day ' + puzzle.day);
+    const df = Math.abs('abcdefgh'.indexOf(knightSquare[0]) - 'abcdefgh'.indexOf(puzzle.targetSquare[0]));
+    const dr = Math.abs(Number(knightSquare[1]) - Number(puzzle.targetSquare[1]));
+    assert.ok((df === 1 && dr === 2) || (df === 2 && dr === 1), 'Knight must attack the target queen on Day ' + puzzle.day);
+  } else {
+    assert.fail('Unexpected puzzle goal on Day ' + puzzle.day);
   }
 }
-assert.equal(normalizePuzzleAnswer('  FORTY-TWO! '), 'forty two');
-assert.equal(isPuzzleAnswerCorrect(DAILY_PUZZLES[1], 'forty-two'), true);
-assert.equal(isPuzzleAnswerCorrect(DAILY_PUZZLES[1], '41'), false);
-assert.equal(isPuzzleAnswerCorrect(DAILY_PUZZLES[18], '4'), true);
-assert.equal(isPuzzleAnswerCorrect(DAILY_PUZZLES[20], '8'), true);
-assert.equal(isPuzzleAnswerCorrect(DAILY_PUZZLES[38], '4 liters'), true);
-assert.equal(isPuzzleAnswerCorrect(DAILY_PUZZLES[27], 'SHORTER'), true);
-assert.equal(isPuzzleAnswerCorrect(DAILY_PUZZLES[45], '0.05'), true);
+
 assert.equal(getPuzzleDayIndex('2026-11-25', '2026-11-25'), 1);
 assert.equal(getPuzzleDayIndex('2026-11-25', '2026-11-26'), 2);
 assert.equal(getPuzzleDayIndex('2026-11-25', '2026-12-14'), 20);
@@ -64,17 +73,17 @@ const enPassantPositions = calculatePositionHistory(enPassantFen, [{ from: 'e5',
 assert.equal(enPassantPositions.length, 2, 'En passant must replay.');
 assert.equal(enPassantGame.fen(), enPassantFen, 'Special-move replay must not mutate its source game.');
 
-console.log('Daily puzzle data and isolated position replay tests passed.');
-
 const bareKingWinnerFen = '7k/8/8/8/8/8/8/K6r b - - 0 1';
-assert.equal(isFlagFallDraw(bareKingWinnerFen, 'b'), true, 'A bare-king winner cannot checkmate even when the flagged side still has a rook.');
+assert.equal(isFlagFallDraw(bareKingWinnerFen, 'b'), true);
 const rookWinnerFen = '7k/8/8/8/8/8/8/K6R b - - 0 1';
-assert.equal(isFlagFallDraw(rookWinnerFen, 'b'), false, 'A winner with a rook can potentially checkmate.');
-assert.equal(isFlagFallDraw('7k/8/8/8/8/8/8/K7 b - - 0 1', 'b'), true, 'Bare kings must draw on time.');
+assert.equal(isFlagFallDraw(rookWinnerFen, 'b'), false);
+assert.equal(isFlagFallDraw('7k/8/8/8/8/8/8/K7 b - - 0 1', 'b'), true);
 assert.throws(() => isFlagFallDraw(rookWinnerFen, 'x'), /flagging side/);
 
 assert.equal(remainingSeconds(60000, 0), 60);
 assert.equal(remainingSeconds(60000, 1001), 59);
 assert.equal(remainingSeconds(60000, 59999), 1);
-assert.equal(remainingSeconds(60000, 60001), 0, 'Timer must expire from elapsed time even after a throttled tab resumes.');
+assert.equal(remainingSeconds(60000, 60001), 0);
 assert.throws(() => remainingSeconds(Number.NaN, 0), /finite numbers/);
+
+console.log('50 legal daily chess puzzles and regression suite passed.');
