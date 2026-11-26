@@ -132,8 +132,8 @@ function loadState() {
 
 function getPublicPlayerName() {
   const user = window.GlassChessCloud?.user;
-  const candidate = user?.displayName || user?.username || String(user?.email || "").split("@")[0];
-  const cleaned = String(candidate || "Anonymous").replace(/[<>]/g, "").trim().slice(0, 20);
+  const candidate = user?.displayName || user?.username || "";
+  const cleaned = String(candidate).replace(/[<>]/g, "").trim().slice(0, 20);
   return cleaned || "Anonymous";
 }
 
