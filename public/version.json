@@ -1,11 +1,11 @@
 {
-  "version": "2026.11.25.10",
+  "version": "2026.11.25.11",
   "name": "Glass Chess Required Update",
   "updatedAt": "2026-11-25",
   "notes": [
-    "Automatically displays the required-update dialog when a newer release is detected",
+    "Keeps the required-update dialog and verified install flow",
     "Adds a direct install action and verified reload flow",
-    "Fixes and expands King Pawn chess-only question handling",
-    "Local game saves remain available while email and recovery-code cloud storage is developed"
+    "Rebuilds King Pawn as an isolated chess-only responder with offline fallback and resilient startup",
+    "Adds email/password registration, sign-in, password reset, and verification-gated private cloud sync"
   ]
 }
