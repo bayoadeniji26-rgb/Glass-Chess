@@ -88,6 +88,8 @@ let victoryPresentationTimer = null;
 let previousVictoryFocus = null;
 let socketBound = false;
 let matchmakingActive = false;
+let toastTimer = null;
+let lastCheckToastPly = 0;
 
 function todayKey() {
   const d = new Date();
@@ -148,7 +150,8 @@ function toast(message) {
   if (!el) return;
   el.textContent = message;
   el.classList.add('show');
-  window.setTimeout(() => el.classList.remove('show'), 2500);
+  if (toastTimer !== null) window.clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => { el.classList.remove('show'); toastTimer = null; }, 2500);
 }
 
 function grantXP(amount, reason) {
@@ -263,6 +266,16 @@ function injectStyles() {
     .gc-piece-glyph.gc-piece-enter{animation:gc-piece-arrive .22s cubic-bezier(.2,.8,.2,1)}
     @keyframes gc-piece-arrive{from{opacity:.65;transform:translateY(-5px) scale(.84)}to{opacity:1;transform:translateY(0) scale(1)}}
     [data-square]:hover .gc-piece-glyph,.square:hover .gc-piece-glyph{transform:translateY(-2px) scale(1.07);filter:drop-shadow(0 5px 4px rgba(0,0,0,.35))}
+    #gc-premium .gc-plus-actions{min-width:0;align-items:stretch}
+    #gc-premium .gc-plus-actions>*{min-width:0;max-width:100%;box-sizing:border-box}
+    #gc-premium .gc-plus-actions button{min-height:38px;transition:transform .14s ease,background-color .16s ease,border-color .16s ease}
+    #gc-premium .gc-plus-actions button:not(:disabled):active{transform:translateY(1px) scale(.985)}
+    #gc-premium .gc-plus-field input,#gc-premium .gc-plus-field select{width:100%;min-width:0;max-width:100%;box-sizing:border-box}
+    #gc-premium .gc-plus-grid>*{min-width:0}
+    #gc-premium .gc-plus-chat p{animation:gc-chat-arrive .18s ease-out both}
+    @keyframes gc-chat-arrive{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
+    @media(max-width:520px){#gc-premium .gc-plus-grid{grid-template-columns:minmax(0,1fr)}}
+    @media(prefers-reduced-motion:reduce){#gc-premium .gc-plus-actions button{transition:none!important}#gc-premium .gc-plus-chat p{animation:none!important}}
     body.gc-no-piece-motion .gc-piece-glyph{transition:none!important;animation:none!important}
     body.gc-piece-royal .gc-piece-glyph[data-side="white"]{background:linear-gradient(160deg,#fffdf0 5%,#f3e2b5 42%,#9c8051 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;-webkit-text-stroke:.35px #fff1ca;filter:drop-shadow(0 2px 1px #5b503e) drop-shadow(0 5px 4px rgba(0,0,0,.34))}
     body.gc-piece-royal .gc-piece-glyph[data-side="black"]{background:linear-gradient(155deg,#56647a 0%,#1a2639 48%,#050a13 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;-webkit-text-stroke:.5px #c5a86a;filter:drop-shadow(0 2px 1px #000) drop-shadow(0 5px 4px rgba(0,0,0,.55))}
@@ -455,17 +468,20 @@ function showRoomState(snapshot) {
   } catch (error) {
     root.querySelector('#gc-plus-room-status').textContent = `Could not sync this game: ${error.message}`;
   }
-  api.setReplayLock(online.role === 'spectator' || Boolean(snapshot.gameOver || snapshot.resigned));
+  api.setReplayLock(online.role === 'spectator' || Boolean(snapshot.gameOver || snapshot.resigned || snapshot.abandoned));
   if (online.role === 'w' || online.role === 'b') api.setOnlineSide(online.role);
   api.setOnlineMatchActive?.(true);
   const white = snapshot.players?.w?.name || 'Waiting for White';
   const black = snapshot.players?.b?.name || 'Waiting for Black';
   root.querySelector('#gc-plus-room-status').textContent = `${online.role === 'spectator' ? 'Spectating' : `Playing as ${online.role === 'w' ? 'White' : 'Black'}`} · ${white} vs ${black} · ${snapshot.result}`;
-  if (snapshot.lastMove?.fx?.isCheck) toast(snapshot.lastMove.fx.isCheckmate ? 'Checkmate!' : 'Check!');
+  if (snapshot.lastMove?.fx?.isCheck && snapshot.lastMove.ply !== lastCheckToastPly) {
+    lastCheckToastPly = snapshot.lastMove.ply;
+    toast(snapshot.lastMove.fx.isCheckmate ? 'Checkmate!' : 'Check!');
+  }
   root.querySelector('#gc-plus-room-people').textContent = `${Number(snapshot.spectators || 0)} spectators`;
   renderRoomButtons();
   window.setTimeout(() => { online.syncing = false; }, 0);
-  if (snapshot.checkmate || snapshot.resigned) {
+  if (snapshot.checkmate || snapshot.resigned || snapshot.abandoned) {
     if (snapshot.checkmate) awardAchievement('first-mate');
     showVictory(snapshot.result || 'Game over');
   }
