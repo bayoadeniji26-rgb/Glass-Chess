@@ -1,4 +1,4 @@
-class ChessEngine {
+export class ChessEngine {
   constructor() {
     this.worker = null;
     this.ready = false;
@@ -209,6 +209,14 @@ class ChessEngine {
 
   search(fen, options = {}) {
     if (this.searchPromise) {
+      const pendingSearch = this.searchPromise;
+      // A stopped/cancelled search may still be unwinding its promise after the
+      // worker has acknowledged "stop". Serialize the next request behind it
+      // instead of returning a spurious busy error. A genuinely live search is
+      // still rejected so two callers cannot compete for one UCI bestmove.
+      if (!this.activeSearch || this.activeSearch.cancelled || this.stopPromise) {
+        return pendingSearch.catch(() => {}).then(() => this.search(fen, options));
+      }
       return Promise.reject(new Error("Stockfish is already running a search."));
     }
 
