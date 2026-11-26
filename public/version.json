@@ -1,11 +1,10 @@
 {
-  "version": "2026.11.25.16",
+  "version": "2026.11.26.1",
   "name": "Glass Chess Required Update",
-  "updatedAt": "2026-11-25",
+  "updatedAt": "2026-11-26",
   "notes": [
-    "Rebuilds the daily chess puzzle board with responsive sizing and working navigation",
-    "Syncs daily puzzle progress with private account saves across devices",
-    "Configures the production Supabase public client for Clerk-authenticated cloud saves",
-    "Preserves local puzzle progress when upgrading from the previous release"
+    "Replaces mirrored template puzzles with 50 distinct CC0 Lichess tactical positions",
+    "Supports full multi-move solution lines with automatic opponent replies",
+    "Adds puzzle-source attribution and stronger puzzle-line regression tests"
   ]
 }
