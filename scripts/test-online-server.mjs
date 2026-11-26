@@ -224,6 +224,7 @@ try {
 
   // Leaving an active two-player game forfeits instead of opening the seat to strangers.
   const abandonedState = nextEvent(friendB, 'room:state', value => value?.abandoned === true);
+  const endedRoomPromise = nextEvent(friendB, 'room:expired', value => value?.code === created.code, 4000);
   const leaveResult = await ack(friendA, 'room:leave');
   assert.equal(leaveResult?.ok, true);
   const abandoned = await abandonedState;
@@ -242,7 +243,7 @@ try {
   assert.equal(intruderJoin?.ok, false, 'A player must not occupy a seat after the game has ended.');
 
   // Ended rooms must be deleted after the retention window, not accumulate forever.
-  const endedRoom = await nextEvent(friendB, 'room:expired', value => value?.code === created.code, 4000);
+  const endedRoom = await endedRoomPromise;
   assert.equal(endedRoom.reason, 'game-ended');
   const deletedRoomJoin = await ack(intruder, 'room:join', {
     code: created.code, playerId: '40000000-0000-4000-8000-000000000001', name: 'Late Guest'
