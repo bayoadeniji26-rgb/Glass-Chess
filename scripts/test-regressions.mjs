@@ -86,3 +86,8 @@ const cloudAuthSource = readFileSync(new URL('../src/clerk-auth.js', import.meta
 assert.match(puzzleUi, /saveEngine\.saveData/, 'Daily puzzle progress must be persisted in the account save payload.');
 assert.match(puzzleUi, /dailyPuzzleProgress/, 'Daily puzzle progress must have a stable cloud-save key.');
 assert.match(cloudAuthSource, /applyCloudProgress/, 'A restored cloud profile must restore daily puzzle progress.');
+
+assert.match(puzzleUi, /solutionIndex/, 'The puzzle UI must track progress through a multi-move solution line.');
+assert.match(puzzleUi, /game\.move\(moveInput\(puzzle\.solution\[solutionIndex\]\)\)/, 'The opponent response must be played from the verified solution line.');
+assert.match(puzzleUi, /Opponent is replying/, 'The player must see the opponent response between their moves.');
+assert.match(puzzleUi, /Lichess CC0/, 'The puzzle UI must attribute the open puzzle source.');
