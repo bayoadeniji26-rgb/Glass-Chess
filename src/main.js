@@ -309,12 +309,7 @@ function createExtraControls() {
       </select>
     `;
 
-    const disclosure = document.createElement("details");
-    disclosure.className = "gc-side-disclosure gc-side-settings";
-    const summary = document.createElement("summary");
-    summary.textContent = "Board & move settings";
-    disclosure.append(summary, panel);
-    side.appendChild(disclosure);
+    side.appendChild(panel);
   }
 
   const controls = document.querySelector(".board-controls");
@@ -334,7 +329,6 @@ function createExtraControls() {
     clear.id = "gc-clear-hint";
     clear.textContent = "Clear Hint";
     clear.title = "Clear the tactical hint and arrow";
-    clear.hidden = true;
     controls.appendChild(clear);
   }
 
@@ -351,13 +345,7 @@ function createExtraControls() {
       <button id="gc-copy-fen">Copy FEN</button>
     `;
 
-    const disclosure = document.createElement("details");
-    disclosure.className = "gc-side-disclosure gc-side-actions";
-    const summary = document.createElement("summary");
-    summary.textContent = "More game actions";
-    disclosure.append(summary, tools);
-    if (side) side.appendChild(disclosure);
-    else controls.insertAdjacentElement("afterend", disclosure);
+    controls.insertAdjacentElement("afterend", tools);
   }
 
   const analysis = document.querySelector(".analysis-panel");
@@ -757,8 +745,6 @@ function render() {
   updateCaptured();
   updateGameStatus();
   updateLabels();
-  const clearHintButton = $("gc-clear-hint");
-  if (clearHintButton) clearHintButton.hidden = activeHintMove?.fen !== game.fen();
 
   $("evaluation").hidden = !settings.evaluation;
   window.GlassChessGameplaySuite?.refresh?.();
@@ -1390,8 +1376,6 @@ function showHintStatus(message, kind = "success") {
   status.classList.toggle("is-error", kind === "error");
   status.classList.toggle("is-loading", kind === "loading");
   status.textContent = message;
-  const clearButton = $("gc-clear-hint");
-  if (clearButton) clearButton.hidden = !activeHintMove;
 }
 
 function clearHint() {
