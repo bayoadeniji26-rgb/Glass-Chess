@@ -1,3 +1,5 @@
+import { ChessEngine } from "./engine.js";
+
 const STORAGE_KEY = 'glass-chess-premium-v1';
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
@@ -45,6 +47,13 @@ let reviewResults = [];
 let audioContext = null;
 let liveAnalysisToken = 0;
 let liveAnalysisRunning = false;
+let liveAnalysisPaused = false;
+let liveAnalysisScheduled = false;
+let liveAnalysisTimer = null;
+let liveAnalysisStopPromise = Promise.resolve();
+let liveAnalysisEngine = null;
+let liveAnalysisEngineReady = null;
+let liveAnalysisSuppressed = false;
 let reviewToken = 0;
 let puzzleToken = 0;
 
@@ -158,10 +167,10 @@ function buildInterface() {
       </div>
       <div class="gc-card"><div class="gc-row"><h4>Chess clock</h4><span class="gc-pill">One clock · Game Lab</span></div><p class="gc-muted">Time controls and the live countdown are managed in Game Lab, so there is only one authoritative clock per match.</p><button id="gc-open-clock-tools">Open Game Lab clock</button></div>
       <div class="gc-card gc-live-engine-card">
-        <div class="gc-row"><h4>Live Engine Lab</h4><span class="gc-pill" id="gc-engine-status">Connecting to Stockfish…</span></div>
+        <div class="gc-row"><h4>Live Engine Lab</h4><span class="gc-pill" id="gc-engine-status">LIVE · Starting automatically</span></div>
         <div class="gc-row gc-live-score-row"><strong id="gc-live-eval">—</strong><span class="gc-muted" id="gc-live-depth">Ready for analysis</span></div>
         <div class="gc-evalbar"><span id="gc-eval-white" style="width:50%"></span><i></i></div>
-        <p id="gc-live-progress" class="gc-engine-progress">Stockfish is starting…</p>
+        <p id="gc-live-progress" class="gc-engine-progress">Live analysis follows the current board automatically.</p>
         <div class="gc-live-result"><strong>Best move</strong><div id="gc-live-best" class="gc-muted">Analyze the current position to get a best-move recommendation.</div></div>
         <div class="gc-live-result"><strong>Principal variation</strong><div id="gc-live-pv" class="gc-muted">The engine’s suggested continuation will appear here.</div></div>
         <label class="gc-live-depth-label" for="gc-live-depth-select">Analysis depth</label>
@@ -172,9 +181,11 @@ function buildInterface() {
           <option value="22">Very deep · Depth 22</option>
         </select>
         <div class="gc-actions">
-          <button class="primary" id="gc-live-analyze">Analyze current position</button>
-          <button id="gc-live-stop" disabled>Stop</button>
+          <button class="primary" id="gc-live-analyze">Refresh live analysis</button>
+          <button id="gc-live-stop" disabled>Pause live analysis</button>
           <button id="gc-open-analysis">Open Analysis Studio</button>
+        </div>
+        <p class="gc-muted">Always-on board monitoring. It refreshes after moves and runs in its own Stockfish worker so it never blocks your moves or the computer's turn.</p>
         </div>
       </div>
       <div class="gc-card"><h4>Opening explorer</h4><div id="gc-opening-name" class="gc-stat" style="font-size:17px">Unclassified position</div><div id="gc-opening-family" class="gc-muted">Play a few moves to identify the opening.</div><div id="gc-opening-suggestions" class="gc-actions"></div></div>
@@ -380,6 +391,7 @@ function onMove(move, beforeFen, afterFen) {
   if (api.gameOver) { recordFinishedGame(); stopClock(); window.GlassChessOnlinePlus?.onGameFinished?.(); }
   setTimeout(() => applyTheme(data.theme), 0);
   refreshReplayControls();
+  if (!puzzle?.active) scheduleLiveAnalysis(180);
 }
 
 function onReset(fen) {
@@ -403,6 +415,8 @@ function onReset(fen) {
   renderOpening();
   setTimeout(() => applyTheme(data.theme), 0);
   refreshReplayControls();
+  liveAnalysisSuppressed = false;
+  scheduleLiveAnalysis(180);
 }
 
 function onUndo(history, fen) {
@@ -419,6 +433,7 @@ function onUndo(history, fen) {
   } finally { suppressTracking = false; }
   renderOpening();
   refreshReplayControls();
+  if (!puzzle?.active) scheduleLiveAnalysis(180);
 }
 
 function onLoadedGame(history, fen) {
@@ -437,6 +452,8 @@ function onLoadedGame(history, fen) {
   api.setReplayLock(false);
   renderOpening();
   refreshReplayControls();
+  liveAnalysisSuppressed = false;
+  scheduleLiveAnalysis(180);
 }
 
 function refreshReplayControls() {
@@ -461,6 +478,7 @@ function replayTo(index) {
   $('gc-replay-range').value = String(target);
   refreshReplayControls();
   renderOpening();
+  scheduleLiveAnalysis(320);
 }
 
 function exitReplay() {
@@ -472,12 +490,21 @@ function exitReplay() {
     api.setReplayLock(false);
   } finally { suppressTracking = false; }
   refreshReplayControls(); renderOpening();
+  scheduleLiveAnalysis(180);
 }
 
 async function createPuzzle() {
   if (!api.engineReady) { $('gc-puzzle-status').textContent = 'Stockfish is still loading. Try again when the engine is ready.'; return; }
   if (api.thinking) { $('gc-puzzle-status').textContent = 'Wait for the current engine calculation to finish.'; return; }
   if (replaying) exitReplay();
+  liveAnalysisSuppressed = true;
+  liveAnalysisToken += 1;
+  if (liveAnalysisTimer !== null) { clearTimeout(liveAnalysisTimer); liveAnalysisTimer = null; }
+  liveAnalysisScheduled = false;
+  if (liveAnalysisEngine?.activeSearch) {
+    const stop = liveAnalysisEngine.stop();
+    liveAnalysisStopPromise = Promise.all([liveAnalysisStopPromise, stop]).then(() => undefined).catch(() => {});
+  }
   const token = ++puzzleToken, generation = api.generation, fen = api.fen;
   $('gc-puzzle-status').textContent = 'Stockfish is selecting a challenge move…';
   try {
@@ -486,12 +513,15 @@ async function createPuzzle() {
     const best = String(result?.bestMove || '').toLowerCase();
     if (!/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(best)) throw new Error('Stockfish did not return a legal move.');
     puzzle = { fen, best, active: true, hinted: false };
+    liveAnalysisSuppressed = true;
     api.setMode('analysis', false);
     $('gc-puzzle-status').textContent = `Puzzle ready. Find the best move for ${api.turn === 'w' ? 'White' : 'Black'}.`;
     $('gc-puzzle-hint').textContent = 'Show hint';
     switchTab('train');
   } catch (error) {
     if (token === puzzleToken) $('gc-puzzle-status').textContent = `Puzzle could not be created: ${error.message}`;
+    liveAnalysisSuppressed = false;
+    scheduleLiveAnalysis(180);
   }
 }
 
@@ -505,6 +535,7 @@ async function handlePuzzleMove(move, afterFen) {
     data.bestPuzzleStreak = Math.max(data.bestPuzzleStreak, data.puzzleStreak);
     saveData(); renderProfile(); playTone('success');
     $('gc-puzzle-status').textContent = `Correct! ${move.san} is Stockfish’s top move. Puzzle solved.`;
+    liveAnalysisSuppressed = false;
     window.GlassChessOnlinePlus?.onPuzzleSolved?.();
     return;
   }
@@ -555,93 +586,172 @@ function formatEngineProgress(info) {
   return parts.join(" · ") || "Stockfish is calculating…";
 }
 
-async function stopLiveAnalysis() {
-  if (!liveAnalysisRunning) return;
-  liveAnalysisToken += 1;
-  $('gc-engine-status').textContent = "Stopping…";
-  $('gc-live-progress').textContent = "Stopping the current Stockfish search…";
-  try { await api.stopSearch(); } catch (error) { console.warn("Could not stop Live Engine Lab:", error); }
-  liveAnalysisRunning = false;
-  $('gc-live-analyze').disabled = !api.engineReady;
-  $('gc-live-stop').disabled = true;
-  $('gc-engine-status').textContent = "Analysis stopped";
-  $('gc-live-progress').textContent = "Ready for another position analysis.";
+function syncLiveAnalysisControls() {
+  const refresh = $('gc-live-analyze');
+  const pause = $('gc-live-stop');
+  if (!refresh || !pause) return;
+  refresh.disabled = false;
+  refresh.textContent = liveAnalysisPaused ? "Resume live analysis" : "Refresh live analysis";
+  pause.disabled = liveAnalysisPaused || (!liveAnalysisRunning && !liveAnalysisScheduled);
 }
 
-async function analyzeCurrent() {
-  if (liveAnalysisRunning) return;
-  if (!api.engineReady) {
-    $('gc-engine-status').textContent = "Stockfish is not ready";
-    $('gc-live-progress').textContent = "The engine has not finished loading. Check the engine status at the top of the board.";
-    return;
+function prepareLiveAnalysisEngine() {
+  if (!liveAnalysisEngine) liveAnalysisEngine = new ChessEngine();
+  if (!liveAnalysisEngineReady) {
+    liveAnalysisEngineReady = (async () => {
+      await liveAnalysisEngine.start();
+      await liveAnalysisEngine.configure({ skillLevel: 20, multiPV: 1 });
+    })().catch(error => {
+      liveAnalysisEngineReady = null;
+      throw error;
+    });
   }
-  if (api.thinking) {
-    $('gc-engine-status').textContent = "Engine busy";
-    $('gc-live-progress').textContent = "Stockfish is handling another move or analysis. Try again when it finishes.";
+  return liveAnalysisEngineReady;
+}
+
+function scheduleLiveAnalysis(delay = 180) {
+  if (!api || liveAnalysisPaused) return;
+  if (liveAnalysisTimer !== null) {
+    clearTimeout(liveAnalysisTimer);
+    liveAnalysisTimer = null;
+  }
+  const token = ++liveAnalysisToken;
+  const fen = api.fen;
+
+  if (liveAnalysisSuppressed || puzzle?.active) {
+    liveAnalysisScheduled = false;
+    liveAnalysisRunning = false;
+    const pendingStop = liveAnalysisEngine?.activeSearch
+      ? liveAnalysisEngine.stop()
+      : Promise.resolve();
+    liveAnalysisStopPromise = Promise.all([liveAnalysisStopPromise, pendingStop]).then(() => undefined).catch(() => {});
+    $('gc-engine-status').textContent = "Live analysis paused for puzzle";
+    $('gc-live-progress').textContent = "The live engine stays out of the way while you solve this puzzle.";
+    syncLiveAnalysisControls();
     return;
   }
 
-  const token = ++liveAnalysisToken;
-  const fen = api.fen;
-  const sideToMove = api.turn;
+  // Invalidate the old position immediately, then wait for its UCI stop acknowledgement
+  // before asking the dedicated worker to analyze the newly played position.
+  const pendingStop = liveAnalysisEngine?.activeSearch
+    ? liveAnalysisEngine.stop()
+    : Promise.resolve();
+  liveAnalysisStopPromise = Promise.all([liveAnalysisStopPromise, pendingStop]).then(() => undefined).catch(() => {});
+  const stopBeforeNextSearch = liveAnalysisStopPromise;
+  liveAnalysisRunning = false;
+  liveAnalysisScheduled = true;
+  $('gc-engine-status').textContent = "LIVE · Updating position";
+  $('gc-live-progress').textContent = "The board changed. Stockfish is refreshing its evaluation automatically.";
+  syncLiveAnalysisControls();
+
+  liveAnalysisTimer = window.setTimeout(async () => {
+    liveAnalysisTimer = null;
+    await stopBeforeNextSearch;
+    if (token !== liveAnalysisToken || liveAnalysisPaused || api.fen !== fen) return;
+    if (liveAnalysisSuppressed || puzzle?.active) {
+      liveAnalysisScheduled = false;
+      syncLiveAnalysisControls();
+      return;
+    }
+    void runLiveAnalysis(fen, token);
+  }, Math.max(0, Number(delay) || 0));
+}
+
+async function runLiveAnalysis(fen, token) {
+  if (token !== liveAnalysisToken || liveAnalysisPaused || api.fen !== fen) return;
+  liveAnalysisScheduled = false;
+  liveAnalysisRunning = true;
+  const sideToMove = fen.split(/\s+/)[1] || api.turn;
   const depth = Number($('gc-live-depth-select').value) || 14;
   let latest = null;
 
-  liveAnalysisRunning = true;
-  $('gc-live-analyze').disabled = true;
+  $('gc-live-analyze').textContent = "Refresh live analysis";
   $('gc-live-stop').disabled = false;
-  $('gc-engine-status').textContent = `Analyzing · Depth ${depth}`;
-  $('gc-live-progress').textContent = "Preparing the current board position…";
+  $('gc-engine-status').textContent = "LIVE · Starting Stockfish";
+  $('gc-live-progress').textContent = "Preparing the dedicated analysis worker…";
   $('gc-live-depth').textContent = `Depth 0 / ${depth}`;
   $('gc-live-eval').textContent = "—";
   $('gc-eval-white').style.width = "50%";
-  $('gc-live-best').textContent = "Stockfish is searching for the strongest move…";
+  $('gc-live-best').textContent = "Stockfish is searching the current position…";
   $('gc-live-pv').textContent = "Waiting for the principal variation…";
 
   try {
-    const result = await api.search(fen, depth, info => {
-      if (token !== liveAnalysisToken || api.fen !== fen) return;
-      latest = info;
-      const score = scoreFromInfo(info);
-      if (score != null) updateLiveEvaluation(score, info, sideToMove);
-      $('gc-live-progress').textContent = formatEngineProgress(info);
-      $('gc-engine-status').textContent = info?.depth
-        ? `Analyzing · Depth ${info.depth}/${depth}`
-        : "Analyzing…";
+    await prepareLiveAnalysisEngine();
+    if (token !== liveAnalysisToken || liveAnalysisPaused || api.fen !== fen) return;
+
+    const result = await liveAnalysisEngine.search(fen, {
+      depth,
+      onInfo: info => {
+        if (token !== liveAnalysisToken || api.fen !== fen || liveAnalysisPaused) return;
+        latest = info;
+        const score = scoreFromInfo(info);
+        if (score != null) updateLiveEvaluation(score, info, sideToMove);
+        $('gc-live-progress').textContent = formatEngineProgress(info);
+        $('gc-engine-status').textContent = info?.depth
+          ? `LIVE · Depth ${info.depth}/${depth}`
+          : "LIVE · Analyzing";
+      }
     });
 
-    if (token !== liveAnalysisToken) return;
+    if (token !== liveAnalysisToken || liveAnalysisPaused) return;
     if (api.fen !== fen) {
-      $('gc-engine-status').textContent = "Position changed";
-      $('gc-live-progress').textContent = "The board changed while Stockfish was analyzing. Run the analysis again for the new position.";
+      $('gc-engine-status').textContent = "LIVE · Position changed";
+      scheduleLiveAnalysis(0);
       return;
     }
     if (result?.cancelled) {
-      $('gc-engine-status').textContent = "Analysis stopped";
+      $('gc-engine-status').textContent = "LIVE · Refreshing";
+      scheduleLiveAnalysis(180);
       return;
     }
 
     const best = String(result?.bestMove || "");
     const score = scoreFromInfo(result) ?? scoreFromInfo(latest);
     updateLiveEvaluation(score, result || latest, sideToMove, best);
-    $('gc-live-progress').textContent = formatEngineProgress(result || latest);
-    $('gc-engine-status').textContent = "Analysis complete";
+    $('gc-live-progress').textContent = formatEngineProgress(result || latest) || "Position evaluated. Waiting for the next board change.";
+    $('gc-engine-status').textContent = `LIVE · Depth ${result?.depth || depth}`;
     if (!best || best === "(none)") {
       $('gc-live-best').textContent = "No legal move is available in this position.";
     }
   } catch (error) {
     if (token === liveAnalysisToken) {
-      $('gc-engine-status').textContent = "Analysis error";
-      $('gc-live-progress').textContent = "Stockfish could not complete this request.";
-      $('gc-live-best').textContent = error?.message || "Unknown engine error.";
+      $('gc-engine-status').textContent = "LIVE · Engine unavailable";
+      $('gc-live-progress').textContent = error?.message || "The dedicated Stockfish worker could not complete its analysis.";
+      $('gc-live-best').textContent = "Live analysis will retry when you refresh or the next position is played.";
     }
   } finally {
     if (token === liveAnalysisToken) {
       liveAnalysisRunning = false;
-      $('gc-live-analyze').disabled = !api.engineReady;
-      $('gc-live-stop').disabled = true;
+      syncLiveAnalysisControls();
     }
   }
+}
+
+async function stopLiveAnalysis() {
+  liveAnalysisPaused = true;
+  liveAnalysisToken += 1;
+  if (liveAnalysisTimer !== null) {
+    clearTimeout(liveAnalysisTimer);
+    liveAnalysisTimer = null;
+  }
+  liveAnalysisScheduled = false;
+  $('gc-engine-status').textContent = "LIVE · Pausing";
+  $('gc-live-progress').textContent = "Stopping the dedicated Live Engine Lab worker…";
+  try {
+    if (liveAnalysisEngine) await liveAnalysisEngine.stop();
+  } catch (error) {
+    console.warn("Could not pause Live Engine Lab:", error);
+  }
+  liveAnalysisRunning = false;
+  $('gc-engine-status').textContent = "LIVE · Paused";
+  $('gc-live-progress').textContent = "Live monitoring is paused. Resume it to follow the current board again.";
+  syncLiveAnalysisControls();
+}
+
+function analyzeCurrent() {
+  liveAnalysisPaused = false;
+  scheduleLiveAnalysis(0);
+  syncLiveAnalysisControls();
 }
 
 function moveClass(loss) {
@@ -755,7 +865,7 @@ function bindEvents() {
   $('gc-live-analyze').addEventListener('click', analyzeCurrent);
   $('gc-live-stop').addEventListener('click', stopLiveAnalysis);
   $('gc-live-depth-select').addEventListener('change', () => {
-    if (liveAnalysisRunning) void stopLiveAnalysis();
+    if (!liveAnalysisPaused) scheduleLiveAnalysis(120);
   });
   $('gc-open-analysis').addEventListener('click', () => { api.setMode('analysis'); switchTab('home'); });
   $('gc-create-puzzle').addEventListener('click', createPuzzle);
@@ -881,24 +991,12 @@ export function mount(chessApi) {
     }
   };
   // Only update the initial loading label. Never overwrite Live Engine Lab's own analysis status.
-  const statusTimer = setInterval(() => {
-    if (!document.getElementById('gc-premium')) { clearInterval(statusTimer); return; }
-    if (api.engineReady) {
-      if (/connecting|loading|checking|starting/i.test($('gc-engine-status').textContent)) {
-        $('gc-engine-status').textContent = 'Stockfish ready';
-        $('gc-live-progress').textContent = 'Engine ready. Select a depth and analyze the current position.';
-        $('gc-live-analyze').disabled = false;
-      }
-      clearInterval(statusTimer);
-      return;
-    }
-    const boardStatus = document.getElementById('engine-status')?.textContent || '';
-    if (/failed|error/i.test(boardStatus)) {
-      $('gc-engine-status').textContent = 'Engine unavailable';
-      $('gc-live-progress').textContent = 'Stockfish could not start. Check the engine connection at the top of the board.';
-      $('gc-live-analyze').disabled = true;
-      clearInterval(statusTimer);
-    }
-  }, 300);
+  // Start Live Engine Lab automatically. It owns an isolated Stockfish worker and
+  // refreshes on every board-position change without locking player input.
+  scheduleLiveAnalysis(250);
+  window.addEventListener('pagehide', () => {
+    if (liveAnalysisTimer !== null) clearTimeout(liveAnalysisTimer);
+    void liveAnalysisEngine?.stop?.();
+  }, { once: true });
   console.log('Glass Chess Premium Suite loaded.');
 }
