@@ -162,16 +162,21 @@ function removeSocketFromRoom(socket, { disconnected = false } = {}) {
         player.disconnectedAt = Date.now();
         if (player.disconnectTimer) clearTimeout(player.disconnectTimer);
         const playerId = player.playerId;
-        player.disconnectTimer = setTimeout(() => {
-          const current = rooms.get(code);
-          const currentPlayer = current?.players[side];
-          if (!current || currentPlayer?.playerId !== playerId || currentPlayer.connected) return;
-          current.abandoned = side;
-          currentPlayer.disconnectTimer = null;
+        if (room.abandoned || room.resigned || room.game.isGameOver()) {
+          player.disconnectTimer = null;
           activePlayers.delete(playerId);
-          broadcast(current);
-        }, DISCONNECT_GRACE_MS);
-        player.disconnectTimer.unref?.();
+        } else {
+          player.disconnectTimer = setTimeout(() => {
+            const current = rooms.get(code);
+            const currentPlayer = current?.players[side];
+            if (!current || currentPlayer?.playerId !== playerId || currentPlayer.connected || current.abandoned || current.resigned || current.game.isGameOver()) return;
+            current.abandoned = side;
+            currentPlayer.disconnectTimer = null;
+            activePlayers.delete(playerId);
+            broadcast(current);
+          }, DISCONNECT_GRACE_MS);
+          player.disconnectTimer.unref?.();
+        }
       } else {
         if (player.disconnectTimer) clearTimeout(player.disconnectTimer);
         activePlayers.delete(player.playerId);
@@ -422,7 +427,7 @@ io.on('connection', socket => {
         if (leavingPlayer.disconnectTimer) clearTimeout(leavingPlayer.disconnectTimer);
         leavingPlayer.id = null;
         leavingPlayer.connected = false;
-        room.abandoned = side;
+        if (!room.abandoned && !room.resigned && !room.game.isGameOver()) room.abandoned = side;
         activePlayers.delete(leavingPlayer.playerId);
         socket.leave(code);
         socket.data.roomCode = null;
