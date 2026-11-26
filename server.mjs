@@ -37,7 +37,7 @@ const io = new Server(httpServer, {
   pingTimeout: 20000
 });
 
-const cleanName = value => String(value || 'Player').replace(/[<>\u0000-\u001f]/g, '').trim().slice(0, 20) || 'Player';
+const cleanName = value => String(value || 'Anonymous').replace(/[<>\u0000-\u001f]/g, '').trim().slice(0, 20) || 'Anonymous';
 const cleanCode = value => String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
 const cleanPlayerId = value => {
   const id = String(value || '').trim().toLowerCase();
