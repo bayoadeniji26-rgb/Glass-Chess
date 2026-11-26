@@ -1,13 +1,11 @@
 {
-  "version": "2026.11.25.14",
+  "version": "2026.11.25.15",
   "name": "Glass Chess Required Update",
   "updatedAt": "2026-11-25",
   "notes": [
-    "Keeps the required-update dialog and verified install flow",
-    "Adds a direct install action and verified reload flow",
-    "Rebuilds King Pawn as an isolated chess-only responder with offline fallback and resilient startup",
-    "Moves account authentication from Firebase to Clerk email/password verification",
-    "Adds Supabase private cloud saves with per-user row-level security",
-    "Keeps local guest saves and separates donations from account authentication"
+    "Rebuilds the daily chess puzzle board with responsive square sizing and reliable move markers",
+    "Adds working previous and next puzzle navigation across all 50 tactical puzzles",
+    "Configures the production Supabase public client settings for authenticated cloud saves",
+    "Keeps private per-account row-level security and local guest saves"
   ]
 }
