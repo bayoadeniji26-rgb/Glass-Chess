@@ -18,6 +18,9 @@ for (const puzzle of DAILY_PUZZLES) {
   assert.ok(categories.has(puzzle.type), 'Unknown category on Day ' + puzzle.day);
   assert.ok(puzzle.title && puzzle.prompt && puzzle.hint && puzzle.answer && puzzle.explanation, 'Missing puzzle content on Day ' + puzzle.day);
   assert.ok(isPuzzleAnswerCorrect(puzzle, puzzle.answer), 'Canonical answer rejected on Day ' + puzzle.day);
+  for (const alias of puzzle.accepted || []) {
+    assert.ok(isPuzzleAnswerCorrect(puzzle, alias), 'Accepted answer alias rejected on Day ' + puzzle.day + ': ' + alias);
+  }
 }
 assert.equal(normalizePuzzleAnswer('  FORTY-TWO! '), 'forty two');
 assert.equal(isPuzzleAnswerCorrect(DAILY_PUZZLES[1], 'forty-two'), true);
@@ -29,6 +32,8 @@ assert.equal(getPuzzleDayIndex('2026-11-25', '2026-11-26'), 2);
 assert.equal(getPuzzleDayIndex('2026-11-25', '2026-12-14'), 20);
 assert.equal(getPuzzleDayIndex('2026-11-25', '2027-01-20'), 50);
 assert.equal(getPuzzleDayIndex('2026-11-25', '2026-11-24'), 1);
+assert.equal(getPuzzleDayIndex('2024-02-28', '2024-03-01'), 3, 'Leap day progression must be calendar-correct.');
+assert.equal(getPuzzleDayIndex('2026-12-31', '2027-01-01'), 2, 'Year boundary progression must be calendar-correct.');
 assert.throws(() => getPuzzleDayIndex('2026-02-30', '2026-03-01'), /Invalid calendar date/);
 
 const start = new Chess();
@@ -61,4 +66,5 @@ const bareKingWinnerFen = '7k/8/8/8/8/8/8/K6r b - - 0 1';
 assert.equal(isFlagFallDraw(bareKingWinnerFen, 'b'), true, 'A bare-king winner cannot checkmate even when the flagged side still has a rook.');
 const rookWinnerFen = '7k/8/8/8/8/8/8/K6R b - - 0 1';
 assert.equal(isFlagFallDraw(rookWinnerFen, 'b'), false, 'A winner with a rook can potentially checkmate.');
+assert.equal(isFlagFallDraw('7k/8/8/8/8/8/8/K7 b - - 0 1', 'b'), true, 'Bare kings must draw on time.');
 assert.throws(() => isFlagFallDraw(rookWinnerFen, 'x'), /flagging side/);
