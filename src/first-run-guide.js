@@ -126,8 +126,8 @@ import './first-run-guide.css';
     root.querySelector('#gc-first-run-note').hidden = false;
     root.querySelector('#gc-first-run-choices').hidden = !welcome;
     root.querySelector('[data-guide-action="back"]').hidden = welcome;
-    root.querySelector('[data-guide-action="next"]').hidden = welcome || currentStep === STEPS.length;
-    root.querySelector('[data-guide-action="next"]').textContent = 'Next';
+    root.querySelector('[data-guide-action="next"]').hidden = welcome;
+    root.querySelector('[data-guide-action="next"]').textContent = currentStep === STEPS.length ? 'Finish' : 'Next';
     root.querySelector('[data-guide-action="skip"]').textContent = welcome ? 'Not now' : 'Skip guide';
     root.querySelector('#gc-first-run-progress-fill').style.width = (welcome ? 0 : currentStep / STEPS.length * 100) + '%';
   }
@@ -143,6 +143,7 @@ import './first-run-guide.css';
 
   function closeGuide() {
     if (!root) return;
+    if (!isDone()) markDone();
     root.hidden = true;
     lastOpener?.focus?.();
   }
