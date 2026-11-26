@@ -757,6 +757,8 @@ function render() {
   updateCaptured();
   updateGameStatus();
   updateLabels();
+  const clearHintButton = $("gc-clear-hint");
+  if (clearHintButton) clearHintButton.hidden = activeHintMove?.fen !== game.fen();
 
   $("evaluation").hidden = !settings.evaluation;
   window.GlassChessGameplaySuite?.refresh?.();
