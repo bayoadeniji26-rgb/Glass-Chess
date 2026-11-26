@@ -136,6 +136,8 @@ try {
   const whiteId = matchedForB.role === 'w' ? ids.black : ids.white;
   const whiteToken = matchedForB.role === 'w' ? matchedForB.resumeToken : foundA.resumeToken;
   const blackToken = matchedForB.role === 'b' ? matchedForB.resumeToken : foundA.resumeToken;
+  const secondRoomAttempt = await ack(white, 'room:create', { playerId: whiteId, name: 'Player A Again' });
+  assert.equal(secondRoomAttempt?.ok, false, 'An active player must not create a second room from the same socket.');
 
   const outOfTurn = await ack(black, 'game:move', {
     code: matchedForB.code, expectedPly: 0, expectedFen: START_FEN,
@@ -192,6 +194,8 @@ try {
   const friendB = await connectClient(url);
   const created = await ack(friendA, 'room:create', { playerId: ids.friendA, name: 'Friend A' });
   assert.equal(created?.ok, true);
+  const activePlayerInviteAttempt = await ack(white, 'room:join', { code: created.code, playerId: whiteId, name: 'Player Already Playing' });
+  assert.equal(activePlayerInviteAttempt?.ok, false, 'An active player must not take a seat in a second room.');
   assert.match(created.code, /^[A-Z0-9]{8}$/);
   assert.equal(typeof created.resumeToken, 'string');
   const accepted = await ack(friendB, 'room:join', { code: created.code, playerId: ids.friendB, name: 'Friend B' });
@@ -217,7 +221,7 @@ try {
   const leaveResult = await ack(friendA, 'room:leave');
   assert.equal(leaveResult?.ok, true);
   const abandoned = await abandonedState;
-  assert.match(abandoned.result, /wins by disconnection/);
+  assert.match(abandoned.result, /Black wins by disconnection/, 'The opponent should win when White leaves an active game.');
   const postForfeitMove = await ack(friendB, 'game:move', {
     code: created.code, expectedPly: 1, expectedFen: new Chess().fen(),
     move: { from: 'e7', to: 'e5' }
