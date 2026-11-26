@@ -7,6 +7,7 @@ import {
   normalizePuzzleAnswer
 } from '../src/daily-puzzle-data.js';
 import { calculatePositionHistory, isFlagFallDraw } from '../src/chess-position-tools.js';
+import { remainingSeconds } from '../src/gameplay-timers.js';
 
 assert.equal(DAILY_PUZZLES.length, 50, 'The series must contain exactly 50 puzzles.');
 assert.deepEqual(DAILY_PUZZLES.map(puzzle => puzzle.day), Array.from({ length: 50 }, (_, index) => index + 1));
@@ -68,3 +69,9 @@ const rookWinnerFen = '7k/8/8/8/8/8/8/K6R b - - 0 1';
 assert.equal(isFlagFallDraw(rookWinnerFen, 'b'), false, 'A winner with a rook can potentially checkmate.');
 assert.equal(isFlagFallDraw('7k/8/8/8/8/8/8/K7 b - - 0 1', 'b'), true, 'Bare kings must draw on time.');
 assert.throws(() => isFlagFallDraw(rookWinnerFen, 'x'), /flagging side/);
+
+assert.equal(remainingSeconds(60000, 0), 60);
+assert.equal(remainingSeconds(60000, 1001), 59);
+assert.equal(remainingSeconds(60000, 59999), 1);
+assert.equal(remainingSeconds(60000, 60001), 0, 'Timer must expire from elapsed time even after a throttled tab resumes.');
+assert.throws(() => remainingSeconds(Number.NaN, 0), /finite numbers/);
