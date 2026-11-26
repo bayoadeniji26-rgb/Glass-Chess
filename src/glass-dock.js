@@ -11,12 +11,12 @@ import "./glass-dock.css";
   ];
 
   const categories = [
-    { id: "analysis", label: "Engine", icon: "◉", terms: ["live engine lab", "engine analysis", "evaluation", "best move"] },
-    { id: "play", label: "Online", icon: "♟", terms: ["online multiplayer", "online", "room", "invite", "friend", "spectat"] },
-    { id: "progress", label: "Progress", icon: "✦", terms: ["daily missions", "achievements", "player profile", "rating", "statistic", "xp", "streak"] },
-    { id: "learn", label: "Learn", icon: "▤", terms: ["puzzle training", "training routine", "opening explorer", "puzzle", "opening"] },
-    { id: "style", label: "Appearance", icon: "◈", terms: ["board themes", "piece appearance", "theme", "customiz", "sound", "animation"] },
-    { id: "settings", label: "Settings", icon: "⚙", terms: ["focus & accessibility", "move preferences", "preference", "option", "personality"] }
+    { id: "home", label: "Overview", icon: "⌂" },
+    { id: "train", label: "Train", icon: "▤" },
+    { id: "review", label: "Review", icon: "↺" },
+    { id: "custom", label: "Customize", icon: "◈" },
+    { id: "onlineplus", label: "Online", icon: "♟" },
+    { id: "advanced-lab", label: "Advanced", icon: "⚙" }
   ];
 
   function findPanel() {
@@ -91,41 +91,35 @@ import "./glass-dock.css";
       }
     }
 
-    const headingNodes = () => Array.from(panel.querySelectorAll("h1,h2,h3,h4,.eyebrow,[data-section-title]"));
-    const findHeading = terms => headingNodes().find(node => {
-      const text = (node.textContent || "").trim().toLowerCase();
-      return text && terms.some(term => text.includes(term));
-    });
+    function viewFor(id) {
+      return Array.from(panel.querySelectorAll("[data-view]")).find(view => view.dataset.view === id) || null;
+    }
 
-    function goTo(target) {
-      if (!target) return;
-      openHub();
-      requestAnimationFrame(() => {
-        const top = target.getBoundingClientRect().top - scroll.getBoundingClientRect().top + scroll.scrollTop - 14;
-        scroll.scrollTo({ top: Math.max(0, top), behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
-        target.classList.remove("gc-hub-target-flash");
-        void target.offsetWidth;
-        target.classList.add("gc-hub-target-flash");
-      });
+    function tabFor(id) {
+      return Array.from(panel.querySelectorAll("[data-tab]")).find(tab => tab.dataset.tab === id) || null;
     }
 
     function buildShortcuts() {
       shortcuts.replaceChildren();
-      const all = iconButton("Show all tools", "⌂", "gc-hub-shortcut-all");
-      all.addEventListener("click", () => scroll.scrollTo({ top: 0, behavior: "smooth" }));
-      shortcuts.appendChild(all);
       for (const item of categories) {
-        const target = findHeading(item.terms);
-        if (!target) continue;
+        const view = viewFor(item.id);
+        const tab = tabFor(item.id);
+        if (!view || !tab) continue;
         const button = iconButton(item.label, item.icon, "gc-hub-shortcut");
         button.dataset.section = item.id;
-        button.addEventListener("click", () => goTo(target));
+        button.setAttribute("aria-pressed", String(view.classList.contains("active")));
+        button.classList.toggle("active", view.classList.contains("active"));
+        button.addEventListener("click", () => {
+          tab.click();
+          shortcuts.querySelectorAll("[data-section]").forEach(shortcut => {
+            const selected = shortcut.dataset.section === item.id;
+            shortcut.classList.toggle("active", selected);
+            shortcut.setAttribute("aria-pressed", String(selected));
+          });
+          scroll.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+        });
         shortcuts.appendChild(button);
       }
-    }
-
-    function publishToolsState(open) {
-      window.dispatchEvent(new CustomEvent("glasschess:tools-state", { detail: { open } }));
     }
 
     function openHub() {
@@ -166,8 +160,12 @@ import "./glass-dock.css";
       if (event.key === "Escape" && dock.classList.contains("gc-hub-open")) closeHub();
     });
 
-    // Rebuild quick links if Online Plus adds its controls after the initial page render.
+    // The hub strip is the Tools tab navigation, not a scroll-only shortcut.
     buildShortcuts();
+    panel.addEventListener("click", event => {
+      if (event.target.closest("[data-tab]")) requestAnimationFrame(buildShortcuts);
+    });
+    // Online + Club and Advanced tabs mount after the core suite.
     const observer = new MutationObserver(() => buildShortcuts());
     observer.observe(panel, { childList: true, subtree: true });
     window.setTimeout(() => observer.disconnect(), 12000);
