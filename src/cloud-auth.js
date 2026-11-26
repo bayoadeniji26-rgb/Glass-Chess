@@ -82,6 +82,7 @@ function ensureMenu() {
   menu.innerHTML = `
     <button type="button" data-action="switch">Switch Account</button>
     <button type="button" data-action="sync">Force Sync Now</button>
+    <button type="button" data-action="verify">Verify Email</button>
     <button type="button" data-action="vault">Cloud Game Vault</button>
     <button type="button" data-action="avatar">Change Profile Picture</button>
     <div class="gc-auth-menu-divider"></div>
@@ -97,6 +98,11 @@ function ensureMenu() {
       if (action === 'switch') {
         await authSdk.signOut(auth);
         await signIn();
+      } else if (action === 'verify') {
+        openEmailAuthDialog();
+        $('gc-email-auth-verification').hidden = false;
+        $('gc-email-auth-email').value = auth.currentUser?.email || activeUser?.email || '';
+        emailAuthStatus('Verify the address shown here to turn on private cloud saves.');
       } else if (action === 'sync') {
         await syncNow();
       } else if (action === 'vault') {
@@ -419,6 +425,11 @@ function openEmailAuthDialog() {
   modal.hidden = false;
   renderEmailAuthMode();
   emailAuthStatus('');
+  if (auth?.currentUser?.email && !auth.currentUser.emailVerified) {
+    $('gc-email-auth-verification').hidden = false;
+    $('gc-email-auth-email').value = auth.currentUser.email;
+    emailAuthStatus('Verify this email address to turn on private cloud saves.');
+  }
   $('gc-email-auth-email')?.focus();
 }
 function mountEmailAuthDialog() {
@@ -1021,10 +1032,6 @@ async function initializeAuth() {
   }
   try {
     await loadFirebaseSdk();
-    await authSdk.getRedirectResult(auth).catch(error => {
-      console.warn('Google redirect sign-in:', error);
-      toast('Google sign-in did not complete: ' + error.message, true);
-    });
     stopAuthObserver = authSdk.onAuthStateChanged(auth, onAuthState);
   } catch (error) {
     console.warn('Firebase initialization failed:', error);
