@@ -125,7 +125,7 @@ import './first-run-guide.css';
       : step.note;
     root.querySelector('#gc-first-run-note').hidden = false;
     root.querySelector('#gc-first-run-choices').hidden = !welcome;
-    root.querySelector('[data-guide-action="back"]').hidden = welcome;
+    root.querySelector('[data-guide-action="back"]').hidden = welcome || currentStep <= 1;
     root.querySelector('[data-guide-action="next"]').hidden = welcome;
     root.querySelector('[data-guide-action="next"]').textContent = currentStep === STEPS.length ? 'Finish' : 'Next';
     root.querySelector('[data-guide-action="skip"]').textContent = welcome ? 'Not now' : 'Skip guide';
