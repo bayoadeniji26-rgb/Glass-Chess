@@ -204,7 +204,32 @@ try {
   });
   assert.equal(friendMove?.ok, true, 'An accepted friend challenge must be playable.');
 
-  console.log('Online integration tests passed: health, queue cancellation, duplicate identity guard, matchmaking, legal/stale moves, reconnect grace and token validation, invite links, and friend gameplay.');
+  // Chat has a per-socket burst limit to stop spam from flooding a room.
+  for (let index = 0; index < 8; index += 1) {
+    const message = await ack(friendA, 'chat:send', { text: 'Test message ' + index });
+    assert.equal(message?.ok, true);
+  }
+  const throttledMessage = await ack(friendA, 'chat:send', { text: 'One message too many' });
+  assert.equal(throttledMessage?.ok, false, 'The server should rate-limit chat bursts.');
+
+  // Leaving an active two-player game forfeits instead of opening the seat to strangers.
+  const abandonedState = nextEvent(friendB, 'room:state', value => value?.abandoned === true);
+  const leaveResult = await ack(friendA, 'room:leave');
+  assert.equal(leaveResult?.ok, true);
+  const abandoned = await abandonedState;
+  assert.match(abandoned.result, /wins by disconnection/);
+  const postForfeitMove = await ack(friendB, 'game:move', {
+    code: created.code, expectedPly: 1, expectedFen: new Chess().fen(),
+    move: { from: 'e7', to: 'e5' }
+  });
+  assert.equal(postForfeitMove?.ok, false, 'A forfeited game must reject later moves.');
+  const intruder = await connectClient(url);
+  const intruderJoin = await ack(intruder, 'room:join', {
+    code: created.code, playerId: '40000000-0000-4000-8000-000000000001', name: 'Intruder'
+  });
+  assert.equal(intruderJoin?.ok, false, 'A player must not occupy a seat after the game has ended.');
+
+  console.log('Online integration tests passed: health, queue cancellation, duplicate identity guard, matchmaking, legal/stale move rejection, reconnect grace and token validation, friend invites, chat throttling, and forfeits.');
 } catch (error) {
   console.error(error);
   if (serverProcess && !serverProcess.killed) serverProcess.kill('SIGTERM');
