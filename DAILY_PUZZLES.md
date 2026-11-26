@@ -182,15 +182,15 @@ The first puzzle becomes Day 1 the first local calendar day this feature is open
 
 **Explanation:** LISTEN and SILENT use exactly the same six letters.
 
-## Day 19 — A Bigger Grid (Spatial)
+## Day 19 — Folded Paper (Spatial)
 
-**Puzzle:** A 4-by-4 grid is made of 16 equal small squares. How many squares of all sizes are in the grid?
+**Puzzle:** You fold a square sheet in half vertically, then in half horizontally. You punch one hole through the folded stack, away from the folded edges. How many holes appear when you unfold it?
 
-**Hint:** Count 1-by-1, 2-by-2, 3-by-3, and 4-by-4 squares.
+**Hint:** Each fold doubles the number of paper layers. Count the layers the hole passes through.
 
-**Answer:** 30
+**Answer:** 4
 
-**Explanation:** There are 16 + 9 + 4 + 1 = 30 squares.
+**Explanation:** The first fold makes 2 layers; the second makes 4. The hole passes through all 4 layers, so unfolding reveals 4 holes.
 
 ## Day 20 — The Family (Deduction)
 
@@ -202,15 +202,15 @@ The first puzzle becomes Day 1 the first local calendar day this feature is open
 
 **Explanation:** There are four daughters and one brother shared by all four: 5 children.
 
-## Day 21 — The Factory (Logic)
+## Day 21 — The Climbing Snail (Math & Sequence)
 
-**Puzzle:** Five machines make five widgets in five minutes. At the same rate, how long do 100 machines take to make 100 widgets?
+**Puzzle:** A snail climbs 3 feet up a 10-foot wall each day, then slides down 2 feet each night. How many days until it reaches the top?
 
-**Hint:** Each machine makes one widget in five minutes, at the same time as the others.
+**Hint:** It does not slide back after the day it reaches the top.
 
-**Answer:** 5 minutes
+**Answer:** 8
 
-**Explanation:** Each machine makes one widget in five minutes. One hundred machines can make one hundred widgets in parallel, so it takes 5 minutes.
+**Explanation:** After 7 nights the snail is at 7 feet. On Day 8 it climbs 3 more feet to 10 and reaches the top before sliding.
 
 ## Day 22 — Divide by Three (Math & Sequence)
 
@@ -382,15 +382,15 @@ The first puzzle becomes Day 1 the first local calendar day this feature is open
 
 **Explanation:** P→C, U→H, R→E, F→S, and F→S. The message is CHESS.
 
-## Day 39 — Five-by-Five Squares (Spatial)
+## Day 39 — The 5-Liter Jug (Spatial)
 
-**Puzzle:** How many squares of every size fit inside a 5-by-5 grid of equal small squares?
+**Puzzle:** You have an unmarked 3-liter jug and an unmarked 5-liter jug, with unlimited water. How can you measure exactly 4 liters in the 5-liter jug?
 
-**Hint:** Add 25, 16, 9, 4, and 1.
+**Hint:** First make 2 liters in the 5-liter jug, then use the 3-liter jug to remove just 1 liter after refilling.
 
-**Answer:** 55
+**Answer:** 4 liters
 
-**Explanation:** There are 25 + 16 + 9 + 4 + 1 = 55 squares.
+**Explanation:** Fill the 5-liter jug and pour into the 3-liter jug, leaving 2 liters in the 5-liter jug. Empty the 3-liter jug and transfer those 2 liters into it. Refill the 5-liter jug, then pour 1 liter into the 3-liter jug to fill it. Exactly 4 liters remain in the 5-liter jug.
 
 ## Day 40 — Matching Socks (Deduction)
 
