@@ -6,7 +6,7 @@ import {
   isPuzzleAnswerCorrect,
   normalizePuzzleAnswer
 } from '../src/daily-puzzle-data.js';
-import { calculatePositionHistory } from '../src/chess-position-tools.js';
+import { calculatePositionHistory, isFlagFallDraw } from '../src/chess-position-tools.js';
 
 assert.equal(DAILY_PUZZLES.length, 50, 'The series must contain exactly 50 puzzles.');
 assert.deepEqual(DAILY_PUZZLES.map(puzzle => puzzle.day), Array.from({ length: 50 }, (_, index) => index + 1));
@@ -56,3 +56,9 @@ assert.equal(enPassantPositions.length, 2, 'En passant must replay.');
 assert.equal(enPassantGame.fen(), enPassantFen, 'Special-move replay must not mutate its source game.');
 
 console.log('Daily puzzle data and isolated position replay tests passed.');
+
+const bareKingWinnerFen = '7k/8/8/8/8/8/8/K6r b - - 0 1';
+assert.equal(isFlagFallDraw(bareKingWinnerFen, 'b'), true, 'A bare-king winner cannot checkmate even when the flagged side still has a rook.');
+const rookWinnerFen = '7k/8/8/8/8/8/8/K6R b - - 0 1';
+assert.equal(isFlagFallDraw(rookWinnerFen, 'b'), false, 'A winner with a rook can potentially checkmate.');
+assert.throws(() => isFlagFallDraw(rookWinnerFen, 'x'), /flagging side/);
