@@ -121,3 +121,45 @@
 #gc-floating-hub.gc-hub-open .gc-hub-drawer {
   pointer-events: auto !important;
 }
+
+
+/* Section shortcuts use both icon and text so the drawer is self-explanatory. */
+#gc-floating-hub .gc-hub-icon-button {
+  min-width: 64px;
+  height: 46px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px 8px;
+}
+#gc-floating-hub .gc-hub-icon-button > span { font-size: 15px; line-height: 1; }
+#gc-floating-hub .gc-hub-icon-button > small {
+  color: var(--gc-hub-muted);
+  font-size: 9px;
+  font-weight: 650;
+  line-height: 1;
+  white-space: nowrap;
+}
+#gc-floating-hub .gc-hub-icon-button:hover > small { color: #fff; }
+
+/* The top-bar Tools control is the normal launcher. Keep the crown launcher
+   available only when Focus/fullscreen hides the top navigation. */
+body:not(.gc-tools-single-launcher) #gc-floating-hub .gc-hub-orb {
+  display: none !important;
+}
+body.gc-tools-single-launcher #gc-floating-hub .gc-hub-orb {
+  display: flex !important;
+}
+#gc-floating-hub .gc-hub-docked-panel .gc-head { display: none !important; }
+#gc-premium .gc-tabs {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+#gc-premium .gc-tabs button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
