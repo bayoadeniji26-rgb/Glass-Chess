@@ -315,3 +315,26 @@ html.gc-tools-single-launcher #gc-floating-hub .gc-hub-backdrop,
 body.gc-tools-single-launcher #gc-floating-hub .gc-hub-backdrop {
   z-index: 2147482500 !important;
 }
+
+
+/* The app header already carries the brand; keep the board toolbar action-only. */
+#gc-final-toolbar {
+  justify-content: flex-end;
+  min-height: 36px;
+  padding: 3px 6px;
+  background: rgba(15,21,34,.82);
+  box-shadow: none;
+}
+#gc-final-toolbar .gc-final-actions { margin-left: auto; gap: 6px; }
+#gc-final-toolbar button[data-gc-analysis-focus] {
+  min-width: 76px;
+  color: #f1dfb4;
+  border-color: rgba(232,199,126,.28);
+  background: rgba(232,199,126,.08);
+}
+#gc-final-toolbar button[data-gc-stage-fullscreen] {
+  width: 36px;
+  min-width: 36px;
+  padding: 0;
+  font-size: 17px;
+}
