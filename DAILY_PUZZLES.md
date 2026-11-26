@@ -202,7 +202,7 @@ The first puzzle becomes Day 1 the first local calendar day this feature is open
 
 **Explanation:** There are four daughters and one brother shared by all four: 5 children.
 
-## Day 21 — The Climbing Snail (Math & Sequence)
+## Day 21 — The Climbing Snail (Logic)
 
 **Puzzle:** A snail climbs 3 feet up a 10-foot wall each day, then slides down 2 feet each night. How many days until it reaches the top?
 
