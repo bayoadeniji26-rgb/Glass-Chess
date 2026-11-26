@@ -4,7 +4,7 @@
  * Firebase web configuration is public client configuration, not a server secret.
  * Copy the values from Firebase Console > Project settings > Your apps into the
  * Vite environment variables in .env.local (see .env.example and FIREBASE_SETUP.md).
- * Enable Google in Authentication, create Firestore + Storage, and deploy the
+ * Enable Email/Password in Authentication, create Firestore + Storage, and deploy the
  * supplied firestore.rules and storage.rules before enabling cloud sync.
  */
 import { saveEngine } from './save-engine.js';
@@ -120,8 +120,8 @@ function mountAuthWidget() {
   widget.id = 'gc-auth-widget';
   widget.innerHTML = `
     <button id="gc-google-signin" class="gc-google-signin" type="button">
-      <svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.05 13.22l7.98 6.19C11.92 13.72 17.48 9.5 24 9.5Z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.9c-.58 2.96-2.25 5.47-4.73 7.16l7.27 5.64c4.24-3.92 7.54-9.7 7.54-17.27Z"/><path fill="#FBBC05" d="M10.03 28.59A14.4 14.4 0 0 1 9.25 24c0-1.59.27-3.12.75-4.59l-7.98-6.19A23.9 23.9 0 0 0 0 24c0 3.9.94 7.59 2.61 10.78l7.42-6.19Z"/><path fill="#34A853" d="M24 48c6.47 0 11.91-2.13 15.88-5.82l-7.27-5.64c-2.02 1.35-4.61 2.14-8.61 2.14-6.52 0-12.08-4.22-14.07-10.09l-7.98 6.19C6.51 42.62 14.62 48 24 48Z"/></svg>
-      <span>Sign in with Google</span>
+      <span aria-hidden="true" class="gc-email-mark">✉</span>
+      <span>Sign in / Create account</span>
     </button>
     <button id="gc-user-pill" class="gc-user-pill" type="button" hidden aria-expanded="false">
       <img id="gc-user-avatar" alt="" referrerpolicy="no-referrer">
@@ -132,6 +132,7 @@ function mountAuthWidget() {
   `;
   header.insertBefore(widget, header.firstChild);
   $('gc-google-signin').addEventListener('click', () => signIn());
+  mountEmailAuthDialog();
   $('gc-user-pill').addEventListener('click', () => {
     const menu = ensureMenu();
     authMenuOpen = !authMenuOpen;
@@ -321,15 +322,18 @@ function authErrorMessage(error) {
   const code = error?.code || '';
   const messages = {
     'auth/unauthorized-domain': 'This website address is not authorized in Firebase Authentication. Add glass-chess-pro.onrender.com under Authentication → Settings → Authorized domains.',
-    'auth/operation-not-allowed': 'Google sign-in is disabled in Firebase. Enable Google under Authentication → Sign-in method.',
+    'auth/operation-not-allowed': 'Email/password sign-in is not enabled. In Firebase Console, open Authentication → Sign-in method and enable Email/Password.',
     'auth/invalid-api-key': 'The Firebase API key is missing or incorrect. Copy the Web app config from Firebase Project settings.',
-    'auth/popup-blocked': 'The browser blocked the Google sign-in popup. Allow popups for this site and try again.',
-    'auth/popup-closed-by-user': 'The Google sign-in window was closed before sign-in finished.',
-    'auth/network-request-failed': 'Google sign-in could not reach Firebase. Check your internet connection or browser privacy extensions.',
-    'auth/web-storage-unsupported': 'This browser blocked the storage needed for Google sign-in. Try allowing site data or using another browser.',
-    'auth/invalid-oauth-client-id': 'The Google OAuth client is not configured correctly. Re-enable Google in Firebase Authentication and check its Web client in Google Cloud.'
+    'auth/email-already-in-use': 'An account already uses this email. Switch to Sign in or use Forgot password.',
+    'auth/invalid-email': 'Enter a valid email address.',
+    'auth/weak-password': 'Choose a stronger password with at least 8 characters.',
+    'auth/invalid-credential': 'The email or password is incorrect. Check both, or use Forgot password.',
+    'auth/user-disabled': 'This account has been disabled.',
+    'auth/too-many-requests': 'Too many attempts were made. Wait a little and try again.',
+    'auth/network-request-failed': 'Firebase could not be reached. Check your internet connection or browser privacy settings.',
+    'auth/web-storage-unsupported': 'This browser blocked the storage needed for sign-in. Allow site data and try again.'
   };
-  return messages[code] || error?.message || 'Google sign-in could not be completed.';
+  return messages[code] || error?.message || 'The account action could not be completed.';
 }
 
 function renderAuth() {
@@ -354,7 +358,7 @@ function renderAuth() {
 async function loadFirebaseSdk() {
   if (firebaseReady) return;
   if (!hasFirebaseConfig) {
-    throw new Error('Google sign-in is not configured yet. Missing Firebase web-app values: ' +
+    throw new Error('Email account sign-in is not configured yet. Missing Firebase web-app values: ' +
       missingFirebaseFields.map(key => 'VITE_FIREBASE_' + key.replace(/[A-Z]/g, letter => '_' + letter).toUpperCase()).join(', ') +
       '. Copy them from Firebase Console → Project settings → Your apps → Web app, then add them to Render and redeploy.');
   }
@@ -391,9 +395,139 @@ function mobileBrowser() {
     window.matchMedia?.('(max-width: 700px)').matches;
 }
 
-function signIn() {
-  toast('This feature is not available right now. Try again later.');
+
+let emailAuthMode = 'signin';
+function emailAuthStatus(message, isError = false) {
+  const node = $('gc-email-auth-status');
+  if (!node) return;
+  node.textContent = message;
+  node.classList.toggle('is-error', Boolean(isError));
 }
+function renderEmailAuthMode() {
+  const create = emailAuthMode === 'create';
+  if ($('gc-email-auth-title')) $('gc-email-auth-title').textContent = create ? 'Create your Glass Chess account' : 'Welcome back';
+  if ($('gc-email-auth-submit')) $('gc-email-auth-submit').textContent = create ? 'Create account' : 'Sign in';
+  if ($('gc-email-auth-switch')) $('gc-email-auth-switch').textContent = create ? 'Already have an account? Sign in' : 'New to Glass Chess? Create an account';
+  if ($('gc-email-auth-password')) $('gc-email-auth-password').autocomplete = create ? 'new-password' : 'current-password';
+  if ($('gc-email-auth-forgot')) $('gc-email-auth-forgot').hidden = create;
+}
+function closeEmailAuthDialog() { const node = $('gc-email-auth'); if (node) node.hidden = true; }
+function openEmailAuthDialog() {
+  mountEmailAuthDialog();
+  const modal = $('gc-email-auth');
+  if (!modal) return;
+  modal.hidden = false;
+  renderEmailAuthMode();
+  emailAuthStatus('');
+  $('gc-email-auth-email')?.focus();
+}
+function mountEmailAuthDialog() {
+  if ($('gc-email-auth')) return;
+  const modal = document.createElement('section');
+  modal.id = 'gc-email-auth';
+  modal.className = 'gc-email-auth';
+  modal.hidden = true;
+  modal.innerHTML = `
+    <div class="gc-email-auth-card" role="dialog" aria-modal="true" aria-labelledby="gc-email-auth-title">
+      <header><div><small>GLASS CHESS ACCOUNT</small><h2 id="gc-email-auth-title">Welcome back</h2></div><button type="button" id="gc-email-auth-close" aria-label="Close sign in">×</button></header>
+      <p class="gc-email-auth-intro">Save games and settings to your private account so they follow you between devices.</p>
+      <form id="gc-email-auth-form">
+        <label for="gc-email-auth-email">Email address</label><input id="gc-email-auth-email" type="email" autocomplete="email" maxlength="254" required placeholder="you@example.com">
+        <label for="gc-email-auth-password">Password</label><input id="gc-email-auth-password" type="password" autocomplete="current-password" minlength="8" maxlength="128" required placeholder="At least 8 characters">
+        <button type="submit" id="gc-email-auth-submit">Sign in</button>
+      </form>
+      <div class="gc-email-auth-actions"><button type="button" id="gc-email-auth-forgot">Forgot password?</button><button type="button" id="gc-email-auth-switch">New to Glass Chess? Create an account</button></div>
+      <section id="gc-email-auth-verification" hidden>
+        <p>Check your inbox for the Glass Chess verification link. Cloud saving stays off until you verify your email. Guest saves remain on this device.</p>
+        <div><button type="button" id="gc-email-auth-resend">Resend verification</button><button type="button" id="gc-email-auth-check">I verified my email</button></div>
+      </section>
+      <p id="gc-email-auth-status" role="status" aria-live="polite"></p>
+      <footer>Guest play still works without an account. Your password is handled by Firebase Authentication and is never stored by Glass Chess.</footer>
+    </div>`;
+  document.body.appendChild(modal);
+  $('gc-email-auth-close').addEventListener('click', closeEmailAuthDialog);
+  modal.addEventListener('click', event => { if (event.target === modal) closeEmailAuthDialog(); });
+  $('gc-email-auth-switch').addEventListener('click', () => {
+    emailAuthMode = emailAuthMode === 'signin' ? 'create' : 'signin';
+    renderEmailAuthMode(); emailAuthStatus('');
+  });
+  $('gc-email-auth-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    const button = $('gc-email-auth-submit');
+    const email = $('gc-email-auth-email').value.trim().toLowerCase();
+    const password = $('gc-email-auth-password').value;
+    if (emailAuthMode === 'create' && password.length < 8) return emailAuthStatus('Use a password with at least 8 characters.', true);
+    button.disabled = true;
+    button.textContent = emailAuthMode === 'create' ? 'Creating…' : 'Signing in…';
+    emailAuthStatus('Connecting to secure account services…');
+    try {
+      await loadFirebaseSdk();
+      if (emailAuthMode === 'create') {
+        const credential = await authSdk.createUserWithEmailAndPassword(auth, email, password);
+        activeUser = credential.user;
+        renderAuth();
+        $('gc-email-auth-verification').hidden = false;
+        setSyncStatus('Verify email to sync', 'pending');
+        try {
+          await authSdk.sendEmailVerification(credential.user);
+          emailAuthStatus('Account created. Open the verification email we sent, then return and choose “I verified my email”.');
+        } catch (error) {
+          emailAuthStatus('Your account was created, but the verification email could not be sent: ' + authErrorMessage(error), true);
+        }
+      } else {
+        const credential = await authSdk.signInWithEmailAndPassword(auth, email, password);
+        activeUser = credential.user;
+        renderAuth();
+        if (!credential.user.emailVerified) {
+          $('gc-email-auth-verification').hidden = false;
+          setSyncStatus('Verify email to sync', 'pending');
+          emailAuthStatus('You signed in, but this email is not verified. Resend the link and verify before cloud saving starts.');
+        } else {
+          closeEmailAuthDialog();
+          toast('Signed in. Syncing your private Glass Chess saves…');
+        }
+      }
+    } catch (error) {
+      emailAuthStatus(authErrorMessage(error), true);
+    } finally {
+      button.disabled = false;
+      button.textContent = emailAuthMode === 'create' ? 'Create account' : 'Sign in';
+      if ($('gc-email-auth-verification') && activeUser?.email && !activeUser.emailVerified) $('gc-email-auth-verification').hidden = false;
+    }
+  });
+  $('gc-email-auth-forgot').addEventListener('click', async () => {
+    const email = $('gc-email-auth-email').value.trim().toLowerCase();
+    if (!email) { emailAuthStatus('Enter your email address first.', true); $('gc-email-auth-email').focus(); return; }
+    try {
+      await loadFirebaseSdk();
+      await authSdk.sendPasswordResetEmail(auth, email);
+      emailAuthStatus('Password reset email sent. Check your inbox, including spam.');
+    } catch (error) { emailAuthStatus(authErrorMessage(error), true); }
+  });
+  $('gc-email-auth-resend').addEventListener('click', async () => {
+    try {
+      await loadFirebaseSdk();
+      if (!auth.currentUser) throw new Error('Sign in with this account first, then request a new verification link.');
+      await authSdk.sendEmailVerification(auth.currentUser);
+      emailAuthStatus('A new verification link has been sent. Check your inbox.');
+    } catch (error) { emailAuthStatus(authErrorMessage(error), true); }
+  });
+  $('gc-email-auth-check').addEventListener('click', async () => {
+    try {
+      await loadFirebaseSdk();
+      if (!auth.currentUser) throw new Error('Sign in again with your email and password, then check verification.');
+      await authSdk.reload(auth.currentUser);
+      const refreshed = auth.currentUser;
+      activeUser = refreshed; renderAuth();
+      if (!refreshed.emailVerified) return emailAuthStatus('Firebase has not marked this email as verified yet. Open the latest link, then try again.', true);
+      closeEmailAuthDialog();
+      toast('Email verified. Your private cloud saves are syncing now.');
+      await syncOnSignIn(refreshed);
+    } catch (error) { emailAuthStatus(authErrorMessage(error), true); }
+  });
+}
+function signIn() { emailAuthMode = 'signin'; openEmailAuthDialog(); }
+
 function profileRef(uid) {
   return firestoreSdk.doc(db, 'users', uid, 'profile', 'settings');
 }
@@ -671,7 +805,7 @@ function mountVault() {
         <div id="gc-cloud-vault-list"></div>
         <details class="gc-cloud-chat-archive"><summary>King Pawn chat archive</summary><div id="gc-cloud-vault-chat"></div></details>
       </div>
-      <footer>Your cloud games, board themes, player pictures and King Pawn chats follow your Google account.</footer>
+      <footer>Your private cloud games, board themes, player pictures and King Pawn chats follow your verified email account.</footer>
     </div>`;
   document.body.appendChild(modal);
   $('gc-cloud-vault-close').addEventListener('click', closeVault);
@@ -682,7 +816,7 @@ function openVault() {
   mountVault();
   $('gc-cloud-vault').hidden = false;
   renderVault();
-  if (!activeUser) toast('Sign in with Google to open your Cloud Game Vault.', true);
+  if (!activeUser) toast('Sign in to your Glass Chess account to open your Cloud Game Vault.', true);
 }
 function closeVault() {
   if ($('gc-cloud-vault')) $('gc-cloud-vault').hidden = true;
@@ -721,6 +855,13 @@ async function attachRealtimeSync(user) {
 
 async function syncOnSignIn(user) {
   activeUser = user;
+  if (user?.email && !user.emailVerified) {
+    saveEngine.setCloudAdapter(null);
+    stopCloudObservers();
+    setSyncStatus('Verify email to sync', 'pending');
+    renderAuth();
+    return;
+  }
   profileAvatarUrl = '';
   renderAuth();
   setSyncStatus('Syncing...', 'syncing');
@@ -841,7 +982,7 @@ async function uploadProfileAvatar(file) {
       updatedAt: firestoreSdk.serverTimestamp()
     }, { merge: true });
     renderAuth();
-    toast('Your Google profile pill picture was updated.');
+    toast('Your Glass Chess account picture was updated.');
   } catch (error) {
     toast('Profile picture upload failed: ' + error.message, true);
   } finally {
@@ -851,6 +992,15 @@ async function uploadProfileAvatar(file) {
 
 function onAuthState(user) {
   if (user) {
+    if (user.email && !user.emailVerified) {
+      activeUser = user;
+      profileAvatarUrl = user.photoURL || '';
+      stopCloudObservers();
+      saveEngine.setCloudAdapter(null);
+      setSyncStatus('Verify email to sync', 'pending');
+      renderAuth();
+      return;
+    }
     void syncOnSignIn(user);
     return;
   }
@@ -866,7 +1016,7 @@ async function initializeAuth() {
   mountAuthWidget();
   mountVault();
   if (!hasFirebaseConfig) {
-    setSyncStatus('Guest mode · cloud setup needed', 'idle');
+    setSyncStatus('Guest mode · configure Firebase email sign-in', 'idle');
     return;
   }
   try {
