@@ -95,7 +95,9 @@ try {
       PORT: String(port),
       HOST: '127.0.0.1',
       GC_INVITE_TTL_MS: '5000',
-      GC_ENDED_ROOM_TTL_MS: '1500'
+      GC_ENDED_ROOM_TTL_MS: '1500',
+      OPENAI_API_KEY: '',
+      GC_ALLOWED_ORIGIN: '*'
     },
     stdio: ['ignore', 'pipe', 'pipe']
   });
@@ -105,6 +107,41 @@ try {
   await waitForHealth(url);
   const missingRoute = await fetch(url + '/missing');
   assert.equal(missingRoute.status, 404, 'Unknown HTTP routes should not masquerade as health checks.');
+
+  // King Pawn refuses unrelated topics at the server boundary before any model key is needed.
+  const offTopicResponse = await fetch(url + '/api/king-pawn', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', origin: 'https://glass-chess-pro.onrender.com' },
+    body: JSON.stringify({ question: 'Dogs or cats?', board: { fen: START_FEN } })
+  });
+  assert.equal(offTopicResponse.status, 200);
+  const offTopicBody = await offTopicResponse.json();
+  assert.equal(offTopicBody.mode, 'chess-only-filter');
+  assert.match(offTopicBody.answer, /chess-only advisor/i);
+
+  const timeQuestionResponse = await fetch(url + '/api/king-pawn', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', origin: 'https://glass-chess-pro.onrender.com' },
+    body: JSON.stringify({ question: 'What time is it?' })
+  });
+  assert.equal(timeQuestionResponse.status, 200);
+  assert.match((await timeQuestionResponse.json()).answer, /chess-only advisor/i);
+
+  // A valid chess question reaches the AI setup and reports missing server configuration honestly.
+  const missingAIKey = await fetch(url + '/api/king-pawn', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', origin: 'https://glass-chess-pro.onrender.com' },
+    body: JSON.stringify({ question: 'How do I get better at chess?', board: { fen: START_FEN } })
+  });
+  assert.equal(missingAIKey.status, 503);
+  assert.match((await missingAIKey.json()).error, /not configured/i);
+
+  const preflight = await fetch(url + '/api/king-pawn', {
+    method: 'OPTIONS',
+    headers: { origin: 'https://glass-chess-pro.onrender.com', 'access-control-request-method': 'POST' }
+  });
+  assert.equal(preflight.status, 204);
+  assert.equal(preflight.headers.get('access-control-allow-origin'), '*');
 
   // Verify queue cancellation and duplicate player protection.
   const queueA = await connectClient(url);
