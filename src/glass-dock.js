@@ -28,7 +28,7 @@ import "./glass-dock.css";
     dock.id = DOCK_ID;
     dock.innerHTML = `
       <button class="gc-hub-backdrop" type="button" aria-label="Close Tools popup"></button>
-      <section class="gc-hub-drawer" aria-label="Glass Chess tools" aria-hidden="true">
+      <section class="gc-hub-drawer" role="dialog" aria-modal="true" aria-label="Glass Chess tools" aria-hidden="true">
         <header class="gc-hub-header">
           <div class="gc-hub-brand">
             <span class="gc-hub-brand-mark" aria-hidden="true">♛</span>
@@ -37,7 +37,7 @@ import "./glass-dock.css";
           <button class="gc-hub-close" type="button" aria-label="Close Tools popup" title="Close">×</button>
         </header>
         <nav class="gc-hub-shortcuts" aria-label="Tool categories"></nav>
-        <div class="gc-hub-scroll"><div class="gc-hub-content"></div></div>
+        <div class="gc-hub-scroll" tabindex="0" aria-label="Scrollable tools"><div class="gc-hub-content"></div></div>
         <footer class="gc-hub-footer"><span class="gc-hub-live-dot"></span><span>All original chess tools are available</span><span class="gc-hub-footer-spacer"></span><span>ESC to close</span></footer>
       </section>
     `;

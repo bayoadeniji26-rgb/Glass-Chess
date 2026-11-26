@@ -219,3 +219,18 @@ assert.doesNotMatch(toolsUi, /gc-hub-orb/, 'The old floating Tools orb must be r
 assert.match(toolsCss, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/, 'Tools categories must use an organized card grid.');
 assert.doesNotMatch(toolsCss, /gc-hub-orb/, 'The Tools stylesheet must not style the removed floating orb.');
 assert.match(workspaceCss, /gc-tools-single-launcher #gc-workspace-actions/, 'The top-bar Tools action must remain reachable in fullscreen focus mode.');
+const finalUiCss = readFileSync(new URL('../src/glass-final-ui.css', import.meta.url), 'utf8');
+const redesignCss = readFileSync(new URL('../src/glass-redesign.css', import.meta.url), 'utf8');
+const redesignUi = readFileSync(new URL('../src/glass-redesign.js', import.meta.url), 'utf8');
+assert.match(toolsCss, /grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/, 'Desktop Tools shortcuts must use a compact three-column layout.');
+assert.match(toolsCss, /overflow-y: auto !important/, 'The Tools feature pane must own vertical scrolling.');
+assert.match(toolsCss, /pointer-events: auto !important/, 'Interactive tool controls must remain clickable above the backdrop.');
+assert.match(toolsCss, /position: relative !important/, 'Tool buttons must remain in the drawer hit-testing layer.');
+assert.match(redesignCss, /bottom: 12px !important/, 'The Tools drawer must use the bottom of the available viewport.');
+assert.doesNotMatch(redesignCss, /bottom: 105px/, 'The removed floating orb must not reserve 105 pixels under the drawer.');
+assert.doesNotMatch(redesignCss, /gc-hub-orb/, 'The redesign stylesheet must not recreate the removed purple orb.');
+assert.doesNotMatch(finalUiCss, /gc-hub-orb/, 'The final UI stylesheet must not style the removed purple orb.');
+assert.doesNotMatch(redesignUi, /gc-hub-orb/, 'The update module must not keep an obsolete orb visible.');
+assert.match(toolsUi, /role="dialog" aria-modal="true"/, 'The Tools panel must expose dialog semantics.');
+assert.match(toolsUi, /tabindex="0" aria-label="Scrollable tools"/, 'The Tools content region must be keyboard-scrollable.');
+

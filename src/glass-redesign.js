@@ -195,21 +195,7 @@ import { APP_VERSION } from './version.js';
     }finally{updating=false;}
   }
 
-  function keepToolsAccessible(){
-    const orb=document.querySelector('#gc-floating-hub .gc-hub-orb');
-    if(!orb)return;
-    orb.style.setProperty('display','flex','important');
-    orb.style.setProperty('visibility','visible','important');
-    orb.style.setProperty('opacity','1','important');
-    orb.style.setProperty('pointer-events','auto','important');
-    orb.setAttribute('aria-label','Open Glass Chess Tools');orb.title='Open Glass Chess Tools';
-  }
-
   function boot(){
-    keepToolsAccessible();
-    const observer=new MutationObserver(()=>keepToolsAccessible());
-    observer.observe(document.documentElement,{childList:true,subtree:true});
-    window.setTimeout(()=>observer.disconnect(),12000);
     void checkForUpdates();
     window.setInterval(()=>{if(!document.hidden)void checkForUpdates();},UPDATE_POLL_MS);
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)void checkForUpdates();});

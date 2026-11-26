@@ -204,45 +204,26 @@ html, body {
 }
 
 #gc-floating-hub {
-  z-index: 2147482000 !important;
+  z-index: 2147483150 !important;
 }
 
-#gc-floating-hub .gc-hub-orb {
-  display: flex !important;
-  position: fixed !important;
-  right: 23px !important;
-  bottom: 22px !important;
-  z-index: 2147483000 !important;
-  width: 68px !important;
-  height: 68px !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-  pointer-events: auto !important;
-  border: 1px solid rgba(229,218,255,.68) !important;
-  background: radial-gradient(circle at 30% 22%, #a18fea 0, #6152b0 42%, #191c3b 83%) !important;
-  box-shadow: 0 12px 36px rgba(42,31,114,.55), inset 0 1px 9px rgba(255,255,255,.26) !important;
-}
-
-#gc-floating-hub .gc-hub-orb-label {
-  font-size: 9px !important;
-  letter-spacing: .2em !important;
-}
-
+/* The Tools panel is a normal full-height drawer, not a floating popover above an orb. */
 #gc-floating-hub .gc-hub-drawer {
-  z-index: 2147482800 !important;
-  right: 23px !important;
-  bottom: 105px !important;
-  width: min(500px, calc(100vw - 30px)) !important;
-  height: min(790px, calc(100dvh - 125px)) !important;
+  top: 76px !important;
+  right: 12px !important;
+  bottom: 12px !important;
+  left: auto !important;
+  width: min(620px, calc(100vw - 24px)) !important;
+  height: auto !important;
+  max-height: none !important;
+  z-index: 2 !important;
   border: 1px solid rgba(206,194,255,.24) !important;
-  border-radius: 23px !important;
+  border-radius: 21px !important;
   background: linear-gradient(155deg, rgba(22,27,46,.98), rgba(9,14,25,.98)) !important;
   box-shadow: 0 30px 95px rgba(0,0,0,.64), inset 0 1px rgba(255,255,255,.07) !important;
 }
 
-#gc-floating-hub .gc-hub-backdrop {
-  z-index: 2147482700 !important;
-}
+#gc-floating-hub .gc-hub-backdrop { z-index: 1 !important; }
 
 #gc-floating-hub .gc-hub-header {
   min-height: 76px !important;
@@ -548,8 +529,8 @@ html, body {
   .engine-status { display: none !important; }
   #gc-workspace-actions { gap: 3px !important; }
   #gc-workspace-actions button, #new-game { min-height: 29px !important; padding: 0 7px !important; font-size: 9px !important; }
-  #gc-floating-hub .gc-hub-orb { right: 13px !important; bottom: 13px !important; width: 60px !important; height: 60px !important; }
-  #gc-floating-hub .gc-hub-drawer { right: 9px !important; bottom: 82px !important; width: calc(100vw - 18px) !important; height: min(76dvh, 720px) !important; }
+  #gc-floating-hub .gc-hub-drawer { top: 60px !important; right: 8px !important; bottom: 8px !important; left: 8px !important; width: auto !important; height: auto !important; max-height: none !important; }
+  #gc-floating-hub .gc-hub-shortcuts { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
   #gc-premium .gc-background-palette { grid-template-columns: repeat(5, minmax(0,1fr)); gap: 6px; }
   .gc-update-banner { top: 59px; width: calc(100vw - 18px); gap: 8px; padding: 9px; }
   .gc-update-copy strong { font-size: 9px; }
@@ -559,7 +540,7 @@ html, body {
 
 @media (prefers-reduced-motion: reduce) {
   .gc-update-banner, .gc-update-overlay, .gc-update-track span,
-  #gc-floating-hub .gc-hub-orb, #gc-premium .gc-view {
+  #gc-premium .gc-view {
     transition: none !important;
     animation: none !important;
   }
