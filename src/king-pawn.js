@@ -397,7 +397,7 @@ function chessTopicAnswer(question, context) {
 
 async function makeLocalChessAnswer(question) {
   const context = currentBoardContext();
-  const chessWords = /\b(chess|board|opening|endgame|tactic|fork|pin|skewer|check|mate|castl|en passant|pawn|rook|bishop|knight|queen|king|move|position|fen|pgn|grandmaster|fischer|kasparov|morphy|stalemate|promotion|opposition|lucena|philidor)\b/i;
+  const chessWords = /\b(chess|chaturanga|board|opening|endgame|tactic|fork|pin|skewer|check|mate|castl|en passant|pawn|rook|bishop|knight|queen|king|move|position|fen|pgn|grandmaster|fischer|kasparov|morphy|stalemate|promotion|opposition|lucena|philidor|gambit|sicilian|zugzwang|tempo|blunder|development|center|centre)\b/i;
   if (!chessWords.test(question)) {
     return 'I am King Pawn, royal advisor of the 64 squares. I only advise on chess matters. Ask me about a move, opening, tactic, rule, endgame, or this board.';
   }
