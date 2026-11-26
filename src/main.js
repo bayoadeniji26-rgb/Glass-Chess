@@ -309,7 +309,12 @@ function createExtraControls() {
       </select>
     `;
 
-    side.appendChild(panel);
+    const disclosure = document.createElement("details");
+    disclosure.className = "gc-side-disclosure gc-side-settings";
+    const summary = document.createElement("summary");
+    summary.textContent = "Board & move settings";
+    disclosure.append(summary, panel);
+    side.appendChild(disclosure);
   }
 
   const controls = document.querySelector(".board-controls");
@@ -329,6 +334,7 @@ function createExtraControls() {
     clear.id = "gc-clear-hint";
     clear.textContent = "Clear Hint";
     clear.title = "Clear the tactical hint and arrow";
+    clear.hidden = true;
     controls.appendChild(clear);
   }
 
@@ -345,7 +351,13 @@ function createExtraControls() {
       <button id="gc-copy-fen">Copy FEN</button>
     `;
 
-    controls.insertAdjacentElement("afterend", tools);
+    const disclosure = document.createElement("details");
+    disclosure.className = "gc-side-disclosure gc-side-actions";
+    const summary = document.createElement("summary");
+    summary.textContent = "More game actions";
+    disclosure.append(summary, tools);
+    if (side) side.appendChild(disclosure);
+    else controls.insertAdjacentElement("afterend", disclosure);
   }
 
   const analysis = document.querySelector(".analysis-panel");
@@ -1376,6 +1388,8 @@ function showHintStatus(message, kind = "success") {
   status.classList.toggle("is-error", kind === "error");
   status.classList.toggle("is-loading", kind === "loading");
   status.textContent = message;
+  const clearButton = $("gc-clear-hint");
+  if (clearButton) clearButton.hidden = !activeHintMove;
 }
 
 function clearHint() {
