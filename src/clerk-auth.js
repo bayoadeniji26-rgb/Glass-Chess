@@ -5,7 +5,7 @@
  * Guest play and local IndexedDB saves remain available without either service.
  */
 import { saveEngine } from './save-engine.js';
-import './clerk-auth.css';
+import './cloud-auth.css';
 
 const CLERK_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || '';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
