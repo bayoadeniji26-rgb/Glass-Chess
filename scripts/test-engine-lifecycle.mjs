@@ -8,6 +8,7 @@ const startFen = new Chess().fen();
 class MockWorker {
   static instances = [];
   static failNextStartup = false;
+  static holdNextStartup = false;
 
   constructor(url) {
     this.url = url;
@@ -41,6 +42,10 @@ class MockWorker {
     this.commands.push(command);
     if (this.terminated) throw new Error('Worker is terminated.');
     if (command === 'uci') {
+      if (MockWorker.holdNextStartup) {
+        MockWorker.holdNextStartup = false;
+        return;
+      }
       if (MockWorker.failNextStartup) {
         MockWorker.failNextStartup = false;
         queueMicrotask(() => this.onerror?.({ message: 'Simulated Stockfish startup failure.' }));
@@ -171,6 +176,23 @@ try {
   assert.equal(retryEngine.worker, null);
   await retryEngine.start();
   assert.equal(retryEngine.ready, true);
+
+  // Restarting during startup must reject the old start and keep its old
+  // timeout from terminating the replacement Worker.
+  const restartingEngine = new ChessEngine();
+  restartingEngine.startTimeoutMs = 40;
+  MockWorker.holdNextStartup = true;
+  const staleStartPromise = restartingEngine.start();
+  await tick(0);
+  const staleStartingWorker = restartingEngine.worker;
+  await restartingEngine.restartWorker();
+  const replacementStartupWorker = restartingEngine.worker;
+  assert.notEqual(replacementStartupWorker, staleStartingWorker);
+  assert.equal(staleStartingWorker.terminated, true);
+  await assert.rejects(staleStartPromise, /restarted during startup/);
+  await tick(60);
+  assert.equal(restartingEngine.ready, true, 'An old startup timeout must not tear down the new Worker.');
+  assert.equal(restartingEngine.worker, replacementStartupWorker);
 
   // An unexpected Worker failure rejects an active search and permits restart.
   const failureWorker = retryEngine.worker;
