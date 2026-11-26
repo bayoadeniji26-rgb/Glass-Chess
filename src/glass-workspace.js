@@ -13,13 +13,16 @@ import './glass-workspace.css';
     if (!app || !topbar || !play || !analysis) return false;
     if ($('#gc-workspace-actions')) return true;
 
+    play.id = 'gc-play-drawer';
+    analysis.id = 'gc-analysis-drawer';
+
     const actions = document.createElement('nav');
     actions.id = 'gc-workspace-actions';
     actions.setAttribute('aria-label', 'Chess workspace');
     actions.innerHTML = `
-      <button type="button" data-workspace-open="play" aria-label="Open play settings">Play</button>
-      <button type="button" data-workspace-open="analysis" aria-label="Open analysis panel">Analysis</button>
-      <button type="button" data-workspace-open="settings" aria-label="Open board settings">Settings</button>
+      <button type="button" data-workspace-open="play" aria-controls="gc-play-drawer" aria-expanded="false">Play</button>
+      <button type="button" data-workspace-open="analysis" aria-controls="gc-analysis-drawer" aria-expanded="false">Analysis</button>
+      <button type="button" data-workspace-open="tools" aria-controls="gc-floating-hub" aria-expanded="false">Tools</button>
     `;
     const newGame = $('#new-game');
     topbar.insertBefore(actions, newGame || null);
@@ -28,6 +31,7 @@ import './glass-workspace.css';
     scrim.type = 'button';
     scrim.id = 'gc-workspace-scrim';
     scrim.setAttribute('aria-label', 'Close panel');
+    scrim.tabIndex = -1;
     document.body.appendChild(scrim);
 
     function prepareDrawer(panel, side, title) {
@@ -46,10 +50,8 @@ import './glass-workspace.css';
       close.addEventListener('click', closeDrawer);
     }
 
-    prepareDrawer(play, 'gc-workspace-left', 'Play settings');
-    prepareDrawer(analysis, 'gc-workspace-right', 'Analysis Studio');
-
-    // Drawers live directly under body so the board layout cannot clip them.
+    prepareDrawer(play, 'gc-workspace-left', 'Play');
+    prepareDrawer(analysis, 'gc-workspace-right', 'Analysis');
     document.body.append(play, analysis);
 
     function closeDrawer() {
@@ -58,24 +60,38 @@ import './glass-workspace.css';
       play.classList.remove('gc-drawer-visible');
       analysis.classList.remove('gc-drawer-visible');
       scrim.classList.remove('gc-scrim-visible');
-      actions.querySelectorAll('button').forEach(button => button.setAttribute('aria-expanded', 'false'));
+      actions.querySelectorAll('button[data-workspace-open="play"], button[data-workspace-open="analysis"]')
+        .forEach(button => button.setAttribute('aria-expanded', 'false'));
     }
 
     function openDrawer(which) {
-      if (active === which) { closeDrawer(); return; }
+      if (which === 'tools') {
+        closeDrawer();
+        if (window.GlassChessTools?.toggle) window.GlassChessTools.toggle();
+        else window.dispatchEvent(new CustomEvent('glasschess:toggle-tools'));
+        return;
+      }
+
+      // There should only ever be one open panel. The Tools hub is separate,
+      // so close it before opening either of the two focused workspace drawers.
+      window.GlassChessTools?.close?.();
+      if (active === which) {
+        closeDrawer();
+        return;
+      }
+
       active = which;
       document.body.classList.add(openClass);
-      play.classList.toggle('gc-drawer-visible', which === 'play' || which === 'settings');
+      play.classList.toggle('gc-drawer-visible', which === 'play');
       analysis.classList.toggle('gc-drawer-visible', which === 'analysis');
       scrim.classList.add('gc-scrim-visible');
-      actions.querySelectorAll('button').forEach(button => {
-        button.setAttribute('aria-expanded', String(button.dataset.workspaceOpen === which));
-      });
-      const target = which === 'settings' ? $('#gc-options') : null;
+      actions.querySelectorAll('button[data-workspace-open="play"], button[data-workspace-open="analysis"]')
+        .forEach(button => button.setAttribute('aria-expanded', String(button.dataset.workspaceOpen === which)));
+
+      const drawer = which === 'analysis' ? analysis : play;
       requestAnimationFrame(() => {
-        const drawer = which === 'analysis' ? analysis : play;
-        if (target) target.scrollIntoView({ block: 'start' });
-        else drawer.scrollTop = 0;
+        drawer.scrollTop = 0;
+        drawer.querySelector('.gc-workspace-drawer-heading')?.focus?.({ preventScroll: true });
       });
     }
 
@@ -87,16 +103,15 @@ import './glass-workspace.css';
     document.addEventListener('keydown', event => {
       if (event.key === 'Escape' && active) closeDrawer();
     });
+    window.addEventListener('glasschess:tools-state', event => {
+      const toolsButton = actions.querySelector('[data-workspace-open="tools"]');
+      toolsButton?.setAttribute('aria-expanded', String(Boolean(event.detail?.open)));
+    });
 
-    // Existing page content remains in the DOM; only its presentation changes.
-    play.classList.remove('gc-workspace-drawer');
-    analysis.classList.remove('gc-workspace-drawer');
-    play.classList.add('gc-workspace-drawer', 'gc-workspace-left');
-    analysis.classList.add('gc-workspace-drawer', 'gc-workspace-right');
+    // Existing content stays alive; only its presentation changes.
     play.classList.remove('gc-drawer-visible');
     analysis.classList.remove('gc-drawer-visible');
 
-    // Keep the compact board actions available without opening a drawer.
     const quick = $('.board-controls');
     if (quick) quick.setAttribute('aria-label', 'Board controls');
     return true;
