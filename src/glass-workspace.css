@@ -290,3 +290,6 @@ body.gc-workspace-drawer-open { overflow: hidden !important; }
   #gc-workspace-actions { margin-left: auto; }
   #gc-workspace-actions button[data-workspace-open] { min-width: 0; padding-inline: 7px; }
 }
+
+.gc-side-settings > summary { color: #cfdaf0; }
+.gc-side-actions > summary { color: #cfdaf0; }
