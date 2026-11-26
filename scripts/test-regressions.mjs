@@ -11,36 +11,19 @@ assert.equal(DAILY_PUZZLES.length, 50, 'The series must contain exactly 50 chess
 assert.deepEqual(DAILY_PUZZLES.map(puzzle => puzzle.day), Array.from({ length: 50 }, (_, index) => index + 1));
 assert.equal(new Set(DAILY_PUZZLES.map(puzzle => puzzle.fen)).size, 50, 'All 50 puzzle positions must be distinct.');
 
-const puzzleTypes = new Set(['Mate in 1', 'Knight fork', 'Back-rank mate']);
+assert.equal(new Set(DAILY_PUZZLES.map(puzzle => puzzle.id)).size, 50, 'Every puzzle must have a different source puzzle ID.');
+assert.ok(new Set(DAILY_PUZZLES.flatMap(puzzle => puzzle.themes.split(' '))).size >= 15, 'The catalog must cover a broad range of tactical themes.');
+assert.ok(new Set(DAILY_PUZZLES.map(puzzle => puzzle.solution.length)).size >= 4, 'The catalog must include varied multi-move solution lengths.');
 for (const puzzle of DAILY_PUZZLES) {
-  assert.ok(puzzleTypes.has(puzzle.type), 'Unknown chess puzzle type on Day ' + puzzle.day);
-  assert.ok(puzzle.title && puzzle.hint && puzzle.explanation, 'Missing chess puzzle content on Day ' + puzzle.day);
-  assert.match(puzzle.fen, /\s[wb]\s/, 'Missing side to move on Day ' + puzzle.day);
-  assert.equal(puzzle.solution.length, 1, 'Each daily puzzle must have one answer move on Day ' + puzzle.day);
-
+  assert.ok(puzzle.title && puzzle.hint && puzzle.explanation && puzzle.sourceUrl, 'Missing puzzle content or attribution on Day ' + puzzle.day);
+  assert.match(puzzle.fen, /\\s[wb]\\s/, 'Missing side to move on Day ' + puzzle.day);
+  assert.ok(puzzle.solution.length >= 2 && puzzle.solution.length % 2 === 0, 'Each puzzle must include a full solver/opponent line on Day ' + puzzle.day);
   const game = new Chess(puzzle.fen);
-  const legalMove = game.moves({ verbose: true }).find(move => uci(move) === puzzle.solution[0]);
-  assert.ok(legalMove, 'Solution must be legal on Day ' + puzzle.day + ': ' + puzzle.solution[0]);
-  const played = game.move({ from: legalMove.from, to: legalMove.to, ...(legalMove.promotion ? { promotion: legalMove.promotion } : {}) });
-  assert.ok(played, 'The solution must apply on Day ' + puzzle.day);
-
-  if (puzzle.goal === 'mate') {
-    assert.equal(game.isCheckmate(), true, 'Mate puzzle must end in checkmate on Day ' + puzzle.day);
-  } else if (puzzle.goal === 'fork') {
-    assert.equal(game.isCheck(), true, 'Fork move must give check on Day ' + puzzle.day);
-    const target = game.get(puzzle.targetSquare);
-    assert.ok(target && target.type === 'q' && target.color === game.turn(), 'Fork must attack the opposing queen on Day ' + puzzle.day);
-    const knightSquare = puzzle.solution[0].slice(2, 4);
-    const knight = game.get(knightSquare);
-    assert.ok(knight && knight.type === 'n' && knight.color !== game.turn(), 'Forking knight must remain on the destination square on Day ' + puzzle.day);
-    const df = Math.abs('abcdefgh'.indexOf(knightSquare[0]) - 'abcdefgh'.indexOf(puzzle.targetSquare[0]));
-    const dr = Math.abs(Number(knightSquare[1]) - Number(puzzle.targetSquare[1]));
-    assert.ok((df === 1 && dr === 2) || (df === 2 && dr === 1), 'Knight must attack the target queen on Day ' + puzzle.day);
-  } else {
-    assert.fail('Unexpected puzzle goal on Day ' + puzzle.day);
+  for (const [index, moveText] of puzzle.solution.entries()) {
+    const move = game.move({ from: moveText.slice(0,2), to: moveText.slice(2,4), ...(moveText[4] ? { promotion: moveText[4] } : {}) });
+    assert.ok(move, 'Puzzle line must be legal on Day ' + puzzle.day + ' at ply ' + (index + 1) + ': ' + moveText);
   }
 }
-
 assert.equal(getPuzzleDayIndex('2026-11-25', '2026-11-25'), 1);
 assert.equal(getPuzzleDayIndex('2026-11-25', '2026-11-26'), 2);
 assert.equal(getPuzzleDayIndex('2026-11-25', '2026-12-14'), 20);
