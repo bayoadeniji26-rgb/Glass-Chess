@@ -147,7 +147,7 @@ body.gc-final-focus-mode { overflow:hidden !important; }
   width: 100vw !important;
   height: 100vh !important;
   height: 100dvh !important;
-  z-index: 2147482000 !important;
+  z-index: 2147483150 !important;
   pointer-events: none !important;
   isolation: isolate !important;
 }
