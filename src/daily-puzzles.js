@@ -144,6 +144,7 @@ function mountDailyPuzzles() {
   let pendingPromotion = [];
   let hintVisible = false;
   let solved = false;
+  let boardSide = 'w';
 
   function currentDay() {
     return getPuzzleDayIndex(progress.startedOn, localDateKey());
@@ -168,8 +169,14 @@ function mountDailyPuzzles() {
   function renderBoard() {
     const host = el('gc-daily-board');
     host.replaceChildren();
-    for (let rank = 8; rank >= 1; rank -= 1) {
-      for (let file = 0; file < 8; file += 1) {
+    const ranks = boardSide === 'w'
+      ? [8, 7, 6, 5, 4, 3, 2, 1]
+      : [1, 2, 3, 4, 5, 6, 7, 8];
+    const files = boardSide === 'w'
+      ? [0, 1, 2, 3, 4, 5, 6, 7]
+      : [7, 6, 5, 4, 3, 2, 1, 0];
+    for (const rank of ranks) {
+      for (const file of files) {
         const square = FILES[file] + rank;
         const piece = game.get(square);
         const cell = document.createElement('button');
@@ -347,6 +354,7 @@ function mountDailyPuzzles() {
     progress = readProgress();
     puzzle = currentPuzzle();
     game = new Chess(puzzle.fen);
+    boardSide = game.turn();
     selectedSquare = null;
     legalMoves = [];
     pendingPromotion = [];
