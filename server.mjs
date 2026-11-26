@@ -141,6 +141,7 @@ io.on('connection', socket => {
     if (socket.data.roomCode) return done({ ok: false, error: 'Leave your current game before finding another opponent.' });
     const playerId = cleanPlayerId(payload.playerId);
     if (!playerId) return done({ ok: false, error: 'A valid player identity is required. Refresh the page and try again.' });
+    if (activePlayers.has(playerId)) return done({ ok: false, error: 'You are already in an online game.' });
     const player = { socketId: socket.id, playerId, name: cleanName(payload.name) };
     const result = matchmaking.enqueue(player);
     if (result.status === 'already_queued') return done({ ok: false, error: 'This player is already searching for an opponent in another tab.' });
