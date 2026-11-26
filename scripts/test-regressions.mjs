@@ -123,7 +123,7 @@ assert.match(appHtml, /id="opponent-name"/, 'The top player nameplate must have 
 assert.match(appHtml, /id="player-name"/, 'The bottom player nameplate must have a separate name element.');
 assert.match(mainUi, /onlineSession\?\.isOnline\?\.\(\) \|\| onlineSession\?\.isMatchmaking\?\.\(\)/, 'Starting a regular game must detect active online rooms and matchmaking searches.');
 assert.match(mainUi, /exitOnlineSession\?\.\(\{ restoreMode: false \}\)/, 'Starting an offline game must leave online mode before resetting the board.');
-assert.match(onlineClient, /isMatchmaking\(\) \{ return matchmakingActive; \}/, 'The main game must be able to detect an in-progress matchmaking search.');
+assert.match(onlineClient, /isMatchmaking\(\) \{ return matchmakingActive \|\| onlineRequestActive; \}/, 'The main game must detect matchmaking and pending room joins.');
 assert.match(onlineClient, /exitOnlineSession\(options = \{\}\) \{ return leaveRoom\(options\); \}/, 'Online Plus must expose a reusable online-session exit action.');
 assert.match(onlineClient, /offlineIntent \|\| \(!matchmakingActive && !online\.code\)/, 'Late match-found events must not re-enter online mode after cancellation.');
 assert.match(onlineClient, /if \(wasSearching && socket\?\.connected\)[\s\S]*?queue:cancel/, 'Leaving online mode must cancel an active matchmaking queue.');
