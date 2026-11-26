@@ -2,6 +2,7 @@ import { Chess } from 'chess.js';
 import { engine } from './engine.js';
 import { saveEngine } from './save-engine.js';
 import './king-pawn.css';
+import { createKingPawnResponder } from './king-pawn-responder.js';
 
 const $ = id => document.getElementById(id);
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -17,7 +18,6 @@ let avatarImages = { player: '', opponent: '' };
 let savedGames = [];
 let activeSaveGameId = null;
 let backgroundDimmer = 56;
-let aiAdapter = null;
 
 function safeImageData(file) {
   return new Promise((resolve, reject) => {
@@ -395,35 +395,11 @@ function chessTopicAnswer(question, context) {
   return 'I have the live position and move list in view. Start by checking king safety, loose pieces, forcing checks and captures, and pawn breaks. Ask me about a specific rule, opening, tactic, endgame, famous game, or type “best move” and I will request a Stockfish line for this exact position.' + boardLine;
 }
 
-async function makeChessAnswer(question) {
+async function makeLocalChessAnswer(question) {
   const context = currentBoardContext();
   const chessWords = /\b(chess|board|opening|endgame|tactic|fork|pin|skewer|check|mate|castl|en passant|pawn|rook|bishop|knight|queen|king|move|position|fen|pgn|grandmaster|fischer|kasparov|morphy|stalemate|promotion|opposition|lucena|philidor)\b/i;
   if (!chessWords.test(question)) {
     return 'I am King Pawn, royal advisor of the 64 squares. I only advise on chess matters. Ask me about a move, opening, tactic, rule, endgame, or this board.';
-  }
-
-  // A secure server-backed model can be attached without exposing its API key in the browser.
-  if (aiAdapter) {
-    try {
-      const answer = await aiAdapter({
-        systemPrompt: `You are King Pawn, Glass Chess's chess-only advisor. Answer the full range of chess questions: history, rules, how to play, openings, tactics, strategy, famous games and players, training, opinions, and the live position. Be conversational and beginner-friendly, but accurate. Acknowledge opinions such as 'chess sucks' without arguing. Distinguish official rules from strategic advice. Never invent a move, statistic, quote, or historical certainty; explain uncertainty. If a question is not about chess, politely say you only answer chess-related questions and suggest a chess question. Analyze the supplied live board and PGN when relevant. Never make moves for the user.`,
-        question,
-        board: {
-          fen: context.fen,
-          pgn: context.pgn,
-          history: context.history,
-          turn: context.turn,
-          gameOver: context.gameOver,
-          inCheck: context.inCheck,
-          checkState: context.checkState,
-          material: context.material
-        }
-      });
-      const text = typeof answer === 'string' ? answer : answer?.answer;
-      if (typeof text === 'string' && text.trim()) return text.trim().slice(0, 12000);
-    } catch (error) {
-      console.warn('King Pawn AI adapter failed; using the local chess advisor:', error);
-    }
   }
 
   const contextAnswer = chessTopicAnswer(question, context);
@@ -453,6 +429,15 @@ async function makeChessAnswer(question) {
     }
   }
   return contextAnswer;
+}
+
+const kingPawnResponder = createKingPawnResponder({
+  getContext: currentBoardContext,
+  getKnowledgeAnswer: makeLocalChessAnswer
+});
+
+async function makeChessAnswer(question) {
+  return kingPawnResponder.ask(question);
 }
 
 function renderChat() {
@@ -614,7 +599,7 @@ function mountKingPawn() {
     '</div>',
     '<div id="gc-king-pawn-messages" aria-live="polite"></div>',
     '<form id="gc-king-pawn-form"><label class="gc-kp-sr-only" for="gc-king-pawn-input">Ask King Pawn a chess question</label><textarea id="gc-king-pawn-input" rows="2" maxlength="1200" placeholder="Ask about a move, opening, tactic, or rule…"></textarea><button type="submit">Ask King Pawn</button></form>',
-    '<footer>Powered by chess knowledge + Stockfish 19</footer>',
+    '<footer>OFFLINE CHESS ADVISOR · LIVE STOCKFISH ANALYSIS</footer>',
     '</section>'
   ].join('');
   document.body.appendChild(dock);
@@ -658,6 +643,14 @@ function mountKingPawn() {
         renderChat();
         queueSave({ chatLog });
       } else addChatMessage('assistant', answer, context);
+    } catch (error) {
+      const last = chatLog.at(-1);
+      const message = 'I hit a temporary problem while preparing that chess answer. Your question and game are saved; please try again.';
+      if (last?.role === 'assistant') last.content = message;
+      else addChatMessage('assistant', message, context);
+      renderChat();
+      queueSave({ chatLog });
+      console.error('King Pawn response failed:', error);
     } finally {
       submit.disabled = false;
       submit.textContent = 'Ask King Pawn';
@@ -794,30 +787,46 @@ function captureGameState(event) {
 }
 
 let bootStarted = false;
+let restoreStarted = false;
+let hintHooksInstalled = false;
+let savePollInstalled = false;
 function boot() {
-  if (bootStarted) return;
   bootStarted = true;
-  mountPersonalization();
-  mountKingPawn();
-  installHintFeedback();
-  void restoreAndMount();
-  document.addEventListener('glasschess:statechange', captureGameState);
-  // Keep premium settings and match history in the portable save, even when they change
-  // without causing a board re-render.
-  window.setInterval(() => {
-    if (!restoreComplete) return;
-    queueSave({ localStorage: saveLegacySettings() });
-  }, 5000);
-  window.GlassChessKingPawn = {
+  try { mountPersonalization(); }
+  catch (error) { console.error('Glass Chess personalization did not mount:', error); }
+  try { mountKingPawn(); }
+  catch (error) {
+    console.error('King Pawn could not mount:', error);
+    showToast('King Pawn is retrying after a startup issue.', true);
+    window.setTimeout(() => {
+      try { mountKingPawn(); }
+      catch (retryError) { console.error('King Pawn retry failed:', retryError); }
+    }, 900);
+  }
+  if (!hintHooksInstalled) {
+    try { installHintFeedback(); hintHooksInstalled = true; }
+    catch (error) { console.error('King Pawn board-link hooks did not mount:', error); }
+  }
+  if (!restoreStarted) {
+    restoreStarted = true;
+    void restoreAndMount();
+  }
+  if (!savePollInstalled) {
+    document.addEventListener('glasschess:statechange', captureGameState);
+    window.setInterval(() => {
+      if (!restoreComplete) return;
+      queueSave({ localStorage: saveLegacySettings() });
+    }, 5000);
+    savePollInstalled = true;
+  }
+  if (!window.GlassChessKingPawn) window.GlassChessKingPawn = {
     name: 'King Pawn',
+    status: 'ready',
     getContext: currentBoardContext,
     ask: makeChessAnswer,
     getMessages: () => chatLog.slice(),
     setCloudAdapter: adapter => saveEngine.setCloudAdapter(adapter),
-    setAIAdapter(adapter) {
-      if (adapter !== null && typeof adapter !== 'function') throw new TypeError('King Pawn AI adapter must be an async function.');
-      aiAdapter = adapter;
-    },
+    setAIAdapter(adapter) { kingPawnResponder.setAIAdapter(adapter); },
     syncToCloud: () => saveEngine.saveToCloud(),
     loadFromCloud: () => saveEngine.loadFromCloud(),
     async applyCloudProfile(profile = {}) {
@@ -857,4 +866,9 @@ if (document.readyState === 'loading') {
 } else {
   boot();
 }
-window.setTimeout(boot, 500);
+window.setTimeout(() => {
+  if (!$('gc-king-pawn')) {
+    try { mountKingPawn(); }
+    catch (error) { console.error('King Pawn delayed mount failed:', error); }
+  }
+}, 900);
