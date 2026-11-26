@@ -91,3 +91,18 @@ assert.match(puzzleUi, /solutionIndex/, 'The puzzle UI must track progress throu
 assert.match(puzzleUi, /game\.move\(moveInput\(puzzle\.solution\[solutionIndex\]\)\)/, 'The opponent response must be played from the verified solution line.');
 assert.match(puzzleUi, /Opponent is replying/, 'The player must see the opponent response between their moves.');
 assert.match(puzzleUi, /Lichess CC0/, 'The puzzle UI must attribute the open puzzle source.');
+
+assert.match(puzzleUi, /Completed earlier — replay this puzzle anytime for practice/, 'Completed puzzles must remain replayable.');
+assert.match(puzzleUi, /el\('gc-daily-board'\)\.addEventListener\('click'/, 'Puzzle square clicks must be handled by the board event delegate.');
+assert.doesNotMatch(puzzleUi, /function revealSolution\(/, 'Opening a completed puzzle must not reveal and disable the board.');
+
+const supportUi = readFileSync(new URL('../src/cloud-auth.js', import.meta.url), 'utf8');
+const supportCss = readFileSync(new URL('../src/cloud-auth.css', import.meta.url), 'utf8');
+assert.match(supportUi, /contact\.id = 'gc-contact'/, 'The top bar must include a standalone Contact action.');
+assert.match(supportUi, /openDonationDialog\('contact'\)/, 'The Contact action must open contact mode.');
+assert.match(supportUi, /message_type: \$\('gc-donation-topic'\)\.value/, 'Contact submissions must include the selected message topic.');
+assert.match(supportUi, /donation_amount: supportMode === 'contact' \? 'No donation/, 'Contact submissions must not require a donation.');
+assert.match(supportUi, /api\.emailjs\.com\/api\/v1\.0\/email\/send/, 'Contact messages must use the configured email delivery service.');
+assert.match(supportCss, /height: 36px !important/, 'Top-bar actions must use a consistent height.');
+assert.match(supportCss, /overflow-x: auto !important/, 'Top-bar controls must remain reachable when the viewport is narrow.');
+assert.match(supportCss, /\.gc-donation-overlay\.is-contact \.gc-donation-actions/, 'Contact mode must have contact-specific presentation.');

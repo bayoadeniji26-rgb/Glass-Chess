@@ -1,10 +1,11 @@
 {
-  "version": "2026.11.26.1",
+  "version": "2026.11.26.2",
   "name": "Glass Chess Required Update",
   "updatedAt": "2026-11-26",
   "notes": [
-    "Replaces mirrored template puzzles with 50 distinct CC0 Lichess tactical positions",
-    "Supports full multi-move solution lines with automatic opponent replies",
-    "Adds puzzle-source attribution and stronger puzzle-line regression tests"
+    "Allows completed daily puzzles to be replayed and reset for practice",
+    "Adds independent Contact and Donate actions with message topics",
+    "Moves Cash App copy into the Donate dialog and evens top-bar control sizing",
+    "Keeps all 50 distinct Lichess CC0 puzzles and full opponent reply lines"
   ]
 }

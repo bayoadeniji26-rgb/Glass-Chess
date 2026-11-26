@@ -176,21 +176,9 @@ function mountDailyPuzzles() {
       cell.setAttribute('aria-label', square + (piece ? ', ' + (piece.color === 'w' ? 'white ' : 'black ') + PIECE_NAMES[piece.type] : ', empty'));
       cell.setAttribute('aria-pressed', String(selectedSquare === square));
       cell.disabled = solved || pendingPromotion.length > 0 || replyPending;
-      cell.addEventListener('click', () => handleSquare(square));
+      cell.tabIndex = solved || replyPending ? -1 : 0;
       host.appendChild(cell);
     }
-  }
-  function revealSolution() {
-    game = new Chess(puzzle.fen);
-    const sans = [];
-    for (const expected of puzzle.solution) {
-      const move = game.move(moveInput(expected));
-      if (!move) throw new Error('The saved puzzle solution is invalid: ' + puzzle.id);
-      sans.push(move.san);
-    }
-    solved = true; replyPending = false; solutionIndex = puzzle.solution.length;
-    solutionSan = sans; clearSelection(); renderBoard();
-    feedback('Solution · ' + sans.join(' '), 'success');
   }
   function completePuzzle() {
     solved = true; replyPending = false; clearSelection();
@@ -258,13 +246,20 @@ function mountDailyPuzzles() {
     }
     clearSelection(); renderBoard();
   }
+  el('gc-daily-board').addEventListener('click', event => {
+    const cell = event.target.closest?.('button[data-square]');
+    if (!cell || !event.currentTarget.contains(cell) || cell.disabled) return;
+    handleSquare(cell.dataset.square);
+  });
+
   function renderPuzzle() {
     if (replyTimer) window.clearTimeout(replyTimer);
     replyTimer = null; replyPending = false; solutionIndex = 0; solutionSan = [];
     progress = readProgress();
     puzzle = DAILY_PUZZLES[puzzleDay - 1];
     game = new Chess(puzzle.fen); boardSide = game.turn();
-    clearSelection(); pendingPromotion = []; solved = progress.completedDays.includes(puzzle.day);
+    const alreadyCompleted = progress.completedDays.includes(puzzle.day);
+    clearSelection(); pendingPromotion = []; solved = false;
     el('gc-daily-day-label').textContent = 'DAILY CHALLENGE · ' + localDateKey();
     el('gc-daily-theme').textContent = puzzle.type.toUpperCase();
     el('gc-daily-rating').textContent = 'RATING ' + puzzle.rating;
@@ -273,8 +268,11 @@ function mountDailyPuzzles() {
     el('gc-daily-hint').hidden = true; el('gc-daily-hint').textContent = '';
     el('gc-daily-promotion').hidden = true;
     action('hint').textContent = 'Hint';
-    feedback(solved ? 'You already solved this puzzle.' : 'Tap a piece, then tap a highlighted destination.', solved ? 'success' : 'neutral');
-    if (solved) revealSolution(); else renderBoard();
+    feedback(alreadyCompleted
+      ? 'Completed earlier — replay this puzzle anytime for practice. Your progress stays saved.'
+      : 'Tap a piece, then tap a highlighted destination.',
+      alreadyCompleted ? 'success' : 'neutral');
+    renderBoard();
     updateProgressUI();
   }
   function closeDialog() { if (dialog.open) dialog.close(); openButton.focus(); }
@@ -292,11 +290,15 @@ function mountDailyPuzzles() {
     action('hint').textContent = hint.hidden ? 'Hint' : 'Hide hint';
   });
   action('restart').addEventListener('click', () => {
-    if (solved) { feedback('This puzzle is already solved. Use Next puzzle to continue.', 'success'); return; }
     if (replyTimer) window.clearTimeout(replyTimer);
     replyTimer = null; replyPending = false; solutionIndex = 0; solutionSan = [];
     game = new Chess(puzzle.fen); boardSide = game.turn(); clearSelection(); pendingPromotion = [];
-    el('gc-daily-promotion').hidden = true; renderBoard(); feedback('Puzzle reset. Find the strongest move.');
+    solved = false;
+    el('gc-daily-promotion').hidden = true;
+    renderBoard();
+    feedback(progress.completedDays.includes(puzzle.day)
+      ? 'Practice reset. Your completed-puzzle progress remains saved.'
+      : 'Puzzle reset. Find the strongest move.');
   });
   action('previous').addEventListener('click', () => { if (puzzleDay > 1) { puzzleDay--; renderPuzzle(); } });
   action('next').addEventListener('click', () => { if (puzzleDay < DAILY_PUZZLES.length) { puzzleDay++; renderPuzzle(); } });
