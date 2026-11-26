@@ -167,7 +167,7 @@ try {
   assert.equal(missingPly?.ok, false, 'A move without an expected ply must be rejected.');
 
   // A dropped socket gets a grace period and can recover the same game with its token.
-  const reconnectSide = matchedForB.role === 'w' ? 'w' : 'b';
+  const reconnectSide = 'w';
   const reconnectId = matchedForB.role === 'w' ? ids.black : ids.white;
   const reconnectToken = matchedForB.role === 'w' ? matchedForB.resumeToken : foundA.resumeToken;
   const remainingSide = matchedForB.role === 'w' ? playerA : playerB;
