@@ -666,15 +666,72 @@ function updateGameStatus() {
     `${game.turn() === "w" ? "White" : "Black"} to move.`;
 }
 
-function updateLabels() {
-  $("opponent-label").textContent =
-    gameMode === "local" ? "Local player" :
-    gameMode === "analysis" ? "Stockfish Analysis" : "Stockfish 19";
+function getSignedInDisplayName() {
+  const user = window.GlassChessCloud?.user;
+  if (!user) return "Anonymous";
+  const candidate = user.displayName || user.username || String(user.email || "").split("@")[0];
+  const cleaned = String(candidate || "").replace(/[<>]/g, "").trim().slice(0, 24);
+  return cleaned || "Glass Chess player";
+}
 
-  $("player-label").textContent =
-    gameMode === "local" ? "Both players" :
-    gameMode === "analysis" ? (game.turn() === "w" ? "White to move" : "Black to move") :
-    playerColor;
+function normalizeSeatName(value, fallback = "Anonymous") {
+  const cleaned = String(value || "").replace(/[<>]/g, "").trim().slice(0, 24);
+  return !cleaned || cleaned.toLowerCase() === "player" ? fallback : cleaned;
+}
+
+function formatSeatRating(player) {
+  const value = Number(player?.rating);
+  return Number.isFinite(value) && value > 0
+    ? `${Math.round(value)} Elo`
+    : "Elo: Unrated";
+}
+
+function updateLabels() {
+  const online = window.GlassChessOnlinePlus;
+  const isOnlineMatch = online?.isOnline?.() === true;
+  const topName = $("opponent-name");
+  const bottomName = $("player-name");
+  const topMeta = $("opponent-label");
+  const bottomMeta = $("player-label");
+  if (!topName || !bottomName || !topMeta || !bottomMeta) return;
+
+  // Stockfish is a seat label only in a game where the computer is actually the opponent.
+  if (gameMode === "computer" && !isOnlineMatch) {
+    topName.textContent = "Stockfish";
+    topMeta.textContent = "Computer";
+    bottomName.textContent = "You";
+    bottomMeta.textContent = playerColor === "white" ? "White" : "Black";
+    return;
+  }
+
+  const topSide = boardIsFlipped() ? "w" : "b";
+  const bottomSide = topSide === "w" ? "b" : "w";
+  const sideName = side => side === "w" ? "White" : "Black";
+
+  if (gameMode === "analysis" && !isOnlineMatch) {
+    topName.textContent = sideName(topSide);
+    topMeta.textContent = "Analysis board";
+    bottomName.textContent = sideName(bottomSide);
+    bottomMeta.textContent = "Analysis board";
+    return;
+  }
+
+  const players = isOnlineMatch ? online.getPlayers?.() || null : null;
+  const signedInName = getSignedInDisplayName();
+  const signedInSide = playerColor === "white" ? "w" : "b";
+  const nameForSide = side => {
+    if (isOnlineMatch) {
+      const player = players?.[side];
+      return player ? normalizeSeatName(player.name) : `Waiting for ${sideName(side)}`;
+    }
+    return side === signedInSide ? signedInName : "Anonymous";
+  };
+  const ratingForSide = side => formatSeatRating(players?.[side]);
+
+  topName.textContent = nameForSide(topSide);
+  topMeta.textContent = `${sideName(topSide)} · ${ratingForSide(topSide)}`;
+  bottomName.textContent = nameForSide(bottomSide);
+  bottomMeta.textContent = `${sideName(bottomSide)} · ${ratingForSide(bottomSide)}`;
 }
 
 function render() {
@@ -1984,6 +2041,7 @@ function launch() {
   createAnalysisStudio();
   connectButtons();
   installBoardDragDrop();
+  window.addEventListener("glasschess:auth-change", updateLabels);
 
   applyPieceAppearance();
   applyPageBackground(settings.background);
