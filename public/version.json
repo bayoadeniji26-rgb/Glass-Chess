@@ -1,11 +1,13 @@
 {
-  "version": "2026.11.25.11",
+  "version": "2026.11.25.12",
   "name": "Glass Chess Required Update",
   "updatedAt": "2026-11-25",
   "notes": [
     "Keeps the required-update dialog and verified install flow",
     "Adds a direct install action and verified reload flow",
     "Rebuilds King Pawn as an isolated chess-only responder with offline fallback and resilient startup",
-    "Adds email/password registration, sign-in, password reset, and verification-gated private cloud sync"
+    "Moves account authentication from Firebase to Clerk email/password verification",
+    "Adds Supabase private cloud saves with per-user row-level security",
+    "Keeps local guest saves and separates donations from account authentication"
   ]
 }
