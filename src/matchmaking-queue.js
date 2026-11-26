@@ -4,8 +4,11 @@ export class MatchmakingQueue {
   }
 
   enqueue(player) {
-    const existing = this.waiting.get(player.socketId);
-    if (existing) return { status: 'waiting', opponent: null };
+    const duplicate = [...this.waiting.values()].find(candidate => candidate.playerId === player.playerId);
+    if (duplicate) {
+      if (duplicate.socketId === player.socketId) return { status: 'waiting', opponent: null };
+      return { status: 'already_queued', opponent: null };
+    }
     const opponent = [...this.waiting.values()]
       .filter(candidate => candidate.socketId !== player.socketId && candidate.playerId !== player.playerId)
       .sort((a, b) => a.joinedAt - b.joinedAt)[0];
@@ -19,6 +22,10 @@ export class MatchmakingQueue {
 
   remove(socketId) {
     return this.waiting.delete(socketId);
+  }
+
+  hasPlayer(playerId) {
+    return [...this.waiting.values()].some(candidate => candidate.playerId === playerId);
   }
 
   get size() {
