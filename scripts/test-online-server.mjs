@@ -261,7 +261,41 @@ try {
   });
   assert.equal(lateInviteJoin?.ok, false);
 
-  console.log('Online integration tests passed: health, matchmaking, queue cancellation, legal/stale moves, reconnect, friend invites, chat throttling, forfeits, ended-room cleanup, and unused-invite expiry.');
+  // Repetition must end the authoritative game as a draw and publish gameOver.
+  const drawRoom = await ack(friendB, 'room:create', { playerId: ids.friendB, name: 'Draw Test' });
+  assert.equal(drawRoom?.ok, true);
+  const drawGuest = await ack(intruder, 'room:join', {
+    code: drawRoom.code, playerId: '40000000-0000-4000-8000-000000000003', name: 'Draw Guest'
+  });
+  assert.equal(drawGuest?.ok, true);
+  const drawGame = new Chess();
+  const repetitionLine = [
+    ['g1', 'f3'], ['g8', 'f6'], ['f3', 'g1'], ['f6', 'g8'],
+    ['g1', 'f3'], ['g8', 'f6'], ['f3', 'g1'], ['f6', 'g8']
+  ];
+  const drawStatePromise = nextEvent(drawGuest ? intruder : friendB, 'room:state', value => value?.gameOver === true);
+  const drawRoomExpired = nextEvent(friendB, 'room:expired', value => value?.code === drawRoom.code, 4000);
+  for (let index = 0; index < repetitionLine.length; index += 1) {
+    const [from, to] = repetitionLine[index];
+    const player = index % 2 === 0 ? friendB : intruder;
+    const expectedFen = drawGame.fen();
+    const expectedPly = drawGame.history().length;
+    const response = await ack(player, 'game:move', {
+      code: drawRoom.code, expectedPly, expectedFen, move: { from, to }
+    });
+    assert.equal(response?.ok, true, 'The repetition line must be legal at ply ' + (index + 1));
+    assert.ok(drawGame.move({ from, to }));
+  }
+  assert.ok(drawGame.isThreefoldRepetition());
+  const drawnState = await drawStatePromise;
+  assert.equal(drawnState.gameOver, true);
+  assert.equal(drawnState.draw, true);
+  assert.equal(drawnState.result, 'Draw');
+  const drawnRoomExpiry = await drawRoomExpired;
+  assert.equal(drawnRoomExpiry.reason, 'game-ended');
+
+  console.log('Online integration tests passed: health, matchmaking, queue cancellation, legal/stale moves, reconnect, friend invites, chat throttling, forfeits, room/invite expiry, and threefold-repetition draws.');
+
 } catch (error) {
   console.error(error);
   if (serverOutput) console.error('Online server output:\n' + serverOutput);
