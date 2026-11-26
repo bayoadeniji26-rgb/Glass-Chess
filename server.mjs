@@ -213,7 +213,7 @@ io.on('connection', socket => {
       socket.data.matchmaking = retry.status === 'waiting';
       return done({ ok: true, waiting: true, queuedPlayers: matchmaking.size });
     }
-    const { room, whiteSocket, blackSocket } = createMatchedRoom(socket, player, opponentSocket, result.opponent);
+    const { room, whiteSocket, blackSocket, whiteResumeToken, blackResumeToken } = createMatchedRoom(socket, player, opponentSocket, result.opponent);
     const state = publicRoom(room);
     const joiningRole = socket.id === whiteSocket.id ? 'w' : 'b';
     const opponentRole = joiningRole === 'w' ? 'b' : 'w';
