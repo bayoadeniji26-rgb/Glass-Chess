@@ -222,7 +222,7 @@ assert.match(workspaceCss, /gc-tools-single-launcher #gc-workspace-actions/, 'Th
 const finalUiCss = readFileSync(new URL('../src/glass-final-ui.css', import.meta.url), 'utf8');
 const redesignCss = readFileSync(new URL('../src/glass-redesign.css', import.meta.url), 'utf8');
 const redesignUi = readFileSync(new URL('../src/glass-redesign.js', import.meta.url), 'utf8');
-assert.match(toolsCss, /grid-template-columns: repeat\\(3, minmax\\(0, 1fr\\)\\)/, 'Desktop Tools shortcuts must use a compact three-column layout.');
+assert.match(toolsCss, /grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/, 'Desktop Tools shortcuts must use a compact three-column layout.');
 assert.match(toolsCss, /overflow-y: auto !important/, 'The Tools feature pane must own vertical scrolling.');
 assert.match(toolsCss, /pointer-events: auto !important/, 'Interactive tool controls must remain clickable above the backdrop.');
 assert.match(toolsCss, /position: relative !important/, 'Tool buttons must remain in the drawer hit-testing layer.');
