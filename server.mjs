@@ -224,7 +224,7 @@ io.on('connection', socket => {
     broadcast(room);
   });
 
-  socket.on('queue:cancel', (done = () => {}) => {
+  socket.on('queue:cancel', (_payload = {}, done = () => {}) => {
     const removed = matchmaking.remove(socket.id);
     socket.data.matchmaking = false;
     done({ ok: true, cancelled: removed });
@@ -373,7 +373,7 @@ io.on('connection', socket => {
     }
   });
 
-  socket.on('room:resign', (done = () => {}) => {
+  socket.on('room:resign', (_payload = {}, done = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
     if (!room) return done({ ok: false, error: 'You are not in a room.' });
     if (room.abandoned || room.resigned || room.game.isGameOver()) return done({ ok: false, error: 'This game has already ended.' });
@@ -384,7 +384,7 @@ io.on('connection', socket => {
     broadcast(room);
   });
 
-  socket.on('room:rematch', (done = () => {}) => {
+  socket.on('room:rematch', (_payload = {}, done = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
     const side = room && ['w', 'b'].find(candidate => room.players[candidate]?.id === socket.id);
     if (!room || !side || room.ownerPlayerId !== room.players[side].playerId) return done({ ok: false, error: 'Only the room creator can start a rematch.' });
@@ -411,7 +411,7 @@ io.on('connection', socket => {
     done({ ok: true });
   });
 
-  socket.on('room:leave', (done = () => {}) => {
+  socket.on('room:leave', (_payload = {}, done = () => {}) => {
     const code = socket.data.roomCode;
     const room = code ? rooms.get(code) : null;
     const side = room && ['w', 'b'].find(candidate => room.players[candidate]?.id === socket.id);
