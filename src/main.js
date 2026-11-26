@@ -1298,6 +1298,11 @@ async function startGame() {
   const options = labOptions || { skillLevel };
 
   const token = ++gameToken;
+  const onlineSession = window.GlassChessOnlinePlus;
+  if (onlineSession?.isOnline?.() || onlineSession?.isMatchmaking?.()) {
+    await onlineSession.exitOnlineSession?.({ restoreMode: false });
+    if (request !== startRequestToken || token !== gameToken) return;
+  }
   thinking = true;
   analysisBestMove = null;
 
