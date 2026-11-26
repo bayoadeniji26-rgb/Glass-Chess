@@ -1,12 +1,12 @@
 # Firebase setup for Glass Chess
 
-Google sign-in is optional. Guests can continue playing without an account; local IndexedDB saving and JSON export/import remain available without Firebase.
+Email accounts are optional. Guests can continue playing without an account; local IndexedDB saving and JSON export/import remain available without Firebase. Cloud sync is only enabled after a player verifies the email address.
 
 ## 1. Create and configure a Firebase project
 
 1. Open the [Firebase Console](https://console.firebase.google.com/) and create a project.
 2. Add a **Web app** and copy its Firebase web configuration.
-3. Under **Authentication → Sign-in method**, enable **Google**.
+3. Under **Authentication → Sign-in method**, enable **Email/Password**.
 4. Under **Authentication → Settings → Authorized domains**, add the exact production hostname:
    `glass-chess-pro.onrender.com`
    Also add `localhost` for local Vite testing. Add any custom domain you use.
@@ -50,11 +50,12 @@ Choose the same Firebase project used for the web configuration when `firebase u
 
 ## 4. Verify sign-in and cloud sync
 
-1. Open the production site and click **Sign in with Google** in the top-left.
-2. Complete Google consent. The profile pill should show **Syncing...** followed by **Synced to Cloud**.
-3. Play a move, change a setting, upload an avatar/background, or chat with King Pawn.
-4. Sign into the same Google account on another browser/device. The profile, saved games, pictures, theme settings, and saved King Pawn chat should restore from Firestore/Storage.
-5. Use the profile menu → **Force Sync Now** to request an immediate sync, or **Cloud Game Vault** to load an archived PGN into Analysis Studio.
+1. Open the production site and click **Sign in / Create account** in the top-left.
+2. Choose **Create an account**, enter an email address and password, and check your inbox for the verification link.
+3. Open the verification link, return to Glass Chess, and choose **I verified my email**. Cloud sync remains off until Firebase confirms the address is verified.
+4. The profile pill should show **Syncing...** followed by **Synced to Cloud**. Then play a move, change a setting, upload an avatar/background, or chat with King Pawn.
+5. Sign into the same verified email account on another browser/device. The profile, saved games, pictures, theme settings, and saved King Pawn chat should restore from Firestore/Storage.
+6. Use the profile menu → **Force Sync Now** to request an immediate sync, or **Cloud Game Vault** to load an archived PGN into Analysis Studio.
 
 If sign-in succeeds but sync fails, inspect the browser console and check that the Firestore and Storage rules above were published and that the Firebase project has billing/Storage access configured as required by your project.
 
