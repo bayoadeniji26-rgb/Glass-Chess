@@ -19,7 +19,7 @@ function readProgress() {
   const defaults = { version: 3, startedOn: today, completedDays: [], revealedDays: [], lastSolvedDay: 0, streak: 0, attempts: {} };
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-    if (!saved || saved.version !== 3 || !/^\d{4}-\d{2}-\d{2}$/.test(saved.startedOn || '')) return defaults;
+    if (!saved || ![2, 3].includes(saved.version) || !/^\d{4}-\d{2}-\d{2}$/.test(saved.startedOn || '')) return defaults;
     getPuzzleDayIndex(saved.startedOn, today);
     return {
       ...defaults, ...saved, version: 3,
