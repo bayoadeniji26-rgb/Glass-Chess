@@ -1,13 +1,12 @@
 {
-  "version": "2026.11.26.7",
+  "version": "2026.11.26.8",
   "name": "Glass Chess Required Update",
   "updatedAt": "2026-11-26",
   "notes": [
+    "Uses only the registered Glass Chess account name for human player labels",
+    "Shows Anonymous when a player has no registered name",
+    "Never derives a player name from an email address",
     "Shows signed-in names on human-versus-human seats and Anonymous for guest players",
-    "Keeps Stockfish nameplates exclusive to games against the computer",
-    "Shows Elo only when a real rating is supplied; otherwise seats are marked Unrated",
-    "Adds Quick Match matchmaking with automatic opponent pairing and cancellation",
-    "Adds shareable private friend invitations with cryptographically random eight-character codes",
-    "Validates every online move against the server position and requires an expected move number"
+    "Keeps Stockfish nameplates exclusive to games against the computer"
   ]
 }
