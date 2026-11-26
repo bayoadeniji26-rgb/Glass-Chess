@@ -6,8 +6,6 @@ import './cloud-auth.css';
 
 const CASHAPP_TAG = '$RaphaelAboy';
 const CASHAPP_URL = 'https://cash.app/$RaphaelAboy';
-const FIREBASE_VERSION = '13.4.0';
-const FIREBASE_CDN = `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/`;
 const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID || 'service_3l9tc2a';
 const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || 'template_qwi52h9';
 const EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'aKuTsseHTnwR-RWg';
