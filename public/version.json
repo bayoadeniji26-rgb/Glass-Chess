@@ -1,5 +1,5 @@
 {
-  "version": "2026.11.26.8",
+  "version": "2026.11.26.9",
   "name": "Glass Chess Required Update",
   "updatedAt": "2026-11-26",
   "notes": [
@@ -7,6 +7,8 @@
     "Shows Anonymous when a player has no registered name",
     "Never derives a player name from an email address",
     "Shows signed-in names on human-versus-human seats and Anonymous for guest players",
-    "Keeps Stockfish nameplates exclusive to games against the computer"
+    "Keeps Stockfish nameplates exclusive to games against the computer",
+    "Automatically exits online rooms and matchmaking before starting Pass and Play, computer, or analysis games",
+    "Clears saved room auto-resume state and blocks late matchmaking events from re-entering online mode"
   ]
 }
