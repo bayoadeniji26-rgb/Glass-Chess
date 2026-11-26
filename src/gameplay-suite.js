@@ -708,13 +708,25 @@ async function refreshEngineArrow() {
   const threatOn=Boolean(document.getElementById('gcl-threat-arrows')?.checked);
   clearEngineArrows();
   if((!bestOn&&!threatOn) || api.mode!=='analysis' || !api.engineReady || api.thinking)return;
+  const fen=api.fen, generation=api.generation;
   try{
-    const result=await api.search(api.fen,10);
-    if(bestOn)drawEngineArrow(result);
-    if(threatOn){
-      const pv=result.variations?.[0]?.pv||[];
-      const reply=pv[1];
-      if(reply?.length>=4)drawArrow(reply.slice(0,2),reply.slice(2,4),'#83bfff','gcl-threat-arrow');
+    const result=await api.search(fen,10);
+    // Searches can be cancelled by a mode switch, position import, or undo.
+    // Never paint their partial principal variation onto a newer board.
+    if(result?.cancelled || api.mode!=='analysis' || api.fen!==fen || api.generation!==generation)return;
+
+    const position=new Chess(fen);
+    const pv=result.variations?.[0]?.pv||[];
+    const best=String(result.bestMove||'').toLowerCase();
+    const legalBest=position.moves({verbose:true}).find(move=>uci(move)===best);
+    if(bestOn&&legalBest)drawEngineArrow({bestMove:uci(legalBest)});
+
+    if(threatOn&&legalBest&&pv.length>1){
+      const afterBest=new Chess(fen);
+      afterBest.move({from:legalBest.from,to:legalBest.to,promotion:legalBest.promotion});
+      const replyUci=String(pv[1]||'').toLowerCase();
+      const legalReply=afterBest.moves({verbose:true}).find(move=>uci(move)===replyUci);
+      if(legalReply)drawArrow(legalReply.from,legalReply.to,'#83bfff','gcl-threat-arrow');
     }
   }catch{}
 }
