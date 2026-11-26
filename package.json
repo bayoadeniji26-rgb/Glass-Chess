@@ -10,7 +10,7 @@
     "online": "node server.mjs",
     "dev:network": "vite --host 0.0.0.0",
     "check:version": "node scripts/check-release-version.mjs",
-    "test": "node scripts/test-regressions.mjs && node scripts/test-engine-lifecycle.mjs && node scripts/test-save-engine.mjs && node scripts/test-cloud-sync-queue.mjs && node scripts/test-stockfish-engine.mjs && node scripts/test-online-server.mjs"
+    "test": "node scripts/test-regressions.mjs && node scripts/test-engine-lifecycle.mjs && node scripts/test-self-test.mjs && node scripts/test-save-engine.mjs && node scripts/test-cloud-sync-queue.mjs && node scripts/test-stockfish-engine.mjs && node scripts/test-online-server.mjs"
   },
   "dependencies": {
     "chess.js": "^1.4.0",
