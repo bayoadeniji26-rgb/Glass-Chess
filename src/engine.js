@@ -1,8 +1,10 @@
-class ChessEngine {
+export class ChessEngine {
   constructor() {
     this.worker = null;
     this.ready = false;
     this.startPromise = null;
+    this.rejectStart = null;
+    this.startTimeoutMs = 20000;
     this.configureQueue = Promise.resolve();
     this.searchPromise = null;
     this.stopPromise = null;
@@ -26,25 +28,31 @@ class ChessEngine {
 
     let settled = false;
     let timeout = null;
+    let worker = null;
     const failStart = error => {
       if (settled) return;
       settled = true;
       if (timeout) clearTimeout(timeout);
-      this.ready = false;
-      try { this.worker?.terminate(); } catch {}
-      this.worker = null;
+      if (this.rejectStart === failStart) this.rejectStart = null;
+      if (this.worker === worker) {
+        this.ready = false;
+        this.worker = null;
+      }
+      try { worker?.terminate(); } catch {}
       rejectReady(error instanceof Error ? error : new Error(String(error)));
     };
+    this.rejectStart = failStart;
     const finishStart = () => {
-      if (settled) return;
+      if (settled || this.worker !== worker) return;
       settled = true;
       if (timeout) clearTimeout(timeout);
+      if (this.rejectStart === failStart) this.rejectStart = null;
       this.ready = true;
       resolveReady();
     };
 
     try {
-      const worker = new Worker("/engine/stockfish.worker.js");
+      worker = new Worker("/engine/stockfish.worker.js");
       this.worker = worker;
 
       worker.onmessage = event => {
@@ -93,7 +101,7 @@ class ChessEngine {
 
       timeout = setTimeout(() => {
         failStart(new Error("Stockfish took too long to start."));
-      }, 20000);
+      }, Math.max(100, Number(this.startTimeoutMs) || 20000));
       worker.postMessage("uci");
     } catch (error) {
       failStart(error);
@@ -132,6 +140,8 @@ class ChessEngine {
   }
 
   async restartWorker() {
+    const rejectPendingStart = this.rejectStart;
+    if (rejectPendingStart) rejectPendingStart(new Error("Stockfish worker was restarted during startup."));
     const previous = this.worker;
     this.worker = null;
     this.ready = false;
@@ -209,6 +219,14 @@ class ChessEngine {
 
   search(fen, options = {}) {
     if (this.searchPromise) {
+      const pendingSearch = this.searchPromise;
+      // A stopped/cancelled search may still be unwinding its promise after the
+      // worker has acknowledged "stop". Serialize the next request behind it
+      // instead of returning a spurious busy error. A genuinely live search is
+      // still rejected so two callers cannot compete for one UCI bestmove.
+      if (!this.activeSearch || this.activeSearch.cancelled || this.stopPromise) {
+        return pendingSearch.catch(() => {}).then(() => this.search(fen, options));
+      }
       return Promise.reject(new Error("Stockfish is already running a search."));
     }
 
