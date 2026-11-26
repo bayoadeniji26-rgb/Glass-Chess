@@ -44,6 +44,7 @@ import './glass-workspace.css';
       close.textContent = '×';
       const heading = document.createElement('div');
       heading.className = 'gc-workspace-drawer-heading';
+      heading.tabIndex = -1;
       heading.innerHTML = `<span>${title}</span>`;
       heading.appendChild(close);
       panel.insertBefore(heading, panel.firstChild);
@@ -91,7 +92,7 @@ import './glass-workspace.css';
       const drawer = which === 'analysis' ? analysis : play;
       requestAnimationFrame(() => {
         drawer.scrollTop = 0;
-        drawer.querySelector('.gc-workspace-drawer-heading')?.focus?.({ preventScroll: true });
+        drawer.querySelector('.gc-workspace-close')?.focus?.({ preventScroll: true });
       });
     }
 
