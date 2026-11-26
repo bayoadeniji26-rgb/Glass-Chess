@@ -87,6 +87,7 @@ let victoryKey = '';
 let victoryPresentationTimer = null;
 let previousVictoryFocus = null;
 let socketBound = false;
+let matchmakingActive = false;
 
 function todayKey() {
   const d = new Date();
@@ -315,15 +316,17 @@ function mountTab() {
       <p class="gc-plus-small">Your name and avatar are shared with players in rooms you join. Profile XP and achievements stay on this device.</p>
     </div>
     <div class="gc-card"><div class="gc-row"><h4>Online multiplayer</h4><span class="gc-pill" id="gc-plus-connection">Offline</span></div>
-      <label class="gc-plus-field">Online server address<input id="gc-plus-server-url" value="http://localhost:3001" spellcheck="false"></label>
-      <div class="gc-plus-actions"><button class="primary" id="gc-plus-connect">Connect</button><button id="gc-plus-create-room">Create private room</button></div>
+      <label class="gc-plus-field" hidden>Online server address<input id="gc-plus-server-url" value="http://localhost:3001" spellcheck="false"></label>
+      <div class="gc-plus-actions"><button class="primary" id="gc-plus-find-match">Find an opponent</button><button id="gc-plus-cancel-match" disabled>Cancel search</button></div>
+      <p class="gc-plus-small">Quick Match pairs you with the next available player. You can cancel while searching.</p>
+      <div class="gc-plus-actions"><button id="gc-plus-create-room">Challenge a friend · Create link</button></div>
       <div class="gc-plus-grid"><label class="gc-plus-field">Room code<input id="gc-plus-room-code" maxlength="8" placeholder="ABC123"></label><div style="display:flex;align-items:end;gap:6px"><button id="gc-plus-join-room" style="flex:1">Join</button><button id="gc-plus-spectate" style="flex:1">Spectate</button></div></div>
       <div class="gc-plus-status" id="gc-plus-room-status">Connect to the online server, then create a room or enter a friend's code.</div>
       <div class="gc-plus-actions"><button id="gc-plus-copy-invite" disabled>Copy invitation link</button><button id="gc-plus-leave-room" disabled>Leave room</button><button id="gc-plus-resign" disabled>Resign</button></div>
-      <div class="gc-plus-small">Private rooms use server-validated legal moves. To play over the internet, the server must be hosted on a public HTTPS-compatible service. Localhost only reaches this computer.</div>
+      <div class="gc-plus-small">Private invitations work across the internet. Your friend opens the link and joins your game. Moves are checked by the Glass Chess game server.</div>
     </div>
     <div class="gc-card"><div class="gc-row"><h4>Room chat</h4><span class="gc-muted" id="gc-plus-room-people">No room</span></div><div class="gc-plus-chat" id="gc-plus-chat"><p class="gc-plus-small">Room chat appears here after you join.</p></div><div class="gc-plus-actions"><input id="gc-plus-chat-input" maxlength="240" placeholder="Message your room" aria-label="Room chat message"><button id="gc-plus-chat-send">Send</button></div></div>
-    <div class="gc-card"><div class="gc-row"><h4>Friends list</h4><span class="gc-pill" id="gc-plus-friend-count">0 friends</span></div><div class="gc-plus-actions"><input id="gc-plus-friend-input" maxlength="20" placeholder="Friend's display name"><button id="gc-plus-add-friend">Add friend</button></div><div id="gc-plus-friends" class="gc-results"><div class="gc-empty">Add a friend to start your local list.</div></div><p class="gc-plus-small">This is a saved contacts list on this device. Invitations are shared through your private room link; accounts and presence syncing are not enabled.</p></div>
+    <div class="gc-card"><div class="gc-row"><h4>Friends list</h4><span class="gc-pill" id="gc-plus-friend-count">0 friends</span></div><div class="gc-plus-actions"><input id="gc-plus-friend-input" maxlength="20" placeholder="Friend's display name"><button id="gc-plus-add-friend">Add friend</button></div><div id="gc-plus-friends" class="gc-results"><div class="gc-empty">Add a friend to start your local list.</div></div><p class="gc-plus-small">This is a saved contacts list on this device. You can invite friends with a private game link.</p></div>
     <div class="gc-card"><div class="gc-row"><h4>Daily missions</h4><span class="gc-pill" id="gc-plus-mission-date">Today</span></div><div id="gc-plus-missions"></div><div class="gc-plus-small">Complete missions to earn XP and unlock new chess-piece designs.</div></div>
     <div class="gc-card"><div class="gc-row"><h4>Game of the day</h4><span class="gc-pill">Daily challenge</span></div><div class="gc-stat" id="gc-plus-daily-title" style="font-size:18px">Find the forced mate</div><p class="gc-muted" id="gc-plus-daily-copy">White to move. Find the move that ends the game immediately.</p><div class="gc-plus-actions"><button class="primary" id="gc-plus-daily-start">Start today's challenge</button></div><div class="gc-plus-status" id="gc-plus-daily-status">One tactical challenge, refreshed each day.</div></div>
     <div class="gc-card"><div class="gc-row"><h4>Achievements</h4><span class="gc-pill" id="gc-plus-achievement-count">0 / ${ACHIEVEMENTS.length}</span></div><div id="gc-plus-achievements"></div></div>
@@ -424,6 +427,10 @@ function renderRoomButtons() {
   root.querySelector('#gc-plus-copy-invite').disabled = !active;
   root.querySelector('#gc-plus-leave-room').disabled = !online.code;
   root.querySelector('#gc-plus-resign').disabled = !online.code || online.role === 'spectator';
+  const find = root.querySelector('#gc-plus-find-match');
+  const cancel = root.querySelector('#gc-plus-cancel-match');
+  if (find) { find.disabled = matchmakingActive || Boolean(online.code); find.textContent = matchmakingActive ? 'Searching…' : 'Find an opponent'; }
+  if (cancel) cancel.disabled = !matchmakingActive;
   root.querySelector('#gc-plus-connection').textContent = socket?.connected ? 'Connected' : 'Offline';
 }
 
@@ -489,6 +496,14 @@ function makeSocket() {
     renderRoomButtons();
   });
   socket.on('room:state', snapshot => showRoomState(snapshot));
+  socket.on('match:found', result => {
+    matchmakingActive = false;
+    online.previousMode = api.mode;
+    online.previousColor = api.playerColor;
+    applyRoomJoin(result);
+    root.querySelector('#gc-plus-room-status').textContent = 'Opponent found! You are playing as ' + (result.role === 'w' ? 'White.' : 'Black.');
+    toast('Match found. Good luck!');
+  });
   socket.on('chat:message', addChatMessage);
   return socket;
 }
@@ -513,6 +528,41 @@ function applyRoomJoin(result) {
   root.querySelector('#gc-plus-room-code').value = result.code;
   root.querySelector('#gc-plus-chat').innerHTML = '';
   showRoomState(result.state);
+  renderRoomButtons();
+}
+
+async function findMatch() {
+  if (online.code) return;
+  try {
+    if (!socket?.connected) makeSocket();
+    await waitForSocket();
+    matchmakingActive = true;
+    renderRoomButtons();
+    root.querySelector('#gc-plus-room-status').textContent = 'Looking for another player… Keep this page open. You can cancel at any time.';
+    const result = await emitAck('queue:join', { name: state.name, playerId: CLIENT_ID });
+    if (result.matched) {
+      matchmakingActive = false;
+      online.previousMode = api.mode;
+      online.previousColor = api.playerColor;
+      applyRoomJoin(result);
+      toast('Opponent found. Game starting!');
+    } else {
+      matchmakingActive = true;
+      root.querySelector('#gc-plus-room-status').textContent = 'Searching for an opponent… You will be connected automatically when someone joins.';
+    }
+  } catch (error) {
+    matchmakingActive = false;
+    renderRoomButtons();
+    root.querySelector('#gc-plus-room-status').textContent = error.message;
+  }
+}
+
+async function cancelMatch() {
+  if (!matchmakingActive) return;
+  try { if (socket?.connected) await emitAck('queue:cancel'); }
+  catch (error) { root.querySelector('#gc-plus-room-status').textContent = error.message; }
+  matchmakingActive = false;
+  root.querySelector('#gc-plus-room-status').textContent = 'Matchmaking cancelled.';
   renderRoomButtons();
 }
 
@@ -597,7 +647,7 @@ async function copyInvite() {
   if (!online.code) return;
   const url = new URL(window.location.href);
   url.searchParams.set('room', online.code);
-  url.searchParams.set('server', root.querySelector('#gc-plus-server-url').value.trim());
+  url.searchParams.delete('server');
   try {
     await navigator.clipboard.writeText(url.toString());
     toast('Invitation link copied. Send it to your friend.');
@@ -800,9 +850,8 @@ function bindUI() {
     state.banner = root.querySelector('#gc-plus-banner-select').value;
     saveState(); renderProfile(); toast('Player profile saved.');
   });
-  root.querySelector('#gc-plus-connect').addEventListener('click', () => {
-    try { makeSocket(); } catch (error) { root.querySelector('#gc-plus-room-status').textContent = error.message; }
-  });
+  root.querySelector('#gc-plus-find-match').addEventListener('click', findMatch);
+  root.querySelector('#gc-plus-cancel-match').addEventListener('click', cancelMatch);
   root.querySelector('#gc-plus-create-room').addEventListener('click', createRoom);
   root.querySelector('#gc-plus-join-room').addEventListener('click', () => joinRoom(false));
   root.querySelector('#gc-plus-spectate').addEventListener('click', () => joinRoom(true));
@@ -846,7 +895,13 @@ function bindUI() {
     serverInput.value = 'https://glass-chess-sqk0.onrender.com';
   }
 
-  if (room) root.querySelector('#gc-plus-room-code').value = room.toUpperCase();
+  if (room) {
+    root.querySelector('#gc-plus-room-code').value = room.toUpperCase();
+    window.setTimeout(() => {
+      root.querySelector('#gc-plus-room-status').textContent = 'Joining your friend’s invitation…';
+      void joinRoom(false);
+    }, 650);
+  }
 }
 
 function buildDailyChallenge() {
