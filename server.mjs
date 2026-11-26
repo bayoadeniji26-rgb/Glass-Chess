@@ -89,7 +89,7 @@ const publicRoom = room => ({
   resigned: room.resigned,
   lastMove: room.lastMove || null,
   invitationExpiresAt: room.invitationExpiresAt || null,
-  result: room.abandoned ? `${room.abandoned === 'w' ? 'White' : 'Black'} wins by disconnection` :
+  result: room.abandoned ? `${room.abandoned === 'w' ? 'Black' : 'White'} wins by disconnection` :
     room.resigned ? `${room.resigned === 'w' ? 'Black' : 'White'} wins by resignation` :
     room.game.isCheckmate() ? `${room.game.turn() === 'w' ? 'Black' : 'White'} wins by checkmate` :
     room.game.isDraw() ? 'Draw' : 'In progress'
@@ -256,7 +256,7 @@ io.on('connection', socket => {
 
   socket.on('room:create', (payload = {}, done = () => {}) => {
     if (!allowRate(socket, 'room:create')) return done({ ok: false, error: 'Too many rooms created. Wait a minute and try again.' });
-    removeSocketFromRoom(socket);
+    if (socket.data.roomCode) return done({ ok: false, error: 'Leave your current online game before creating another room.' });
     const playerId = cleanPlayerId(payload.playerId);
     if (!playerId) return done({ ok: false, error: 'A valid local player identity is required. Refresh the page and try again.' });
     if (activePlayers.has(playerId)) return done({ ok: false, error: 'You are already in an online game.' });
@@ -301,6 +301,7 @@ io.on('connection', socket => {
       return done({ ok: false, error: 'This browser is already assigned to the other seat. Open the invite on a different device or browser profile.' });
     }
     if (room.players.b) return done({ ok: false, error: 'That room already has two players. Join as a spectator instead.' });
+    if (socket.data.roomCode && socket.data.roomCode !== code) return done({ ok: false, error: 'Leave your current room before joining another game.' });
     if (activePlayers.has(playerId)) return done({ ok: false, error: 'You are already in an online game.' });
     removeSocketFromRoom(socket);
     const resumeToken = issueResumeToken();
@@ -318,6 +319,7 @@ io.on('connection', socket => {
     const code = cleanCode(payload.code);
     const room = rooms.get(code);
     if (!room) return done({ ok: false, error: 'Room not found. Check the code.' });
+    if (socket.data.roomCode && (socket.data.roomCode !== code || socket.data.role !== 'spectator')) return done({ ok: false, error: 'Leave your current game before spectating another room.' });
     removeSocketFromRoom(socket);
     room.spectators.set(socket.id, cleanName(payload.name));
     socket.join(code);
