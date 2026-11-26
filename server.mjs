@@ -11,6 +11,13 @@ const matchmaking = new MatchmakingQueue();
 const activePlayers = new Map();
 const INVITE_TTL_MS = 15 * 60 * 1000;
 const DISCONNECT_GRACE_MS = 30 * 1000;
+const RATE_LIMITS = {
+  'queue:join': { limit: 3, windowMs: 10000 },
+  'room:create': { limit: 5, windowMs: 60000 },
+  'room:join': { limit: 6, windowMs: 10000 },
+  'game:move': { limit: 8, windowMs: 10000 },
+  'chat:send': { limit: 8, windowMs: 10000 }
+};
 const httpServer = http.createServer((req, res) => {
   if (req.method === 'GET' && (req.url === '/healthz' || req.url === '/')) {
     res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
@@ -44,6 +51,19 @@ const isResumeTokenValid = (storedHash, token) => {
   const supplied = hashResumeToken(token);
   return stored.length === supplied.length && timingSafeEqual(stored, supplied);
 };
+const allowRate = (socket, eventName) => {
+  const rule = RATE_LIMITS[eventName];
+  if (!rule) return true;
+  const now = Date.now();
+  const buckets = socket.data.rateLimitBuckets ||= new Map();
+  let bucket = buckets.get(eventName);
+  if (!bucket || now >= bucket.resetAt) {
+    bucket = { count: 0, resetAt: now + rule.windowMs };
+    buckets.set(eventName, bucket);
+  }
+  bucket.count += 1;
+  return bucket.count <= rule.limit;
+};
 const publicRoom = room => ({
   code: room.code,
   players: {
@@ -51,6 +71,7 @@ const publicRoom = room => ({
     b: room.players.b ? { name: room.players.b.name, connected: Boolean(room.players.b.connected) } : null
   },
   spectators: room.spectators.size,
+  abandoned: Boolean(room.abandoned),
   history: room.game.history({ verbose: true }).map(move => ({
     from: move.from,
     to: move.to,
@@ -81,7 +102,7 @@ function codeAvailable() {
     code = '';
     while (code.length < 8) {
       const byte = randomBytes(1)[0];
-      if (byte < 248) code += alphabet[byte % alphabet.length];
+      if (byte < 252) code += alphabet[byte % alphabet.length];
     }
   } while (rooms.has(code));
   return code;
@@ -103,6 +124,7 @@ function createMatchedRoom(firstSocket, firstPlayer, secondSocket, secondPlayer)
   const room = {
     code,
     ownerId: whiteSocket.id,
+    ownerPlayerId: whitePlayer.playerId,
     players: {
       w: { id: whiteSocket.id, playerId: whitePlayer.playerId, name: whitePlayer.name, connected: true, resumeTokenHash: hashResumeToken(whiteResumeToken).toString('hex') },
       b: { id: blackSocket.id, playerId: blackPlayer.playerId, name: blackPlayer.name, connected: true, resumeTokenHash: hashResumeToken(blackResumeToken).toString('hex') }
@@ -172,6 +194,7 @@ function removeSocketFromRoom(socket, { disconnected = false } = {}) {
 
 io.on('connection', socket => {
   socket.on('queue:join', (payload = {}, done = () => {}) => {
+    if (!allowRate(socket, 'queue:join')) return done({ ok: false, error: 'Too many matchmaking requests. Wait a few seconds and try again.' });
     if (socket.data.roomCode) return done({ ok: false, error: 'Leave your current game before finding another opponent.' });
     const playerId = cleanPlayerId(payload.playerId);
     if (!playerId) return done({ ok: false, error: 'A valid player identity is required. Refresh the page and try again.' });
@@ -223,6 +246,7 @@ io.on('connection', socket => {
     player.id = socket.id;
     player.connected = true;
     player.disconnectedAt = null;
+    if (room.ownerPlayerId === playerId) room.ownerId = socket.id;
     socket.join(code);
     socket.data.roomCode = code;
     socket.data.role = side;
@@ -231,6 +255,7 @@ io.on('connection', socket => {
   });
 
   socket.on('room:create', (payload = {}, done = () => {}) => {
+    if (!allowRate(socket, 'room:create')) return done({ ok: false, error: 'Too many rooms created. Wait a minute and try again.' });
     removeSocketFromRoom(socket);
     const playerId = cleanPlayerId(payload.playerId);
     if (!playerId) return done({ ok: false, error: 'A valid local player identity is required. Refresh the page and try again.' });
@@ -240,6 +265,7 @@ io.on('connection', socket => {
     const room = {
       code,
       ownerId: socket.id,
+      ownerPlayerId: playerId,
       players: { w: { id: socket.id, playerId, name: cleanName(payload.name), connected: true, resumeTokenHash: hashResumeToken(resumeToken).toString('hex') }, b: null },
       spectators: new Map(),
       game: new Chess(),
@@ -257,6 +283,7 @@ io.on('connection', socket => {
   });
 
   socket.on('room:join', (payload = {}, done = () => {}) => {
+    if (!allowRate(socket, 'room:join')) return done({ ok: false, error: 'Too many room attempts. Wait a few seconds and try again.' });
     const code = cleanCode(payload.code);
     const room = rooms.get(code);
     if (!room) return done({ ok: false, error: 'Room not found. Check the code.' });
@@ -300,6 +327,7 @@ io.on('connection', socket => {
   });
 
   socket.on('game:move', (payload = {}, done = () => {}) => {
+    if (!allowRate(socket, 'game:move')) return done({ ok: false, error: 'Moves are arriving too quickly. Please try again.' });
     const room = rooms.get(cleanCode(payload.code || socket.data.roomCode));
     if (!room || socket.data.roomCode !== room.code) return done({ ok: false, error: 'You are not in that room.' });
     if (room.abandoned || room.resigned || room.game.isGameOver()) return done({ ok: false, error: 'This game has ended.' });
@@ -355,14 +383,20 @@ io.on('connection', socket => {
 
   socket.on('room:rematch', (done = () => {}) => {
     const room = rooms.get(socket.data.roomCode);
-    if (!room || room.ownerId !== socket.id) return done({ ok: false, error: 'Only the room creator can start a rematch.' });
+    const side = room && ['w', 'b'].find(candidate => room.players[candidate]?.id === socket.id);
+    if (!room || !side || room.ownerPlayerId !== room.players[side].playerId) return done({ ok: false, error: 'Only the room creator can start a rematch.' });
+    if (!room.resigned && !room.abandoned && !room.game.isGameOver()) return done({ ok: false, error: 'Finish the current game before starting a rematch.' });
+    if (!room.players.w?.connected || !room.players.b?.connected) return done({ ok: false, error: 'Both players must be connected to start a rematch.' });
     room.game = new Chess();
     room.resigned = null;
+    room.abandoned = null;
+    room.lastMove = null;
     done({ ok: true });
     broadcast(room);
   });
 
   socket.on('chat:send', (payload = {}, done = () => {}) => {
+    if (!allowRate(socket, 'chat:send')) return done({ ok: false, error: 'You are sending messages too quickly. Wait a moment.' });
     const room = rooms.get(socket.data.roomCode);
     if (!room) return done({ ok: false, error: 'Join a room to chat.' });
     const text = String(payload.text || '').replace(/[<>\u0000-\u001f]/g, '').trim().slice(0, 240);
@@ -375,7 +409,32 @@ io.on('connection', socket => {
   });
 
   socket.on('room:leave', (done = () => {}) => {
-    removeSocketFromRoom(socket);
+    const code = socket.data.roomCode;
+    const room = code ? rooms.get(code) : null;
+    const side = room && ['w', 'b'].find(candidate => room.players[candidate]?.id === socket.id);
+    if (room && side) {
+      const otherSide = side === 'w' ? 'b' : 'w';
+      const leavingPlayer = room.players[side];
+      if (room.players[otherSide]) {
+        if (leavingPlayer.disconnectTimer) clearTimeout(leavingPlayer.disconnectTimer);
+        leavingPlayer.id = null;
+        leavingPlayer.connected = false;
+        room.abandoned = side;
+        activePlayers.delete(leavingPlayer.playerId);
+        socket.leave(code);
+        socket.data.roomCode = null;
+        socket.data.role = null;
+        broadcast(room);
+      } else {
+        rooms.delete(code);
+        activePlayers.delete(leavingPlayer.playerId);
+        socket.leave(code);
+        socket.data.roomCode = null;
+        socket.data.role = null;
+      }
+    } else {
+      removeSocketFromRoom(socket);
+    }
     done({ ok: true });
   });
 
