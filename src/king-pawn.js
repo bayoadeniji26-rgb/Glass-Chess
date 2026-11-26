@@ -432,9 +432,15 @@ function chessTopicAnswer(question, context) {
   return 'I have the live position and move list in view. Start by checking king safety, loose pieces, forcing checks and captures, and pawn breaks. Ask me about a specific rule, opening, tactic, endgame, famous game, or type “best move” and I will request a Stockfish line for this exact position.' + boardLine;
 }
 
-async function makeLocalChessAnswer(question) {
+async function makeLocalChessAnswer(question, responderContext = {}) {
   const context = currentBoardContext();
-  const contextAnswer = chessTopicAnswer(question, context);
+  const isBoardAction = /\b(best move|what should i (?:play|move|do)|what now|what next|what should my plan|analy[sz]e (this|the|my)|current position|why was my last move|is this move good|what is the plan)\b/i.test(question);
+  const followUp = /^(?:why|how|what about that|what does that mean|tell me more|explain that|how so|why not)[?.!]*$/i.test(question.trim());
+  const previousQuestion = [...(responderContext.recentConversation || [])].reverse().find(message =>
+    message?.role === 'user' && String(message.content || '').trim().toLowerCase() !== question.trim().toLowerCase()
+  );
+  const answerQuestion = followUp && previousQuestion && !isBoardAction ? String(previousQuestion.content || '') : question;
+  const contextAnswer = chessTopicAnswer(answerQuestion, context);
   if (/\b(best move|what should i (?:play|move|do)|what now|what next|what should my plan|analy[sz]e (this|the|my)|current position|why was my last move|is this move good|what is the plan)\b/i.test(question)) {
     if (!context.fen) return contextAnswer;
     if (context.gameOver) return 'This game is already over, so there is no next move to recommend. Review the final position in the move list.';
