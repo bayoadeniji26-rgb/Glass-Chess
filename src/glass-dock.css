@@ -163,3 +163,15 @@ body.gc-tools-single-launcher #gc-floating-hub .gc-hub-orb {
   flex: 0 0 auto;
   white-space: nowrap;
 }
+
+
+#gc-floating-hub .gc-hub-icon-button.active,
+#gc-floating-hub .gc-hub-icon-button[aria-pressed="true"] {
+  border-color: rgba(232,199,126,.55);
+  color: #f4d99d;
+  background: rgba(232,199,126,.13);
+}
+#gc-floating-hub .gc-hub-icon-button.active > small,
+#gc-floating-hub .gc-hub-icon-button[aria-pressed="true"] > small { color: #f4d99d; }
+#gc-floating-hub .gc-hub-shortcuts { justify-content: flex-start; }
+#gc-floating-hub .gc-hub-docked-panel .gc-tabs { display: none !important; }
