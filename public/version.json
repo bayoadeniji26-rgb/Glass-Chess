@@ -3,9 +3,10 @@
   "name": "Glass Chess Required Update",
   "updatedAt": "2026-11-26",
   "notes": [
-    "Restores the original working Play, Analysis and Settings navigation",
-    "Restores the complete Glass Hub and all original Tools shortcuts and feature tabs",
-    "Preserves all chess, online, training, appearance, settings and Game Lab modules",
-    "Preserves all 50 daily chess puzzles and saved daily puzzle progress"
+    "Moves Tools into the top navigation and removes the floating launcher",
+    "Adds descriptive Tools category cards linked to the existing feature tabs",
+    "Adds Play Online to the Play menu and opens the existing Online + Club area",
+    "Automatically closes the Play drawer when Start Game is selected",
+    "Preserves the existing game systems, settings, training modules and all 50 daily puzzles"
   ]
 }
