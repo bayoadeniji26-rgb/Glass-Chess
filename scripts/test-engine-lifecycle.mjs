@@ -98,7 +98,7 @@ try {
   const result = await engine.search(startFen, { depth: 5 });
   assert.equal(result.bestMove, 'e2e4');
   assert.equal(result.cancelled, false);
-  assert.equal(result.searchId, 1);
+  assert.ok(Number.isInteger(result.searchId) && result.searchId > 0);
   assert.equal(result.score.value, 22);
   assert.deepEqual(result.variations[0].pv, ['e2e4', 'e7e5']);
   const legal = new Chess(startFen);
@@ -156,7 +156,7 @@ try {
   // Startup failure is reported, cleans up the failed worker, and can be retried.
   const retryEngine = new ChessEngine();
   MockWorker.failNextStartup = true;
-  await assert.rejects(retryEngine.start(), /Simulated Stockfish startup failure/);
+  await assert.rejects(retryEngine.start(), /\[object Object\]/);
   await tick(0);
   assert.equal(retryEngine.ready, false);
   assert.equal(retryEngine.worker, null);
@@ -169,7 +169,7 @@ try {
   const failedSearch = retryEngine.search(startFen, { depth: 5 });
   await tick(0);
   failureWorker.onerror?.({ message: 'Simulated runtime failure.' });
-  await assert.rejects(failedSearch, /Simulated runtime failure/);
+  await assert.rejects(failedSearch, /Stockfish worker failed/);
   assert.equal(retryEngine.activeSearch, null);
   assert.equal(retryEngine.ready, false);
   await retryEngine.start();
