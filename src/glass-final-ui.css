@@ -79,9 +79,7 @@
 #gc-final-toolbar button:hover { transform:translateY(-1px); border-color:rgba(232,199,126,.45); background:rgba(232,199,126,.12); }
 #gc-final-toolbar button[aria-pressed="true"] { color:#f4d99d; border-color:rgba(232,199,126,.5); background:rgba(232,199,126,.13); }
 
-/* Make the floating tools feel consistent without changing their existing interactions. */
-#gc-floating-hub .gc-hub-orb { width:64px; height:64px; }
-#gc-floating-hub .gc-hub-orb-glyph { font-size:30px; }
+/* Keep feature controls comfortably tappable inside the Tools drawer. */
 #gc-floating-hub .gc-hub-docked-panel button,
 #gc-floating-hub .gc-hub-docked-panel select,
 #gc-floating-hub .gc-hub-docked-panel input { min-height:36px; font-size:13px; }
@@ -164,10 +162,6 @@ body.gc-final-focus-mode { overflow:hidden !important; }
   pointer-events: none;
 }
 
-#gc-floating-hub .gc-hub-orb {
-  z-index: 3 !important;
-  pointer-events: auto !important;
-}
 
 #gc-floating-hub.gc-hub-open .gc-hub-backdrop,
 #gc-floating-hub.gc-hub-open .gc-hub-drawer {
