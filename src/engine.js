@@ -1,4 +1,4 @@
-class ChessEngine {
+export class ChessEngine {
   constructor() {
     this.worker = null;
     this.ready = false;
