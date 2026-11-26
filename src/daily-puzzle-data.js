@@ -4,7 +4,7 @@ export const DAILY_PUZZLES = Object.freeze([{"day":1,"id":"00LRq","fen":"1k6/1p1
 
 export function getPuzzleDayIndex(startDate, currentDate) {
   const parse = value => {
-    const match = String(value || '').match(/^(\\d{4})-(\\d{2})-(\\d{2})$/);
+    const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (!match) throw new TypeError('Dates must use YYYY-MM-DD.');
     const year = Number(match[1]), month = Number(match[2]), day = Number(match[3]);
     const date = new Date(Date.UTC(year, month - 1, day));
