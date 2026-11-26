@@ -633,7 +633,7 @@ function mountKingPawn() {
   dock.innerHTML = [
     '<button type="button" id="gc-king-pawn-launcher" aria-expanded="false" aria-controls="gc-king-pawn-panel"><span aria-hidden="true">♛</span><small>KING PAWN</small></button>',
     '<section id="gc-king-pawn-panel" aria-label="King Pawn chess assistant" hidden>',
-    '<header><span class="gc-kp-crown">♛</span><div><strong>King Pawn</strong><small>Chess advisor · Board-aware</small></div><button type="button" id="gc-king-pawn-close" aria-label="Close King Pawn">×</button></header>',
+    '<header><span class="gc-kp-crown">♛</span><div><strong>King Pawn</strong><small>Chess-only AI · Board-aware</small></div><button type="button" id="gc-king-pawn-close" aria-label="Close King Pawn">×</button></header>',
     '<div class="gc-kp-context" id="gc-kp-context">Connected to your current board and move list.</div>',
     '<div class="gc-kp-prompts" aria-label="Quick chess questions">' +
       '<button type="button" data-kp-prompt="Analyze my current position">Analyze position</button>' +
@@ -643,7 +643,7 @@ function mountKingPawn() {
     '</div>',
     '<div id="gc-king-pawn-messages" aria-live="polite"></div>',
     '<form id="gc-king-pawn-form"><label class="gc-kp-sr-only" for="gc-king-pawn-input">Ask King Pawn a chess question</label><textarea id="gc-king-pawn-input" rows="2" maxlength="1200" placeholder="Ask about a move, opening, tactic, or rule…"></textarea><button type="submit">Ask King Pawn</button></form>',
-    '<footer>OFFLINE CHESS ADVISOR · LIVE STOCKFISH ANALYSIS</footer>',
+    '<footer>CHESS-ONLY AI COACH · LIVE STOCKFISH POSITION ANALYSIS</footer>',
     '</section>'
   ].join('');
   document.body.appendChild(dock);
