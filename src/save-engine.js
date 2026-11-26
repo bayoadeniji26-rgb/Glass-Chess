@@ -111,26 +111,36 @@ export class SaveEngine {
     return this.writeQueue;
   }
 
-  async replaceData(nextState) {
-    const safe = mergeState(DEFAULT_STATE, nextState || {});
-    if (!Array.isArray(safe.chatLog) || !Array.isArray(safe.games) || !safe.avatars) {
-      throw new Error('This save file is missing required profile data.');
-    }
-    this.memoryState = safe;
-    try {
-      const db = await this.open();
-      const tx = db.transaction(STORE_NAME, 'readwrite');
-      tx.objectStore(STORE_NAME).put(safe, ACTIVE_KEY);
-      await transactionDone(tx);
-      localStorage.removeItem('glass-chess-save-engine-fallback');
-    } catch (error) {
-      try { localStorage.setItem('glass-chess-save-engine-fallback', JSON.stringify(safe)); }
-      catch { throw new Error('The imported save is too large for this browser storage.'); }
-    }
-    return structuredCloneSafe(safe);
+  replaceData(nextState) {
+    const replace = async () => {
+      const source = nextState || {};
+      if (!Array.isArray(source.chatLog) || !Array.isArray(source.games) ||
+          !source.avatars || typeof source.avatars !== 'object') {
+        throw new Error('This save file is missing required profile data.');
+      }
+      const safe = mergeState(DEFAULT_STATE, source);
+      this.memoryState = safe;
+      try {
+        const db = await this.open();
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        tx.objectStore(STORE_NAME).put(safe, ACTIVE_KEY);
+        await transactionDone(tx);
+        localStorage.removeItem('glass-chess-save-engine-fallback');
+      } catch (error) {
+        try { localStorage.setItem('glass-chess-save-engine-fallback', JSON.stringify(safe)); }
+        catch { throw new Error('The imported save is too large for this browser storage.'); }
+      }
+      return structuredCloneSafe(safe);
+    };
+    // Replacements must share the same serial write queue as incremental saves.
+    // Otherwise an older queued write can finish after an import/cloud restore and
+    // silently put the old profile back on top of the restored profile.
+    this.writeQueue = this.writeQueue.then(replace, replace);
+    return this.writeQueue;
   }
 
   async exportSave() {
+    await this.writeQueue;
     const state = await this.loadData();
     return JSON.stringify({
       format: 'glass-chess.kingpawn-save',
@@ -157,11 +167,15 @@ export class SaveEngine {
 
   async saveToCloud() {
     if (!this.cloudAdapter) throw new Error('Cloud sync is not configured. Export a save file to move data between devices.');
-    return this.cloudAdapter.push(await this.loadData());
+    // Wait for all writes already accepted by this tab before taking the cloud snapshot.
+    await this.writeQueue;
+    const snapshot = await this.loadData();
+    return this.cloudAdapter.push(snapshot);
   }
 
   async loadFromCloud() {
     if (!this.cloudAdapter) throw new Error('Cloud sync is not configured. Export a save file to move data between devices.');
+    await this.writeQueue;
     const remote = await this.cloudAdapter.pull();
     if (!remote || typeof remote !== 'object') throw new Error('The cloud service returned an invalid save.');
     return this.replaceData(remote);
