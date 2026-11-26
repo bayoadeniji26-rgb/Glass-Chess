@@ -207,3 +207,22 @@ body.gc-workspace-drawer-open { overflow: hidden !important; }
   #gc-final-toolbar { min-height: 32px !important; }
   #gc-workspace-scrim { inset: 44px 0 0; }
 }
+
+
+/* Keep the top-bar Tools action reachable in fullscreen focus mode. */
+html.gc-tools-single-launcher #gc-workspace-actions [data-workspace-open="tools"],
+body.gc-tools-single-launcher #gc-workspace-actions [data-workspace-open="tools"] {
+  position: fixed !important;
+  top: max(12px, env(safe-area-inset-top)) !important;
+  right: max(14px, env(safe-area-inset-right)) !important;
+  z-index: 2147483000 !important;
+  min-height: 42px !important;
+  padding: 0 15px !important;
+  border: 1px solid rgba(232,199,126,.42) !important;
+  border-radius: 12px !important;
+  color: #f4ead2 !important;
+  background: rgba(17,22,34,.96) !important;
+  box-shadow: 0 10px 32px rgba(0,0,0,.34) !important;
+  font-size: 12px !important;
+  pointer-events: auto !important;
+}
