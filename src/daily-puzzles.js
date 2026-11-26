@@ -113,14 +113,14 @@ function mountDailyPuzzles() {
           <button type="button" class="gc-daily-next" data-action="next">Next puzzle →</button>
         </nav>
       </section>
-      <footer class="gc-daily-footer"><span>50 curated chess tactics</span><span>Progress saved on this device</span></footer>
+      <footer class="gc-daily-footer"><span>50 real multi-move tactics · Lichess CC0</span><span>Progress saves locally and to your account</span></footer>
     </div>`;
   document.body.appendChild(dialog);
 
   const el = id => dialog.querySelector('#' + id);
   const action = name => dialog.querySelector('[data-action="' + name + '"]');
   let puzzleDay = Math.min(DAILY_PUZZLES.length, getPuzzleDayIndex(progress.startedOn, localDateKey()));
-  let puzzle = null, game = null, selectedSquare = null, legalMoves = [], pendingPromotion = [], solved = false, boardSide = 'w';
+  let puzzle = null, game = null, selectedSquare = null, legalMoves = [], pendingPromotion = [], solved = false, boardSide = 'w', solutionIndex = 0, replyPending = false, replyTimer = null, solutionSan = [];
 
   function applyCloudProgress(remote) {
     const merged = mergePuzzleProgress(progress, remote);
@@ -175,26 +175,25 @@ function mountDailyPuzzles() {
       }
       cell.setAttribute('aria-label', square + (piece ? ', ' + (piece.color === 'w' ? 'white ' : 'black ') + PIECE_NAMES[piece.type] : ', empty'));
       cell.setAttribute('aria-pressed', String(selectedSquare === square));
-      cell.disabled = solved || pendingPromotion.length > 0;
+      cell.disabled = solved || pendingPromotion.length > 0 || replyPending;
       cell.addEventListener('click', () => handleSquare(square));
       host.appendChild(cell);
     }
   }
   function revealSolution() {
     game = new Chess(puzzle.fen);
-    const move = game.move(moveInput(puzzle.solution[0]));
-    if (!move) throw new Error('The saved puzzle solution is invalid.');
-    solved = true; clearSelection(); renderBoard();
-    feedback('Solved · ' + move.san + ' — ' + puzzle.explanation, 'success');
-  }
-  function finishMove(move) {
-    const correct = puzzle.goal === 'mate' ? game.isCheckmate() : isForkSolved(game, puzzle);
-    if (!correct) {
-      game.undo(); clearSelection(); renderBoard();
-      feedback('That move is legal, but it does not solve the tactic. Try again.', 'error');
-      return;
+    const sans = [];
+    for (const expected of puzzle.solution) {
+      const move = game.move(moveInput(expected));
+      if (!move) throw new Error('The saved puzzle solution is invalid: ' + puzzle.id);
+      sans.push(move.san);
     }
-    solved = true; clearSelection();
+    solved = true; replyPending = false; solutionIndex = puzzle.solution.length;
+    solutionSan = sans; clearSelection(); renderBoard();
+    feedback('Solution · ' + sans.join(' '), 'success');
+  }
+  function completePuzzle() {
+    solved = true; replyPending = false; clearSelection();
     if (!progress.completedDays.includes(puzzle.day)) {
       progress.completedDays.push(puzzle.day);
       progress.completedDays.sort((a,b) => a-b);
@@ -202,19 +201,35 @@ function mountDailyPuzzles() {
       progress.lastSolvedDay = puzzle.day;
     }
     saveProgress(progress); renderBoard();
-    feedback('Correct · ' + move.san + ' — ' + puzzle.explanation, 'success');
+    feedback('Correct! ' + puzzle.explanation + ' · ' + solutionSan.join(' '), 'success');
     updateProgressUI();
   }
   function playMove(move) {
-    if (solved || !move) return;
-    if (uci(move) !== puzzle.solution[0]) {
+    if (solved || replyPending || !move) return;
+    if (uci(move) !== puzzle.solution[solutionIndex]) {
       progress.attempts[puzzle.day] = Number(progress.attempts[puzzle.day] || 0) + 1;
       saveProgress(progress); clearSelection(); renderBoard();
-      feedback('Not quite. Look for the forcing move.', 'error'); return;
+      feedback('Not quite. Look for the forcing move: check, capture, or threat.', 'error'); return;
     }
     const played = game.move({ from: move.from, to: move.to, ...(move.promotion ? { promotion: move.promotion } : {}) });
     if (!played) { clearSelection(); renderBoard(); feedback('That move is not legal. Select a highlighted square.', 'error'); return; }
-    finishMove(played);
+    solutionSan.push(played.san); solutionIndex++; clearSelection();
+    if (solutionIndex >= puzzle.solution.length) {
+      completePuzzle(); return;
+    }
+    replyPending = true; renderBoard();
+    feedback('Correct move. Opponent is replying…');
+    replyTimer = window.setTimeout(() => {
+      replyPending = false;
+      const response = game.move(moveInput(puzzle.solution[solutionIndex]));
+      if (!response) {
+        feedback('Puzzle line error. Please reset this puzzle.', 'error');
+        renderBoard(); return;
+      }
+      solutionSan.push(response.san); solutionIndex++; renderBoard();
+      if (solutionIndex >= puzzle.solution.length) completePuzzle();
+      else feedback('Good. Find the next move in the combination.', 'success');
+    }, 320);
   }
   function showPromotion(choices) {
     pendingPromotion = choices;
@@ -231,7 +246,7 @@ function mountDailyPuzzles() {
     panel.appendChild(cancel); panel.hidden = false; renderBoard();
   }
   function handleSquare(square) {
-    if (solved || pendingPromotion.length) return;
+    if (solved || replyPending || pendingPromotion.length) return;
     const piece = game.get(square);
     if (selectedSquare) {
       const choices = legalMoves.filter(move => move.to === square);
@@ -244,6 +259,8 @@ function mountDailyPuzzles() {
     clearSelection(); renderBoard();
   }
   function renderPuzzle() {
+    if (replyTimer) window.clearTimeout(replyTimer);
+    replyTimer = null; replyPending = false; solutionIndex = 0; solutionSan = [];
     progress = readProgress();
     puzzle = DAILY_PUZZLES[puzzleDay - 1];
     game = new Chess(puzzle.fen); boardSide = game.turn();
@@ -252,7 +269,7 @@ function mountDailyPuzzles() {
     el('gc-daily-theme').textContent = puzzle.type.toUpperCase();
     el('gc-daily-rating').textContent = 'RATING ' + puzzle.rating;
     el('gc-daily-title').textContent = puzzle.title;
-    el('gc-daily-prompt').textContent = (game.turn() === 'w' ? 'White' : 'Black') + ' to move. ' + (puzzle.goal === 'mate' ? 'Find checkmate in one.' : 'Find the checking fork.');
+    el('gc-daily-prompt').textContent = (game.turn() === 'w' ? 'White' : 'Black') + ' to move. Find the best move and calculate the full combination.';
     el('gc-daily-hint').hidden = true; el('gc-daily-hint').textContent = '';
     el('gc-daily-promotion').hidden = true;
     action('hint').textContent = 'Hint';
@@ -276,6 +293,8 @@ function mountDailyPuzzles() {
   });
   action('restart').addEventListener('click', () => {
     if (solved) { feedback('This puzzle is already solved. Use Next puzzle to continue.', 'success'); return; }
+    if (replyTimer) window.clearTimeout(replyTimer);
+    replyTimer = null; replyPending = false; solutionIndex = 0; solutionSan = [];
     game = new Chess(puzzle.fen); boardSide = game.turn(); clearSelection(); pendingPromotion = [];
     el('gc-daily-promotion').hidden = true; renderBoard(); feedback('Puzzle reset. Find the strongest move.');
   });
