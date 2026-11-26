@@ -203,3 +203,17 @@ assert.match(firstRunGuide, /data-guide-action="tour"/, 'The welcome flow must o
 assert.match(firstRunGuide, /keepFocusInside/, 'The welcome dialog must keep keyboard focus inside.');
 assert.match(firstRunCss, /\.gc-first-run-overlay\[hidden\]/, 'The guide must support a properly hidden state.');
 assert.match(appHtml, /src="\/src\/first-run-guide\.js"/, 'The first-run guide must load in the application.');
+
+
+const workspaceUi = readFileSync(new URL('../src/glass-workspace.js', import.meta.url), 'utf8');
+const toolsUi = readFileSync(new URL('../src/glass-dock.js', import.meta.url), 'utf8');
+const toolsCss = readFileSync(new URL('../src/glass-dock.css', import.meta.url), 'utf8');
+assert.match(workspaceUi, /onlineOption\.value = 'online'/, 'Play must offer Online beside its offline game modes.');
+assert.match(workspaceUi, /data-workspace-open="tools"/, 'Tools must be available from the top navigation.');
+assert.match(workspaceUi, /play\.addEventListener\('click',[\s\S]*?closeDrawer\(\)/, 'Starting a game must close the Play drawer automatically.');
+assert.match(mainUi, /requestedMode === "online"/, 'The Play Online choice must route into Online + Club instead of the local engine.');
+assert.match(toolsUi, /openOnline,/, 'The Tools hub must expose a direct Online destination.');
+assert.match(toolsUi, /description:/, 'Tools categories must provide descriptive helper text.');
+assert.doesNotMatch(toolsUi, /gc-hub-orb/, 'The old floating Tools orb must be removed.');
+assert.match(toolsCss, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/, 'Tools categories must use an organized card grid.');
+assert.doesNotMatch(toolsCss, /gc-hub-orb/, 'The Tools stylesheet must not style the removed floating orb.');
