@@ -90,7 +90,15 @@ try {
   const url = `http://127.0.0.1:${port}`;
   serverProcess = spawn(process.execPath, ['server.mjs'], {
     cwd: process.cwd(),
-    env: { ...process.env, PORT: String(port), HOST: '127.0.0.1' },
+    env: {
+      ...process.env,
+      PORT: String(port),
+      HOST: '127.0.0.1',
+      GC_INVITE_TTL_MS: '5000',
+      GC_ENDED_ROOM_TTL_MS: '1500',
+      OPENAI_API_KEY: '',
+      GC_ALLOWED_ORIGIN: '*'
+    },
     stdio: ['ignore', 'pipe', 'pipe']
   });
   serverProcess.stdout.on('data', chunk => { serverOutput += chunk.toString(); });
@@ -99,6 +107,41 @@ try {
   await waitForHealth(url);
   const missingRoute = await fetch(url + '/missing');
   assert.equal(missingRoute.status, 404, 'Unknown HTTP routes should not masquerade as health checks.');
+
+  // King Pawn refuses unrelated topics at the server boundary before any model key is needed.
+  const offTopicResponse = await fetch(url + '/api/king-pawn', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', origin: 'https://glass-chess-pro.onrender.com' },
+    body: JSON.stringify({ question: 'Dogs or cats?', board: { fen: START_FEN } })
+  });
+  assert.equal(offTopicResponse.status, 200);
+  const offTopicBody = await offTopicResponse.json();
+  assert.equal(offTopicBody.mode, 'chess-only-filter');
+  assert.match(offTopicBody.answer, /chess-only advisor/i);
+
+  const timeQuestionResponse = await fetch(url + '/api/king-pawn', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', origin: 'https://glass-chess-pro.onrender.com' },
+    body: JSON.stringify({ question: 'What time is it?' })
+  });
+  assert.equal(timeQuestionResponse.status, 200);
+  assert.match((await timeQuestionResponse.json()).answer, /chess-only advisor/i);
+
+  // A valid chess question reaches the AI setup and reports missing server configuration honestly.
+  const missingAIKey = await fetch(url + '/api/king-pawn', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', origin: 'https://glass-chess-pro.onrender.com' },
+    body: JSON.stringify({ question: 'How do I get better at chess?', board: { fen: START_FEN } })
+  });
+  assert.equal(missingAIKey.status, 503);
+  assert.match((await missingAIKey.json()).error, /not configured/i);
+
+  const preflight = await fetch(url + '/api/king-pawn', {
+    method: 'OPTIONS',
+    headers: { origin: 'https://glass-chess-pro.onrender.com', 'access-control-request-method': 'POST' }
+  });
+  assert.equal(preflight.status, 204);
+  assert.equal(preflight.headers.get('access-control-allow-origin'), '*');
 
   // Verify queue cancellation and duplicate player protection.
   const queueA = await connectClient(url);
@@ -218,7 +261,10 @@ try {
 
   // Leaving an active two-player game forfeits instead of opening the seat to strangers.
   const abandonedState = nextEvent(friendB, 'room:state', value => value?.abandoned === true);
+  const endedRoomPromise = nextEvent(friendB, 'room:expired', value => value?.code === created.code, 4000);
   const leaveResult = await ack(friendA, 'room:leave');
+  const reusedIdentityRoom = await ack(friendA, 'room:create', { playerId: ids.friendA, name: 'New Friend Room' });
+  assert.equal(reusedIdentityRoom?.ok, true, 'A player who left a forfeited room may start a new room immediately.');
   assert.equal(leaveResult?.ok, true);
   const abandoned = await abandonedState;
   assert.match(abandoned.result, /Black wins by disconnection/, 'The opponent should win when White leaves an active game.');
@@ -235,7 +281,64 @@ try {
   });
   assert.equal(intruderJoin?.ok, false, 'A player must not occupy a seat after the game has ended.');
 
-  console.log('Online integration tests passed: health, queue cancellation, duplicate identity guard, matchmaking, legal/stale move rejection, reconnect grace and token validation, friend invites, chat throttling, and forfeits.');
+  // Ended rooms must be deleted after the retention window, not accumulate forever.
+  const endedRoom = await endedRoomPromise;
+  assert.equal(endedRoom.reason, 'game-ended');
+  const duplicateOwner = await connectClient(url);
+  const duplicateOwnerRoom = await ack(duplicateOwner, 'room:create', { playerId: ids.friendA, name: 'Duplicate Owner' });
+  assert.equal(duplicateOwnerRoom?.ok, false, 'Expiring an older room must not clear a newer active-player lock.');
+  assert.equal((await ack(friendA, 'room:leave'))?.ok, true, 'The replacement invitation should close cleanly.');
+  const deletedRoomJoin = await ack(intruder, 'room:join', {
+    code: created.code, playerId: '40000000-0000-4000-8000-000000000001', name: 'Late Guest'
+  });
+  assert.equal(deletedRoomJoin?.ok, false);
+  assert.match(deletedRoomJoin?.error || '', /Room not found/);
+
+  // An invitation with no second player must also expire automatically.
+  const unusedInvite = await ack(friendB, 'room:create', { playerId: ids.friendB, name: 'Unused Invite' });
+  assert.equal(unusedInvite?.ok, true);
+  const expiredInvite = await nextEvent(friendB, 'room:expired', value => value?.code === unusedInvite.code, 7000);
+  assert.equal(expiredInvite.reason, 'invitation-expired');
+  const lateInviteJoin = await ack(intruder, 'room:join', {
+    code: unusedInvite.code, playerId: '40000000-0000-4000-8000-000000000001', name: 'Late Guest'
+  });
+  assert.equal(lateInviteJoin?.ok, false);
+
+  // Repetition must end the authoritative game as a draw and publish gameOver.
+  const drawRoom = await ack(friendB, 'room:create', { playerId: ids.friendB, name: 'Draw Test' });
+  assert.equal(drawRoom?.ok, true);
+  const drawGuest = await ack(intruder, 'room:join', {
+    code: drawRoom.code, playerId: '40000000-0000-4000-8000-000000000003', name: 'Draw Guest'
+  });
+  assert.equal(drawGuest?.ok, true);
+  const drawGame = new Chess();
+  const repetitionLine = [
+    ['g1', 'f3'], ['g8', 'f6'], ['f3', 'g1'], ['f6', 'g8'],
+    ['g1', 'f3'], ['g8', 'f6'], ['f3', 'g1'], ['f6', 'g8']
+  ];
+  const drawStatePromise = nextEvent(drawGuest ? intruder : friendB, 'room:state', value => value?.gameOver === true);
+  const drawRoomExpired = nextEvent(friendB, 'room:expired', value => value?.code === drawRoom.code, 4000);
+  for (let index = 0; index < repetitionLine.length; index += 1) {
+    const [from, to] = repetitionLine[index];
+    const player = index % 2 === 0 ? friendB : intruder;
+    const expectedFen = drawGame.fen();
+    const expectedPly = drawGame.history().length;
+    const response = await ack(player, 'game:move', {
+      code: drawRoom.code, expectedPly, expectedFen, move: { from, to }
+    });
+    assert.equal(response?.ok, true, 'The repetition line must be legal at ply ' + (index + 1));
+    assert.ok(drawGame.move({ from, to }));
+  }
+  assert.ok(drawGame.isThreefoldRepetition());
+  const drawnState = await drawStatePromise;
+  assert.equal(drawnState.gameOver, true);
+  assert.equal(drawnState.draw, true);
+  assert.equal(drawnState.result, 'Draw');
+  const drawnRoomExpiry = await drawRoomExpired;
+  assert.equal(drawnRoomExpiry.reason, 'game-ended');
+
+  console.log('Online integration tests passed: health, matchmaking, queue cancellation, legal/stale moves, reconnect, friend invites, chat throttling, forfeits, room/invite expiry, and threefold-repetition draws.');
+
 } catch (error) {
   console.error(error);
   if (serverOutput) console.error('Online server output:\n' + serverOutput);

@@ -360,6 +360,43 @@ function chessTopicAnswer(question, context) {
   if (/why (do|should) (i|you|people) (play )?chess|why do you chess|why is chess (important|popular|good)|what is the point of chess|benefits of chess/.test(q)) {
     return 'People play chess for different reasons: solving problems, planning ahead, competing, being creative, and enjoying a challenge. I do not play like a person, but I can help explain positions, tactics, and ideas while you play.';
   }
+  if (/how (do i|can i|should i) (get better|improve|train|practice)|how to improve at chess|how do i win|how can i win/.test(q)) {
+    return 'A strong improvement routine is simple and repeatable: solve a few tactics slowly, play games at a time control that lets you think, review your losses before looking at engine moves, and learn one opening setup for each color. After every move, ask: what is my opponent threatening, are any of my pieces undefended, and what checks, captures, or threats are available? Focus on avoiding one-move blunders before memorizing opening theory.' + boardLine;
+  }
+  if (/best|greatest|strongest|number one/.test(q) && /chess player|grandmaster|player ever|player in history/.test(q)) {
+    return 'There is no universally agreed “greatest ever.” Magnus Carlsen is often included because of his sustained elite results and peak rating; Garry Kasparov, Bobby Fischer, José Raúl Capablanca, and Anatoly Karpov are also central candidates. Comparing eras is difficult because preparation, competition, and access to engines changed the game.';
+  }
+  if (/elo|rating system|chess rating|fide rating|uscf rating/.test(q)) {
+    return 'A chess rating estimates playing strength from results against rated opponents. Elo ratings rise when you score better than expected and fall when you score worse than expected; the size of the change depends on the rating system and its K-factor. FIDE and national federations each have their own rating pools, so online ratings are not directly interchangeable with over-the-board ratings.';
+  }
+  if (/blitz|bullet|rapid|classical|time control|chess clock/.test(q)) {
+    return 'Time controls describe how much thinking time each player gets. Bullet is extremely fast, blitz is fast, rapid gives more time to calculate, and classical games are much longer. Exact time-control categories can vary by federation and event. Faster games reward pattern recognition, but slower games are usually better for learning.';
+  }
+  if (/best opening|good opening for beginners|what opening should i learn/.test(q)) {
+    return 'There is no single best opening for everyone. As White, 1.e4 gives open positions and quick development; 1.d4 often leads to more structured positions. As Black, learn a sound response to 1.e4 and 1.d4, develop your pieces, fight for the center, and castle. Choose openings whose typical plans you understand rather than memorizing long lines.';
+  }
+  if (/strategy|strategic plan|how to win|winning plan/.test(q)) {
+    return 'A useful general plan is to improve your worst-placed piece, control important central squares, keep your king safe, and create a target you can attack. Before committing to a plan, check what your opponent threatens. In a tactical position, calculate forcing checks, captures, and threats before making a quiet improving move.' + boardLine;
+  }
+  if (/how many (pieces|squares)|how many chess pieces|starting position/.test(q)) {
+    return 'A standard chessboard has 64 squares. Each player starts with 16 pieces: one king, one queen, two rooks, two bishops, two knights, and eight pawns. That makes 32 pieces at the start of a normal game.';
+  }
+  if (/difference between checkmate and stalemate|checkmate.*stalemate|stalemate.*checkmate/.test(q)) {
+    return 'Checkmate means the king is in check and has no legal way to escape, so the player loses. Stalemate means the king is not in check but the player has no legal move, so the game is a draw.';
+  }
+  if (/what (does|can) (a )?knight do|how does (a )?knight move/.test(q)) {
+    return 'A knight moves in an L-shape: two squares in one direction and then one square sideways. It is the only piece that can jump over other pieces. A knight on the rim usually controls fewer useful squares than one near the center.';
+  }
+  if (/what (does|can) (a )?(bishop|rook|queen|king|pawn) do|how does (a )?(bishop|rook|queen|king|pawn) move/.test(q)) {
+    if (/bishop/.test(q)) return 'A bishop moves diagonally any number of empty squares. Each bishop stays on the same square color for the whole game, so the two bishops complement each other.';
+    if (/rook/.test(q)) return 'A rook moves horizontally or vertically along clear ranks and files. Rooks become especially powerful on open files and behind passed pawns.';
+    if (/queen/.test(q)) return 'A queen moves like a rook and a bishop combined: horizontally, vertically, or diagonally along clear squares. It is powerful, but bringing it out too early can let the opponent gain time by attacking it.';
+    if (/king/.test(q)) return 'A king normally moves one square in any direction, provided the destination is not attacked. Castling is its special two-square move with a rook.';
+    return 'A pawn moves one square forward, may move two squares on its first move if the path is clear, and captures one square diagonally forward. Pawns cannot move backward, and they promote on the last rank.';
+  }
+  if (/what is (fen|pgn|uci|algebraic notation)|notation/.test(q)) {
+    return 'Algebraic notation records moves with piece letters and destination squares, such as Nf3 or Bxc6+. FEN describes one position in a compact text string; PGN records a game’s moves and metadata; UCI is a coordinate format often used to communicate with chess engines, such as e2e4.';
+  }
   const opening = [
     [/ruy lopez|spanish opening/i, 'The Ruy Lopez starts 1.e4 e5 2.Nf3 Nc6 3.Bb5. White pressures the c6-knight, which supports e5. Develop smoothly, castle, and keep central tension; Black can challenge the bishop with ...a6 or develop with ...Nf6.'],
     [/italian game|giuoco piano/i, 'The Italian Game begins 1.e4 e5 2.Nf3 Nc6 3.Bc4. White aims at f7 and can build with c3 and d4. Black should develop quickly and contest the center rather than chase the bishop.'],
@@ -395,15 +432,16 @@ function chessTopicAnswer(question, context) {
   return 'I have the live position and move list in view. Start by checking king safety, loose pieces, forcing checks and captures, and pawn breaks. Ask me about a specific rule, opening, tactic, endgame, famous game, or type “best move” and I will request a Stockfish line for this exact position.' + boardLine;
 }
 
-async function makeLocalChessAnswer(question) {
+async function makeLocalChessAnswer(question, responderContext = {}) {
   const context = currentBoardContext();
-  const chessWords = /\b(chess|chaturanga|board|opening|endgame|tactic|fork|pin|skewer|check|mate|castl|en passant|pawn|rook|bishop|knight|queen|king|move|position|fen|pgn|grandmaster|fischer|kasparov|morphy|stalemate|promotion|opposition|lucena|philidor|gambit|sicilian|zugzwang|tempo|blunder|development|center|centre)\b/i;
-  if (!chessWords.test(question)) {
-    return 'I am King Pawn, royal advisor of the 64 squares. I only advise on chess matters. Ask me about a move, opening, tactic, rule, endgame, or this board.';
-  }
-
-  const contextAnswer = chessTopicAnswer(question, context);
-  if (/\b(best move|what should i play|what should my plan|analy[sz]e (this|the|my)|current position|why was my last move|is this move good|what is the plan)\b/i.test(question)) {
+  const isBoardAction = /\b(best move|what should i (?:play|move|do)|what now|what next|what should my plan|analy[sz]e (this|the|my)|current position|why was my last move|is this move good|what is the plan)\b/i.test(question);
+  const followUp = /^(?:why|how|what about that|what does that mean|tell me more|explain that|how so|why not)[?.!]*$/i.test(question.trim());
+  const previousQuestion = [...(responderContext.recentConversation || [])].reverse().find(message =>
+    message?.role === 'user' && String(message.content || '').trim().toLowerCase() !== question.trim().toLowerCase()
+  );
+  const answerQuestion = followUp && previousQuestion && !isBoardAction ? String(previousQuestion.content || '') : question;
+  const contextAnswer = chessTopicAnswer(answerQuestion, context);
+  if (/\b(best move|what should i (?:play|move|do)|what now|what next|what should my plan|analy[sz]e (this|the|my)|current position|why was my last move|is this move good|what is the plan)\b/i.test(question)) {
     if (!context.fen) return contextAnswer;
     if (context.gameOver) return 'This game is already over, so there is no next move to recommend. Review the final position in the move list.';
     if (window.GlassChess?.thinking || engine.searchPromise) {
@@ -432,7 +470,13 @@ async function makeLocalChessAnswer(question) {
 }
 
 const kingPawnResponder = createKingPawnResponder({
-  getContext: currentBoardContext,
+  getContext: () => ({
+    ...currentBoardContext(),
+    recentConversation: chatLog.slice(-8).map(message => ({
+      role: message.role,
+      content: String(message.content || '').slice(0, 700)
+    }))
+  }),
   getKnowledgeAnswer: makeLocalChessAnswer
 });
 
@@ -589,7 +633,7 @@ function mountKingPawn() {
   dock.innerHTML = [
     '<button type="button" id="gc-king-pawn-launcher" aria-expanded="false" aria-controls="gc-king-pawn-panel"><span aria-hidden="true">♛</span><small>KING PAWN</small></button>',
     '<section id="gc-king-pawn-panel" aria-label="King Pawn chess assistant" hidden>',
-    '<header><span class="gc-kp-crown">♛</span><div><strong>King Pawn</strong><small>Chess advisor · Board-aware</small></div><button type="button" id="gc-king-pawn-close" aria-label="Close King Pawn">×</button></header>',
+    '<header><span class="gc-kp-crown">♛</span><div><strong>King Pawn</strong><small>Chess-only AI · Board-aware</small></div><button type="button" id="gc-king-pawn-close" aria-label="Close King Pawn">×</button></header>',
     '<div class="gc-kp-context" id="gc-kp-context">Connected to your current board and move list.</div>',
     '<div class="gc-kp-prompts" aria-label="Quick chess questions">' +
       '<button type="button" data-kp-prompt="Analyze my current position">Analyze position</button>' +
@@ -599,7 +643,7 @@ function mountKingPawn() {
     '</div>',
     '<div id="gc-king-pawn-messages" aria-live="polite"></div>',
     '<form id="gc-king-pawn-form"><label class="gc-kp-sr-only" for="gc-king-pawn-input">Ask King Pawn a chess question</label><textarea id="gc-king-pawn-input" rows="2" maxlength="1200" placeholder="Ask about a move, opening, tactic, or rule…"></textarea><button type="submit">Ask King Pawn</button></form>',
-    '<footer>OFFLINE CHESS ADVISOR · LIVE STOCKFISH ANALYSIS</footer>',
+    '<footer>CHESS-ONLY AI COACH · LIVE STOCKFISH POSITION ANALYSIS</footer>',
     '</section>'
   ].join('');
   document.body.appendChild(dock);
