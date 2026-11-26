@@ -177,6 +177,10 @@ try {
   (matchedForB.role === 'w' ? playerB : playerA).disconnect();
   await disconnectedState;
   const resumedClient = await connectClient(url);
+  const invalidResume = await ack(resumedClient, 'room:resume', {
+    code: matchedForB.code, playerId: reconnectId, resumeToken: 'invalid-token'
+  });
+  assert.equal(invalidResume?.ok, false, 'A reconnect without the server-issued token must fail.');
   const resumed = await ack(resumedClient, 'room:resume', {
     code: matchedForB.code, playerId: reconnectId, resumeToken: reconnectToken
   });
@@ -184,10 +188,6 @@ try {
   assert.equal(resumed.role, reconnectSide);
   assert.equal(resumed.state.fen, expectedGame.fen());
   assert.equal(resumed.state.players[reconnectSide].connected, true);
-  const invalidResume = await ack(remainingSide, 'room:resume', {
-    code: matchedForB.code, playerId: reconnectId, resumeToken: 'invalid-token'
-  });
-  assert.equal(invalidResume?.ok, false, 'A reconnect without the server-issued token must fail.');
 
   // Friend links create an eight-character room and return independent credentials.
   const friendA = await connectClient(url);
@@ -222,8 +222,10 @@ try {
   assert.equal(leaveResult?.ok, true);
   const abandoned = await abandonedState;
   assert.match(abandoned.result, /Black wins by disconnection/, 'The opponent should win when White leaves an active game.');
+  const friendPosition = new Chess();
+  friendPosition.move('e4');
   const postForfeitMove = await ack(friendB, 'game:move', {
-    code: created.code, expectedPly: 1, expectedFen: new Chess().fen(),
+    code: created.code, expectedPly: 1, expectedFen: friendPosition.fen(),
     move: { from: 'e7', to: 'e5' }
   });
   assert.equal(postForfeitMove?.ok, false, 'A forfeited game must reject later moves.');
@@ -242,10 +244,13 @@ try {
   for (const client of connected) {
     try { client.disconnect(); } catch {}
   }
-  if (serverProcess && !serverProcess.killed) {
-    serverProcess.kill('SIGTERM');
+  if (serverProcess) {
+    if (!serverProcess.killed) serverProcess.kill('SIGTERM');
     await Promise.race([
-      new Promise(resolve => serverProcess.once('exit', resolve)),
+      new Promise(resolve => {
+        if (serverProcess.exitCode !== null) resolve();
+        else serverProcess.once('exit', resolve);
+      }),
       delay(1000)
     ]);
   }
