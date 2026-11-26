@@ -76,7 +76,7 @@ function moveInput(uciMove) {
 function isForkSolved(game, puzzle) {
   if (puzzle.goal !== 'fork' || !puzzle.targetSquare || !game.isCheck()) return false;
   const target = game.get(puzzle.targetSquare);
-  if (!target || target.type !== 'q' || target.color === game.turn()) return false;
+  if (!target || target.type !== 'q' || target.color !== game.turn()) return false;
   const knightSquare = puzzle.solution[0].slice(2, 4);
   const knight = game.get(knightSquare);
   if (!knight || knight.type !== 'n' || knight.color === game.turn()) return false;
@@ -368,7 +368,6 @@ function mountDailyPuzzles() {
       solved ? 'You already solved today’s puzzle.' : 'Select a piece, then choose a legal destination.',
       solved ? 'success' : 'neutral'
     );
-    el('gc-daily-submit');
     dialog.querySelector('[data-action="hint"]').textContent = 'Hint';
     if (solved) revealSolvedPosition();
     else renderBoard();
