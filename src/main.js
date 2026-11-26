@@ -1470,7 +1470,8 @@ async function hint() {
       setEngineStatus(engine.ready ? "Stockfish 19 ready" : "Stockfish recovering…");
       console.error("Stockfish Hint failed:", error);
     }
-    void engine.stop().catch(() => {});
+    // Keep the UI busy until UCI has acknowledged stop (or the worker has restarted).
+    await engine.stop().catch(() => {});
   } finally {
     if (watchdog !== null) window.clearTimeout(watchdog);
     if (token === gameToken) {
