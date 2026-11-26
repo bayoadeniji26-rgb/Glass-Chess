@@ -22,7 +22,7 @@ function readProgress() {
     if (!saved || saved.version !== 3 || !/^\d{4}-\d{2}-\d{2}$/.test(saved.startedOn || '')) return defaults;
     getPuzzleDayIndex(saved.startedOn, today);
     return {
-      ...defaults, ...saved,
+      ...defaults, ...saved, version: 3,
       completedDays: [...new Set((Array.isArray(saved.completedDays) ? saved.completedDays : []).map(Number).filter(n => Number.isInteger(n) && n >= 1 && n <= DAILY_PUZZLES.length))],
       revealedDays: [...new Set((Array.isArray(saved.revealedDays) ? saved.revealedDays : []).map(Number).filter(n => Number.isInteger(n) && n >= 1 && n <= DAILY_PUZZLES.length))],
       attempts: saved.attempts && typeof saved.attempts === 'object' ? saved.attempts : {}
