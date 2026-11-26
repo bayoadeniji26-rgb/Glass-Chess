@@ -82,11 +82,13 @@ import { APP_VERSION } from './version.js';
       <p id="gc-update-status">Checking the latest release…</p>
       <div class="gc-update-track" role="progressbar" aria-label="Update progress" aria-valuemin="0" aria-valuemax="4" aria-valuenow="0"><span id="gc-update-progress-bar"></span></div>
       <div class="gc-update-progress-row"><span id="gc-update-progress-label">Preparing update</span><strong id="gc-update-stage" aria-live="polite">CHECKING</strong></div>
-      <button type="button" id="gc-update-close" class="gc-update-close">Close</button></section>`;
+      <button type="button" id="gc-update-install" class="gc-update-install">Install update now</button>
+      <button type="button" id="gc-update-close" class="gc-update-close">Remind me later</button></section>`;
     document.body.appendChild(updateOverlay);
     updateOverlay.querySelector('#gc-update-close').addEventListener('click',()=>{
       if(!updating)updateOverlay.classList.remove('is-open');
     });
+    updateOverlay.querySelector('#gc-update-install').addEventListener('click',runUpdate);
   }
 
   function setDialog(phase,message){
@@ -106,6 +108,13 @@ import { APP_VERSION } from './version.js';
       if(compareVersions(release.version,APP_VERSION)>0){
         publish('available','A newer release is available.');makeUpdateUI();updateBanner.classList.add('is-visible');
         updateBanner.querySelector('#gc-update-description').textContent=(release.name?release.name+' · ':'')+'Version '+release.version+' is ready. Reload to install the required update.';
+        const installButton=updateOverlay.querySelector('#gc-update-install');
+        if(installButton)installButton.disabled=false;
+        const closeButton=updateOverlay.querySelector('#gc-update-close');
+        if(closeButton)closeButton.hidden=false;
+        updateOverlay.querySelector('#gc-update-title').textContent='New update required';
+        updateOverlay.querySelector('#gc-update-status').textContent='Glass Chess version '+release.version+' is ready. Install it now to get the latest features and fixes.';
+        updateOverlay.classList.add('is-open');
       }else{
         publish('current','This browser is running the latest published Glass Chess version.');
         updateBanner?.classList.remove('is-visible');
@@ -137,6 +146,8 @@ import { APP_VERSION } from './version.js';
     updating=true;makeUpdateUI();
     const button=updateBanner.querySelector('#gc-update-now');
     button.disabled=true;
+    const modalButton=updateOverlay.querySelector('#gc-update-install');
+    if(modalButton)modalButton.disabled=true;
     setDialog('checking-release','Rechecking the release manifest before changing this page.');
     try{
       const response=await fetchNoStore(VERSION_URL+'?refresh='+Date.now());
@@ -179,6 +190,7 @@ import { APP_VERSION } from './version.js';
       makeUpdateUI();updateOverlay.classList.add('is-open');
       updateOverlay.querySelector('#gc-update-close').hidden=false;
       button.disabled=false;button.textContent='RETRY UPDATE →';
+      if(modalButton)modalButton.disabled=false;
     }finally{updating=false;}
   }
 

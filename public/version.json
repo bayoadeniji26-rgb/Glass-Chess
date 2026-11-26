@@ -1,10 +1,11 @@
 {
-  "version": "2026.11.25.9",
-  "name": "Glass Chess Required Update Experience",
+  "version": "2026.11.25.10",
+  "name": "Glass Chess Required Update",
   "updatedAt": "2026-11-25",
   "notes": [
-    "Restored the required update banner and full-screen update flow",
-    "Added truthful stage-based progress, service-worker activation, release verification, and automatic reload",
-    "Cloud save data remains local until account-backed cloud sync is enabled"
+    "Automatically displays the required-update dialog when a newer release is detected",
+    "Adds a direct install action and verified reload flow",
+    "Fixes and expands King Pawn chess-only question handling",
+    "Local game saves remain available while email and recovery-code cloud storage is developed"
   ]
 }

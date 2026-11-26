@@ -351,13 +351,13 @@ function chessTopicAnswer(question, context) {
     : '';
 
   // Short, reliable answers for common chess questions before the deeper topic library.
-  if (/when (was|is) chess (made|invented|created)|who invented chess|origin of chess|history of chess/.test(q)) {
+  if (/when (was|is) chess (made|invented|created)|who (invented|made|created) chess|origin of chess|history of chess/.test(q)) {
     return 'Chess developed from an earlier Indian strategy game called chaturanga, around the 6th century CE. It spread through Persia and the Islamic world, then reached Europe. The rules gradually changed, and the modern game took shape in Europe around the late 15th century. So chess was not invented by one known person on one exact date.';
   }
   if (/chess sucks|chess is boring|i hate chess|i do not like chess/.test(q)) {
     return 'Fair enough — chess is not everybody’s thing. Some people dislike how much thinking it takes, how long games can last, or how frustrating a mistake feels. What part do you dislike most: the rules, the time, or losing?';
   }
-  if (/why (do|should) (i|you|people) (play )?chess|why do you chess|what is the point of chess|benefits of chess/.test(q)) {
+  if (/why (do|should) (i|you|people) (play )?chess|why do you chess|why is chess (important|popular|good)|what is the point of chess|benefits of chess/.test(q)) {
     return 'People play chess for different reasons: solving problems, planning ahead, competing, being creative, and enjoying a challenge. I do not play like a person, but I can help explain positions, tactics, and ideas while you play.';
   }
   const opening = [
