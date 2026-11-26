@@ -28,3 +28,20 @@ export function calculatePositionHistory(initialFen, moveList) {
 
   return positions;
 }
+
+/**
+ * Determines whether a flag fall is an automatic draw because the non-flagging
+ * side has no non-king piece and therefore cannot deliver checkmate.
+ * chess.js isInsufficientMaterial() remains the additional dead-position check.
+ */
+export function isFlagFallDraw(fen, loserSide) {
+  if (!['w', 'b'].includes(loserSide)) {
+    throw new TypeError('The flagging side must be w or b.');
+  }
+  const position = new Chess(fen);
+  const winnerSide = loserSide === 'w' ? 'b' : 'w';
+  const winnerHasNonKingPiece = position.board().some(row =>
+    row.some(piece => piece && piece.color === winnerSide && piece.type !== 'k')
+  );
+  return !winnerHasNonKingPiece || position.isInsufficientMaterial();
+}
