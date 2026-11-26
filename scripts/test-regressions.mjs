@@ -106,3 +106,4 @@ assert.match(supportUi, /api\.emailjs\.com\/api\/v1\.0\/email\/send/, 'Contact m
 assert.match(supportCss, /height: 36px !important/, 'Top-bar actions must use a consistent height.');
 assert.match(supportCss, /overflow-x: auto !important/, 'Top-bar controls must remain reachable when the viewport is narrow.');
 assert.match(supportCss, /\.gc-donation-overlay\.is-contact \.gc-donation-actions/, 'Contact mode must have contact-specific presentation.');
+assert.match(supportCss, /#gc-copy-cashapp-dialog/, 'The Cash App copy button inside the donation dialog must be styled.');

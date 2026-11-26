@@ -371,12 +371,12 @@ body.gc-custom-background #gc-floating-hub .gc-hub-drawer {
 .gc-donation-copy-row[hidden],
 #gc-donation-cashapp[hidden] { display: none !important; }
 .gc-donation-copy-row { display:flex; justify-content:flex-end; margin-top:-2px; }
-#gc-donation-copy-cashapp {
+#gc-copy-cashapp-dialog {
   min-height:30px; padding:0 10px; border:1px solid rgba(0,214,50,.25);
   border-radius:9px; color:#9cebad; background:rgba(0,214,50,.06);
   font:700 10px/1 system-ui,sans-serif; cursor:pointer;
 }
-#gc-donation-copy-cashapp:hover { background:rgba(0,214,50,.13); }
+#gc-copy-cashapp-dialog:hover { background:rgba(0,214,50,.13); }
 .gc-donation-overlay.is-contact .gc-donation-mark {
   color:#e4eaff; background:rgba(145,165,220,.14);
 }
