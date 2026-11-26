@@ -374,6 +374,8 @@ async function applyCloudProfile(profile) {
     ...profile,
     avatarUrl: profileAvatarUrl
   }));
+  window.GlassChessDailyPuzzles?.applyCloudProgress?.(profile.localStorage?.dailyPuzzleProgress);
+  window.dispatchEvent(new CustomEvent('glasschess:cloud-profile', { detail: { profile } }));
 }
 
 async function syncNow() {
