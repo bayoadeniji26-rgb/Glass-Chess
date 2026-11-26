@@ -89,6 +89,8 @@ let previousVictoryFocus = null;
 let socketBound = false;
 let matchmakingActive = false;
 let matchmakingGeneration = 0;
+let onlineRequestActive = false;
+let onlineRequestGeneration = 0;
 let offlineIntent = false;
 let toastTimer = null;
 let lastCheckToastPly = 0;
@@ -646,15 +648,33 @@ async function cancelMatch() {
 
 async function createRoom() {
   offlineIntent = false;
+  online.previousMode = api.mode;
+  online.previousColor = api.playerColor;
+  onlineRequestActive = true;
+  const generation = ++onlineRequestGeneration;
   try {
     if (!socket?.connected) makeSocket();
     await waitForSocket();
+    if (generation !== onlineRequestGeneration || offlineIntent) return;
     const result = await emitAck('room:create', { name: getPublicPlayerName(), playerId: CLIENT_ID });
-    online.previousMode = api.mode;
-    online.previousColor = api.playerColor;
+    if (generation !== onlineRequestGeneration || offlineIntent) {
+      if (result?.code && socket?.connected) {
+        try { await emitAck('room:leave'); } catch {}
+      }
+      return;
+    }
     applyRoomJoin(result);
     toast(`Room ${result.code} created. Share the invitation link.`);
-  } catch (error) { root.querySelector('#gc-plus-room-status').textContent = error.message; }
+  } catch (error) {
+    if (generation === onlineRequestGeneration && !offlineIntent) {
+      root.querySelector('#gc-plus-room-status').textContent = error.message;
+    }
+  } finally {
+    if (generation === onlineRequestGeneration) {
+      onlineRequestActive = false;
+      renderRoomButtons();
+    }
+  }
 }
 
 function waitForSocket() {
@@ -670,17 +690,35 @@ function waitForSocket() {
 
 async function joinRoom(spectate = false) {
   offlineIntent = false;
+  online.previousMode = api.mode;
+  online.previousColor = api.playerColor;
+  onlineRequestActive = true;
+  const generation = ++onlineRequestGeneration;
   try {
     if (!socket?.connected) makeSocket();
     await waitForSocket();
-    online.previousMode = api.mode;
-    online.previousColor = api.playerColor;
+    if (generation !== onlineRequestGeneration || offlineIntent) return;
     const code = root.querySelector('#gc-plus-room-code').value.trim().toUpperCase();
     const result = await emitAck(spectate ? 'room:spectate' : 'room:join', { code, name: getPublicPlayerName(), playerId: CLIENT_ID });
+    if (generation !== onlineRequestGeneration || offlineIntent) {
+      if (result?.code && socket?.connected) {
+        try { await emitAck('room:leave'); } catch {}
+      }
+      return;
+    }
     applyRoomJoin(result);
     if (spectate) toast(`Watching room ${result.code}.`);
     else toast(`Joined room ${result.code}.`);
-  } catch (error) { root.querySelector('#gc-plus-room-status').textContent = error.message; }
+  } catch (error) {
+    if (generation === onlineRequestGeneration && !offlineIntent) {
+      root.querySelector('#gc-plus-room-status').textContent = error.message;
+    }
+  } finally {
+    if (generation === onlineRequestGeneration) {
+      onlineRequestActive = false;
+      renderRoomButtons();
+    }
+  }
 }
 
 function handleLocalMove(move) {
@@ -713,10 +751,13 @@ function handleLocalMove(move) {
 async function leaveRoom({ restoreMode = true } = {}) {
   const roomCode = online.code;
   const wasSearching = matchmakingActive;
+  const hadPendingRequest = onlineRequestActive;
   const previousMode = online.previousMode || 'computer';
   const previousColor = online.previousColor || api.playerColor || 'white';
   offlineIntent = true;
   ++matchmakingGeneration;
+  ++onlineRequestGeneration;
+  onlineRequestActive = false;
 
   // Cancel both queue searches and active rooms before allowing local play.
   if (wasSearching && socket?.connected) {
@@ -741,6 +782,7 @@ async function leaveRoom({ restoreMode = true } = {}) {
   online.lastState = null;
   online.syncing = false;
   matchmakingActive = false;
+  onlineRequestActive = false;
   api.setReplayLock(false);
   api.setOnlineMatchActive?.(false);
   if (restoreMode) api.setMode(previousMode);
@@ -757,7 +799,7 @@ async function leaveRoom({ restoreMode = true } = {}) {
 
   root.querySelector('#gc-plus-room-status').textContent = roomCode
     ? 'You left the room.'
-    : wasSearching ? 'Matchmaking cancelled.' : 'Ready for offline play.';
+    : (wasSearching || hadPendingRequest) ? 'Online request cancelled. Ready for offline play.' : 'Ready for offline play.';
   root.querySelector('#gc-plus-room-people').textContent = 'No room';
   renderRoomButtons();
   return true;
@@ -1068,7 +1110,7 @@ export function mountOnlinePlus(chessApi, premiumRoot) {
   installPieceObserver();
   window.GlassChessOnlinePlus = {
     isOnline() { return Boolean(online.code); },
-    isMatchmaking() { return matchmakingActive; },
+    isMatchmaking() { return matchmakingActive || onlineRequestActive; },
     exitOnlineSession(options = {}) { return leaveRoom(options); },
     getPlayers() { return online.lastState?.players || null; },
     canMove(side = api.turn) {
