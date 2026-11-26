@@ -234,3 +234,17 @@ assert.doesNotMatch(redesignUi, /gc-hub-orb/, 'The update module must not keep a
 assert.match(toolsUi, /role="dialog" aria-modal="true"/, 'The Tools panel must expose dialog semantics.');
 assert.match(toolsUi, /tabindex="0" aria-label="Scrollable tools"/, 'The Tools content region must be keyboard-scrollable.');
 
+const premiumUi = readFileSync(new URL('../src/premium.js', import.meta.url), 'utf8');
+assert.ok(premiumUi.includes('import { ChessEngine } from "./engine.js"'), 'Live Engine Lab must use an isolated Stockfish engine worker.');
+assert.ok(premiumUi.includes('function scheduleLiveAnalysis'), 'Live Engine Lab must have an automatic position-refresh scheduler.');
+assert.ok(premiumUi.includes('liveAnalysisEngine.search(fen'), 'Live Engine Lab must search with its dedicated engine.');
+const liveMoveHook = premiumUi.slice(premiumUi.indexOf('function onMove('), premiumUi.indexOf('function onReset('));
+const liveResetHook = premiumUi.slice(premiumUi.indexOf('function onReset('), premiumUi.indexOf('function onUndo('));
+assert.ok(liveMoveHook.includes('scheduleLiveAnalysis(180)'), 'Every accepted board move must schedule a fresh live evaluation.');
+assert.ok(liveResetHook.includes('scheduleLiveAnalysis(180)'), 'Starting a new game must refresh the live evaluation.');
+assert.ok(premiumUi.includes('scheduleLiveAnalysis(250)'), 'Live Engine Lab must start automatically after the Premium Suite mounts.');
+assert.ok(premiumUi.includes('Always-on board monitoring'), 'The interface must explain that Live Engine Lab runs automatically.');
+assert.ok(premiumUi.includes('liveAnalysisEngine.stop()'), 'Position changes and pause must stop stale background searches safely.');
+assert.ok(premiumUi.includes('liveAnalysisSuppressed = true'), 'Live Engine Lab must stay out of the way while a training puzzle is active.');
+const liveRunner = premiumUi.slice(premiumUi.indexOf('async function runLiveAnalysis'), premiumUi.indexOf('function moveClass(loss)'));
+assert.ok(!liveRunner.includes('api.search('), 'Live Engine Lab must not use the main game thinking lock.');
