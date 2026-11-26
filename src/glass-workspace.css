@@ -47,10 +47,14 @@ body { position: fixed; inset: 0; }
   cursor: pointer;
 }
 #gc-workspace-actions button:hover,
-#gc-workspace-actions button[aria-expanded="true"] {
+#gc-workspace-actions button[aria-expanded="true"],
+#gc-workspace-actions button[data-workspace-open="tools"] {
   color: #f4d99d;
   border-color: rgba(232,199,126,.48);
   background: rgba(232,199,126,.12);
+}
+#gc-workspace-actions button[data-workspace-open="tools"] {
+  font-weight: 800;
 }
 #new-game { min-height: 34px; padding: 0 13px; white-space: nowrap; }
 .layout {
