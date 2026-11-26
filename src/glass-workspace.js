@@ -11,6 +11,16 @@ import './glass-workspace.css';
     const play = $('.side-panel');
     const analysis = $('.analysis-panel');
     if (!app || !topbar || !play || !analysis) return false;
+
+    // Online is a destination in the Play menu, not a fake chess.js game mode.
+    const modeSelect = $('#mode');
+    if (modeSelect && !modeSelect.querySelector('option[value="online"]')) {
+      const onlineOption = document.createElement('option');
+      onlineOption.value = 'online';
+      onlineOption.textContent = 'Play Online';
+      modeSelect.appendChild(onlineOption);
+    }
+
     if ($('#gc-workspace-actions')) return true;
 
     const actions = document.createElement('nav');
@@ -20,6 +30,7 @@ import './glass-workspace.css';
       <button type="button" data-workspace-open="play" aria-label="Open play settings">Play</button>
       <button type="button" data-workspace-open="analysis" aria-label="Open analysis panel">Analysis</button>
       <button type="button" data-workspace-open="settings" aria-label="Open board settings">Settings</button>
+      <button type="button" data-workspace-open="tools" aria-label="Open chess tools" aria-expanded="false">Tools</button>
     `;
     const newGame = $('#new-game');
     topbar.insertBefore(actions, newGame || null);
@@ -62,6 +73,8 @@ import './glass-workspace.css';
     }
 
     function openDrawer(which) {
+      // Keep the Tools popup and workspace drawers mutually exclusive.
+      window.GlassChessTools?.close?.();
       if (active === which) { closeDrawer(); return; }
       active = which;
       document.body.classList.add(openClass);
@@ -81,8 +94,20 @@ import './glass-workspace.css';
 
     actions.addEventListener('click', event => {
       const button = event.target.closest('[data-workspace-open]');
-      if (button) openDrawer(button.dataset.workspaceOpen);
+      if (!button) return;
+      if (button.dataset.workspaceOpen === 'tools') {
+        closeDrawer();
+        window.GlassChessTools?.toggle?.();
+        return;
+      }
+      openDrawer(button.dataset.workspaceOpen);
     });
+
+    // Starting a selected game closes the Play drawer automatically.
+    play.addEventListener('click', event => {
+      if (event.target.closest('#start-game,[data-play-online]')) closeDrawer();
+    }, true);
+
     scrim.addEventListener('click', closeDrawer);
     document.addEventListener('keydown', event => {
       if (event.key === 'Escape' && active) closeDrawer();
