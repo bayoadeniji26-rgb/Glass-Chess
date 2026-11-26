@@ -59,6 +59,10 @@ Choose the same Firebase project used for the web configuration when `firebase u
 
 If sign-in succeeds but sync fails, inspect the browser console and check that the Firestore and Storage rules above were published and that the Firebase project has billing/Storage access configured as required by your project.
 
+## King Pawn AI service
+
+King Pawn now has a separate responder core. Without an AI service configured, it uses its local chess knowledge and Stockfish-backed position analysis, so it remains available offline. For full generative answers to open-ended chess questions, deploy a secure backend endpoint that accepts a POST request with `systemPrompt`, `question`, and `board`, then returns JSON with an `answer` string. Set `VITE_KING_PAWN_AI_ENDPOINT` to that endpoint in the Vite/Render build environment. Keep the model provider's secret API key on the backend only; never put it in a `VITE_*` variable or browser code.
+
 ## 5. Donation messages by email + Cash App
 
 The Donate button opens an in-app form. A visitor can add their name, reply email, suggested amount, and message. **Sending the message does not charge them**; they use the separate Cash App link to make a voluntary payment to `$RaphaelAboy`.
