@@ -491,8 +491,13 @@ function makeSocket() {
     renderRoomButtons();
   });
   socket.on('disconnect', reason => {
+    if (matchmakingActive) {
+      matchmakingActive = false;
+      root.querySelector('#gc-plus-room-status').textContent = 'Connection lost while searching. Reconnect and try again.';
+    } else {
+      root.querySelector('#gc-plus-room-status').textContent = `Disconnected: ${reason}. Reconnect to continue.`;
+    }
     root.querySelector('#gc-plus-connection').textContent = 'Disconnected';
-    root.querySelector('#gc-plus-room-status').textContent = `Disconnected: ${reason}. Reconnect to continue.`;
     renderRoomButtons();
   });
   socket.on('room:state', snapshot => showRoomState(snapshot));
