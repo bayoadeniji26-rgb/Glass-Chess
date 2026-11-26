@@ -130,6 +130,13 @@ function loadState() {
   }
 }
 
+function getPublicPlayerName() {
+  const user = window.GlassChessCloud?.user;
+  const candidate = user?.displayName || user?.username || String(user?.email || "").split("@")[0];
+  const cleaned = String(candidate || "Anonymous").replace(/[<>]/g, "").trim().slice(0, 20);
+  return cleaned || "Anonymous";
+}
+
 function saveState() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
   catch (error) { console.warn('Glass Chess Online Plus could not save local progress:', error); }
@@ -589,7 +596,7 @@ async function findMatch() {
     matchmakingActive = true;
     renderRoomButtons();
     root.querySelector('#gc-plus-room-status').textContent = 'Looking for another player… Keep this page open. You can cancel at any time.';
-    const result = await emitAck('queue:join', { name: state.name, playerId: CLIENT_ID });
+    const result = await emitAck('queue:join', { name: getPublicPlayerName(), playerId: CLIENT_ID });
     if (result.matched) {
       matchmakingActive = false;
       online.previousMode = api.mode;
@@ -620,7 +627,7 @@ async function createRoom() {
   try {
     if (!socket?.connected) makeSocket();
     await waitForSocket();
-    const result = await emitAck('room:create', { name: state.name, playerId: CLIENT_ID });
+    const result = await emitAck('room:create', { name: getPublicPlayerName(), playerId: CLIENT_ID });
     online.previousMode = api.mode;
     online.previousColor = api.playerColor;
     applyRoomJoin(result);
@@ -646,7 +653,7 @@ async function joinRoom(spectate = false) {
     online.previousMode = api.mode;
     online.previousColor = api.playerColor;
     const code = root.querySelector('#gc-plus-room-code').value.trim().toUpperCase();
-    const result = await emitAck(spectate ? 'room:spectate' : 'room:join', { code, name: state.name, playerId: CLIENT_ID });
+    const result = await emitAck(spectate ? 'room:spectate' : 'room:join', { code, name: getPublicPlayerName(), playerId: CLIENT_ID });
     applyRoomJoin(result);
     if (spectate) toast(`Watching room ${result.code}.`);
     else toast(`Joined room ${result.code}.`);
@@ -1002,6 +1009,7 @@ export function mountOnlinePlus(chessApi, premiumRoot) {
   installPieceObserver();
   window.GlassChessOnlinePlus = {
     isOnline() { return Boolean(online.code); },
+    getPlayers() { return online.lastState?.players || null; },
     canMove(side = api.turn) {
       return Boolean(
         online.code &&
