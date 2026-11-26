@@ -79,7 +79,7 @@ let api;
 let root;
 let state;
 let socket = null;
-let online = { code: '', role: '', side: '', lastState: null, syncing: false, previousMode: 'computer', previousColor: 'white' };
+let online = { code: '', role: '', side: '', resumeToken: '', lastState: null, syncing: false, previousMode: 'computer', previousColor: 'white' };
 let dailyChallenge = { active: false, solution: '', notation: '', solved: false, rewardEligible: false };
 let finishedFen = '';
 let pieceObserver = null;
@@ -460,7 +460,8 @@ function showRoomState(snapshot) {
   api.setOnlineMatchActive?.(true);
   const white = snapshot.players?.w?.name || 'Waiting for White';
   const black = snapshot.players?.b?.name || 'Waiting for Black';
-  root.querySelector('#gc-plus-room-status').textContent = `${online.role === 'spectator' ? 'Spectating' : `Playing as ${online.role === 'w' ? 'White' : 'Black'}`} · ${white} vs ${black} · ${snapshot.result}`;\n  if (snapshot.lastMove?.fx?.isCheck) toast(snapshot.lastMove.fx.isCheckmate ? 'Checkmate!' : 'Check!');
+  root.querySelector('#gc-plus-room-status').textContent = `${online.role === 'spectator' ? 'Spectating' : `Playing as ${online.role === 'w' ? 'White' : 'Black'}`} · ${white} vs ${black} · ${snapshot.result}`;
+  if (snapshot.lastMove?.fx?.isCheck) toast(snapshot.lastMove.fx.isCheckmate ? 'Checkmate!' : 'Check!');
   root.querySelector('#gc-plus-room-people').textContent = `${Number(snapshot.spectators || 0)} spectators`;
   renderRoomButtons();
   window.setTimeout(() => { online.syncing = false; }, 0);
@@ -482,7 +483,24 @@ function makeSocket() {
   root.querySelector('#gc-plus-room-status').textContent = `Connecting to Glass Chess online…`;
   socket.on('connect', () => {
     root.querySelector('#gc-plus-connection').textContent = 'Connected';
-    if (!online.code) root.querySelector('#gc-plus-room-status').textContent = 'Connected. Create a room or enter a room code.';
+    if (online.code && online.resumeToken) {
+      root.querySelector('#gc-plus-room-status').textContent = 'Reconnecting to your game…';
+      socket.timeout(7000).emit('room:resume', { code: online.code, playerId: CLIENT_ID, resumeToken: online.resumeToken }, (timeoutError, result) => {
+        if (timeoutError || !result?.ok) {
+          root.querySelector('#gc-plus-room-status').textContent = result?.error || 'Could not restore the online game. Your session may have expired.';
+          renderRoomButtons();
+          return;
+        }
+        online.role = result.role;
+        online.side = result.role === 'w' || result.role === 'b' ? result.role : '';
+        online.lastState = result.state;
+        showRoomState(result.state);
+        root.querySelector('#gc-plus-room-status').textContent = 'Connection restored. Your game is synchronized.';
+        toast('Back in the game.');
+      });
+    } else if (!online.code) {
+      root.querySelector('#gc-plus-room-status').textContent = 'Connected. Create a room or enter a room code.';
+    }
     renderRoomButtons();
   });
   socket.on('connect_error', error => {
@@ -516,7 +534,11 @@ function makeSocket() {
 function emitAck(event, payload = {}) {
   return new Promise((resolve, reject) => {
     if (!socket?.connected) return reject(new Error('Not connected to the online server.'));
-    socket.emit(event, payload, result => result?.ok ? resolve(result) : reject(new Error(result?.error || 'The server rejected that request.')));
+    socket.timeout(6500).emit(event, payload, (timeoutError, result) => {
+      if (timeoutError) return reject(new Error('The online server did not respond. Check your connection and try again.'));
+      if (result?.ok) resolve(result);
+      else reject(new Error(result?.error || 'The server rejected that request.'));
+    });
   });
 }
 
@@ -524,7 +546,14 @@ function applyRoomJoin(result) {
   online.code = result.code;
   online.role = result.role;
   online.side = result.role === 'w' || result.role === 'b' ? result.role : '';
+  online.resumeToken = result.resumeToken || online.resumeToken || '';
   online.lastState = result.state;
+  if (online.resumeToken) {
+    try {
+      localStorage.setItem('glass-chess-online-room-code', online.code);
+      localStorage.setItem(`glass-chess-online-resume:${online.code}`, online.resumeToken);
+    } catch { /* Reconnection remains available for this page session. */ }
+  }
   api.stopSearch?.();
   api.setMode('local', false);
   if (online.side) api.setOnlineSide(online.side);
@@ -638,7 +667,11 @@ function handleLocalMove(move) {
 async function leaveRoom() {
   if (!online.code) return;
   try { if (socket?.connected) await emitAck('room:leave'); } catch {}
-  online.code = ''; online.role = ''; online.side = ''; online.lastState = null;
+  try {
+    localStorage.removeItem(`glass-chess-online-resume:${online.code}`);
+    localStorage.removeItem('glass-chess-online-room-code');
+  } catch { /* Local storage may be disabled. */ }
+  online.code = ''; online.role = ''; online.side = ''; online.resumeToken = ''; online.lastState = null;
   api.setReplayLock(false);
   api.setOnlineMatchActive?.(false);
   api.setMode(online.previousMode || 'computer');
@@ -906,6 +939,20 @@ function bindUI() {
       root.querySelector('#gc-plus-room-status').textContent = 'Joining your friend’s invitation…';
       void joinRoom(false);
     }, 650);
+  } else {
+    try {
+      const savedCode = localStorage.getItem('glass-chess-online-room-code') || '';
+      const savedToken = savedCode ? localStorage.getItem(`glass-chess-online-resume:${savedCode}`) : '';
+      if (savedCode && savedToken) {
+        online.code = savedCode;
+        online.resumeToken = savedToken;
+        root.querySelector('#gc-plus-room-code').value = savedCode;
+        window.setTimeout(() => {
+          root.querySelector('#gc-plus-room-status').textContent = 'Restoring your previous online game…';
+          try { makeSocket(); } catch (error) { root.querySelector('#gc-plus-room-status').textContent = error.message; }
+        }, 250);
+      }
+    } catch { /* Local storage may be disabled. */ }
   }
 }
 
