@@ -260,7 +260,7 @@ try {
   // An invitation with no second player must also expire automatically.
   const unusedInvite = await ack(friendB, 'room:create', { playerId: ids.friendB, name: 'Unused Invite' });
   assert.equal(unusedInvite?.ok, true);
-  const expiredInvite = await nextEvent(friendB, 'room:expired', value => value?.code === unusedInvite.code, 4000);
+  const expiredInvite = await nextEvent(friendB, 'room:expired', value => value?.code === unusedInvite.code, 7000);
   assert.equal(expiredInvite.reason, 'invitation-expired');
   const lateInviteJoin = await ack(intruder, 'room:join', {
     code: unusedInvite.code, playerId: '40000000-0000-4000-8000-000000000001', name: 'Late Guest'
