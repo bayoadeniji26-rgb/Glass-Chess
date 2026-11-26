@@ -480,6 +480,9 @@ io.on('connection', socket => {
         socket.data.role = null;
         broadcast(room);
       } else {
+        if (room.inviteTimer) clearTimeout(room.inviteTimer);
+        if (room.cleanupTimer) clearTimeout(room.cleanupTimer);
+        if (leavingPlayer.disconnectTimer) clearTimeout(leavingPlayer.disconnectTimer);
         rooms.delete(code);
         activePlayers.delete(leavingPlayer.playerId);
         socket.leave(code);
