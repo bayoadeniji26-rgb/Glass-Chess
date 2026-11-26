@@ -8,6 +8,8 @@ const PORT = Number(process.env.PORT || 3001);
 const HOST = process.env.HOST || '0.0.0.0';
 const rooms = new Map();
 const matchmaking = new MatchmakingQueue();
+const activePlayers = new Map();
+const INVITE_TTL_MS = 15 * 60 * 1000;
 const httpServer = http.createServer((req, res) => {
   res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' });
   res.end('Glass Chess online server is running.');
@@ -50,7 +52,7 @@ const publicRoom = room => ({
   draw: room.game.isDraw(),
   gameOver: room.game.isGameOver(),
   resigned: room.resigned,
-  result: room.resigned ? `${room.resigned === 'w' ? 'Black' : 'White'} wins by resignation` :
+  lastMove: room.lastMove || null,\n  invitationExpiresAt: room.invitationExpiresAt || null,\n  result: room.resigned ? `${room.resigned === 'w' ? 'Black' : 'White'} wins by resignation` :
     room.game.isCheckmate() ? `${room.game.turn() === 'w' ? 'Black' : 'White'} wins by checkmate` :
     room.game.isDraw() ? 'Draw' : 'In progress'
 });
@@ -110,7 +112,7 @@ function removeSocketFromRoom(socket) {
     if (!room.players.w && !room.players.b && room.spectators.size === 0) {
       setTimeout(() => {
         const current = rooms.get(code);
-        if (current && !current.players.w && !current.players.b && current.spectators.size === 0) rooms.delete(code);
+        if (current && !current.players.w && !current.players.b && current.spectators.size === 0) {\n          for (const player of Object.values(current.players)) if (player?.playerId) activePlayers.delete(player.playerId);\n          rooms.delete(code);\n        }
       }, 60000);
     }
   }
