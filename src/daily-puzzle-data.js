@@ -1,82 +1,206 @@
-export const DAILY_PUZZLES = Object.freeze([
-  { day: 1, type: 'Logic', title: 'The Sheep Count', prompt: 'A farmer has 17 sheep. All but 9 wander away. How many sheep remain?', hint: 'The phrase “all but 9” tells you how many did not leave.', answer: '9', accepted: ['nine'], explanation: 'All but 9 means every sheep except 9 left. So 9 remain.' },
-  { day: 2, type: 'Math & Sequence', title: 'Growing Gaps', prompt: 'Find the next number: 2, 6, 12, 20, 30, __', hint: 'Look at the differences between neighboring numbers.', answer: '42', accepted: ['forty two', 'forty-two'], explanation: 'The differences are 4, 6, 8, and 10. The next difference is 12, so 30 + 12 = 42.' },
-  { day: 3, type: 'Word & Cipher', title: 'One Step Back', prompt: 'Each letter has been moved one place forward in the alphabet. Decode DBU.', hint: 'Move every letter one place backward: D becomes C.', answer: 'CAT', accepted: [], explanation: 'D moves back to C, B to A, and U to T. The decoded word is CAT.' },
-  { day: 4, type: 'Spatial', title: 'Squares Inside Squares', prompt: 'A square is divided into a 3-by-3 grid of equal small squares. How many squares of every size are there altogether?', hint: 'Count 1-by-1, 2-by-2, and the large 3-by-3 square.', answer: '14', accepted: ['fourteen'], explanation: 'There are 9 small squares, 4 squares made from four small ones, and 1 large square: 9 + 4 + 1 = 14.' },
-  { day: 5, type: 'Deduction', title: 'The Race', prompt: 'You pass the runner who is in second place. What place are you in now?', hint: 'You take the position of the person you passed, not the leader.', answer: 'second', accepted: ['second place', '2nd', '2nd place'], explanation: 'Passing the runner in second place puts you into second place.' },
-  { day: 6, type: 'Logic', title: 'The Cat Catchers', prompt: 'Three cats catch three mice in three minutes. At the same rate, how long do 100 cats take to catch 100 mice?', hint: 'Each cat catches one mouse in the same three-minute interval.', answer: '3 minutes', accepted: ['3', 'three minutes', 'three'], explanation: 'Each cat catches one mouse in 3 minutes. One hundred cats can each catch one mouse at the same time, so it still takes 3 minutes.' },
-  { day: 7, type: 'Math & Sequence', title: 'The Rabbit Sequence', prompt: 'What comes next? 1, 1, 2, 3, 5, 8, 13, __', hint: 'Each term is the sum of the two terms before it.', answer: '21', accepted: ['twenty one', 'twenty-one'], explanation: '13 + 8 = 21. This is the Fibonacci sequence.' },
-  { day: 8, type: 'Word & Cipher', title: 'The Sound That Returns', prompt: 'I have no mouth, but I can answer you. I have no ears, but I repeat what you say. What am I?', hint: 'You might hear it in a canyon or an empty hall.', answer: 'echo', accepted: [], explanation: 'An echo is a sound reflection that repeats what was said.' },
-  { day: 9, type: 'Spatial', title: 'Painted Cube', prompt: 'A large cube is painted on all six outside faces, then cut into 3 equal pieces along each edge, making 27 small cubes. How many small cubes have exactly two painted faces?', hint: 'Look at the middle cube on each of the 12 edges. Do not count corners.', answer: '12', accepted: ['twelve'], explanation: 'Each of the cube’s 12 edges has one non-corner small cube with exactly two painted faces. There are 12.' },
-  { day: 10, type: 'Deduction', title: 'The Mislabelled Boxes', prompt: 'Three boxes are labelled APPLES, ORANGES, and MIXED. Every label is wrong. You may take one fruit from one box without looking inside. Which labelled box should you draw from to identify all three boxes?', hint: 'Choose the box whose label tells you it cannot be a mixed box.', answer: 'the mixed box', accepted: ['mixed', 'box labelled mixed', 'box labeled mixed', 'the box labelled mixed', 'the box labeled mixed'], explanation: 'Draw from the box labelled MIXED. Since every label is wrong, it contains only apples or only oranges. That single fruit identifies it, and the other two boxes follow by elimination.' },
-  { day: 11, type: 'Logic', title: 'Equal Weight', prompt: 'Which is heavier: 1 kilogram of feathers or 1 kilogram of iron?', hint: 'Compare the amounts, not the materials.', answer: 'they weigh the same', accepted: ['equal', 'same weight', 'neither', 'both weigh the same', '1 kilogram each'], explanation: 'Both weigh exactly 1 kilogram.' },
-  { day: 12, type: 'Math & Sequence', title: 'Order of Operations', prompt: 'Calculate: 3 + 3 × 3 = ?', hint: 'Multiplication is done before addition.', answer: '12', accepted: ['twelve'], explanation: 'Multiply first: 3 × 3 = 9. Then add 3, giving 12.' },
-  { day: 13, type: 'Word & Cipher', title: 'Alphabet Numbers', prompt: 'Using A = 1, B = 2, C = 3, and so on, decode 3-8-5-19-19.', hint: 'Turn each number into its matching letter.', answer: 'CHESS', accepted: [], explanation: '3 = C, 8 = H, 5 = E, 19 = S, and 19 = S. The word is CHESS.' },
-  { day: 14, type: 'Spatial', title: 'Knight’s First Move', prompt: 'A chess knight starts on a1 on an otherwise empty board. How many legal destination squares can it reach in one move?', hint: 'A knight moves two squares one way and one square sideways.', answer: '2', accepted: ['two'], explanation: 'From a1, the knight can move to b3 or c2. There are 2 destinations.' },
-  { day: 15, type: 'Deduction', title: 'The Doctor', prompt: 'A doctor says, “That patient is my brother.” The patient says, “I have no brothers.” How can both statements be true?', hint: 'The doctor and patient do not have to be the same gender.', answer: 'the doctor is his sister', accepted: ['his sister', 'the doctor is the patients sister', 'the doctor is the patient’s sister', 'the doctor is a sister'], explanation: 'The doctor is the patient’s sister. The patient has no brothers, but can have a sister.' },
-  { day: 16, type: 'Logic', title: 'The Candles', prompt: 'Ten candles are lit. You blow out two. The other eight burn all the way down. How many candles are left the next morning?', hint: 'The candles that go out are the ones that do not burn away.', answer: '2', accepted: ['two'], explanation: 'The eight still burning melt away. The two blown-out candles remain.' },
-  { day: 17, type: 'Math & Sequence', title: 'Percent and Add', prompt: 'What is 20% of 80, then add 10?', hint: 'Find one fifth of 80 first.', answer: '26', accepted: ['twenty six', 'twenty-six'], explanation: '20% of 80 is 16. Then 16 + 10 = 26.' },
-  { day: 18, type: 'Word & Cipher', title: 'Letter Shuffle', prompt: 'Rearrange the letters LISTEN to make a different English word that means “quiet”.', hint: 'It begins with S.', answer: 'SILENT', accepted: [], explanation: 'LISTEN and SILENT use exactly the same six letters.' },
-  { day: 19, type: 'Spatial', title: 'Folded Paper', prompt: 'You fold a square sheet in half vertically, then in half horizontally. You punch one hole through the folded stack, away from the folded edges. How many holes appear when you unfold it?', hint: 'Each fold doubles the number of paper layers. Count the layers the hole passes through.', answer: '4', accepted: ['four'], explanation: 'The first fold makes 2 layers; the second makes 4. The hole passes through all 4 layers, so unfolding reveals 4 holes.' },
-  { day: 20, type: 'Deduction', title: 'The Family', prompt: 'Mary has four daughters. Each daughter has the same brother. How many children does Mary have?', hint: 'The daughters do not each have a different brother.', answer: '5', accepted: ['five'], explanation: 'There are four daughters and one brother shared by all four: 5 children.' },
-  { day: 21, type: 'Logic', title: 'The Climbing Snail', prompt: 'A snail climbs 3 feet up a 10-foot wall each day, then slides down 2 feet each night. How many days until it reaches the top?', hint: 'It does not slide back after the day it reaches the top.', answer: '8', accepted: ['eight'], explanation: 'After 7 nights the snail is at 7 feet. On Day 8 it climbs 3 more feet to 10 and reaches the top before sliding.' },
-  { day: 22, type: 'Math & Sequence', title: 'Divide by Three', prompt: 'What number comes next? 81, 27, 9, 3, __', hint: 'Each number is one third of the previous number.', answer: '1', accepted: ['one'], explanation: '3 ÷ 3 = 1.' },
-  { day: 23, type: 'Word & Cipher', title: 'A Letter Riddle', prompt: 'What appears once in the word MINUTE, twice in the word MOMENT, and never in the phrase A THOUSAND YEARS?', hint: 'Look for a letter, not a whole word.', answer: 'M', accepted: ['the letter m', 'letter m'], explanation: 'The letter M appears once in MINUTE, twice in MOMENT, and not at all in A THOUSAND YEARS.' },
-  { day: 24, type: 'Spatial', title: 'Diagonal Triangles', prompt: 'Draw both diagonals of a square, from corner to opposite corner. How many triangles of all sizes are formed?', hint: 'Count the four small triangles and the larger half-square triangles.', answer: '8', accepted: ['eight'], explanation: 'The diagonals make 4 small triangles and 4 larger triangles, for a total of 8.' },
-  { day: 25, type: 'Deduction', title: 'Three Generations', prompt: 'Two fathers and two sons sit down to eat. There are only three people at the table. Who are they?', hint: 'One person can be both a son and a father.', answer: 'grandfather, father, and son', accepted: ['grandfather father son', 'a grandfather a father and a son', 'three generations'], explanation: 'The grandfather is a father, the middle person is both a son and a father, and the youngest is a son.' },
-  { day: 26, type: 'Logic', title: 'The Egg Basket', prompt: 'A basket has 6 eggs. You take out 2, fry those same 2, and eat those same 2. How many eggs remain in the basket?', hint: 'The eggs you fry and eat are the two you took out.', answer: '4', accepted: ['four'], explanation: 'You removed two eggs from the basket. Frying and eating them does not remove any more, so 4 remain.' },
-  { day: 27, type: 'Math & Sequence', title: 'Growing Differences', prompt: 'Find the next number: 7, 10, 16, 25, 37, __', hint: 'The gaps increase by 3 each time.', answer: '52', accepted: ['fifty two', 'fifty-two'], explanation: 'The differences are 3, 6, 9, and 12. The next difference is 15, so 37 + 15 = 52.' },
-  { day: 28, type: 'Word & Cipher', title: 'The Short Word', prompt: 'What five-letter word becomes a word meaning “less brief” when you add two letters to it?', hint: 'Add the letters E and R to the end.', answer: 'SHORTER', accepted: [], explanation: 'Add E and R to SHORT to make SHORTER.' },
-  { day: 29, type: 'Spatial', title: 'The Chessboard Count', prompt: 'How many squares of all sizes are on a standard 8-by-8 chessboard?', hint: 'Add the number of 1-by-1 through 8-by-8 squares.', answer: '204', accepted: ['two hundred four', 'two hundred and four'], explanation: 'Count 64 + 49 + 36 + 25 + 16 + 9 + 4 + 1 = 204 squares.' },
-  { day: 30, type: 'Deduction', title: 'Who Tells the Truth?', prompt: 'A says, “B is lying.” B says, “C is lying.” C says, “A and B are both lying.” Exactly one person tells the truth. Who is it?', hint: 'B and C make opposite claims, so exactly one of those two is true.', answer: 'B', accepted: ['person b', 'b is the only truth teller', 'b tells the truth'], explanation: 'If A were truthful, B would be lying and C would be truthful, which makes two truth-tellers. So A is lying. B is truthful, and C is lying. Only B tells the truth.' },
-  { day: 31, type: 'Logic', title: 'The Photograph', prompt: 'A man says about a photograph: “Brothers and sisters I have none, but that person’s father is my father’s son.” Who is in the photograph?', hint: 'Since he has no siblings, “my father’s son” means the speaker.', answer: 'his son', accepted: ['son', 'the speakers son', 'the speaker’s son'], explanation: 'The speaker’s father’s son is the speaker himself. So the person in the photo has the speaker as their father: his son.' },
-  { day: 32, type: 'Math & Sequence', title: 'Factorial Steps', prompt: 'Find the next number: 1, 2, 6, 24, 120, __', hint: 'Multiply by 2, then 3, then 4, then 5.', answer: '720', accepted: ['seven hundred twenty', 'seven hundred and twenty'], explanation: 'The multipliers rise by one: 1 × 2 × 3 × 4 × 5 × 6 = 720.' },
-  { day: 33, type: 'Word & Cipher', title: 'A Balanced Word', prompt: 'What five-letter English word reads the same forwards and backwards and names a tool used to check whether a surface is flat?', hint: 'It has the same first and last letter, and the middle is EVE.', answer: 'LEVEL', accepted: [], explanation: 'LEVEL is a palindrome and a level is used to check whether a surface is horizontal.' },
-  { day: 34, type: 'Spatial', title: 'Rectangles in a Grid', prompt: 'A grid has 3 columns and 2 rows of small rectangles. How many different rectangles can you trace using the grid lines?', hint: 'Choose any 2 of the 4 vertical lines, and any 2 of the 3 horizontal lines.', answer: '18', accepted: ['eighteen'], explanation: 'There are 6 ways to choose 2 vertical lines and 3 ways to choose 2 horizontal lines: 6 × 3 = 18 rectangles.' },
-  { day: 35, type: 'Deduction', title: 'The Height Order', prompt: 'Ava is taller than Ben. Cara is shorter than Ben. Who is tallest?', hint: 'Put the three people in order from tallest to shortest.', answer: 'Ava', accepted: ['ava is tallest'], explanation: 'Ava is taller than Ben, and Ben is taller than Cara. So Ava is tallest.' },
-  { day: 36, type: 'Logic', title: 'The Hundred Doors', prompt: 'There are 100 closed doors. Student 1 toggles every door; student 2 toggles every second door; student 3 every third door; this continues through student 100. How many doors are open at the end?', hint: 'A door changes state once for each divisor it has. Which numbers have an odd number of divisors?', answer: '10', accepted: ['ten'], explanation: 'Only perfect-square door numbers have an odd number of divisors. The open doors are 1, 4, 9, 16, 25, 36, 49, 64, 81, and 100: 10 doors.' },
-  { day: 37, type: 'Math & Sequence', title: 'Rectangle Area', prompt: 'A rectangle has a perimeter of 30 cm. Its length is 9 cm. What is its area?', hint: 'Use 2 × (length + width) = perimeter.', answer: '54 cm2', accepted: ['54', '54 square cm', '54 square centimeters', '54 cm squared'], explanation: 'The width is 15 − 9 = 6 cm. Area = 9 × 6 = 54 cm².' },
-  { day: 38, type: 'Word & Cipher', title: 'ROT13 Message', prompt: 'Decode the message PURFF using ROT13: each letter is replaced by the letter 13 places away in the alphabet.', hint: 'ROT13 is its own reverse. P becomes C.', answer: 'CHESS', accepted: [], explanation: 'P→C, U→H, R→E, F→S, and F→S. The message is CHESS.' },
-  { day: 39, type: 'Spatial', title: 'The 5-Liter Jug', prompt: 'You have an unmarked 3-liter jug and an unmarked 5-liter jug, with unlimited water. How can you measure exactly 4 liters in the 5-liter jug?', hint: 'First make 2 liters in the 5-liter jug, then use the 3-liter jug to remove just 1 liter after refilling.', answer: '4 liters', accepted: ['4', 'four liters', '4 l'], explanation: 'Fill the 5-liter jug and pour into the 3-liter jug, leaving 2 liters in the 5-liter jug. Empty the 3-liter jug and transfer those 2 liters into it. Refill the 5-liter jug, then pour 1 liter into the 3-liter jug to fill it. Exactly 4 liters remain in the 5-liter jug.' },
-  { day: 40, type: 'Deduction', title: 'Matching Socks', prompt: 'A drawer contains only red socks and blue socks. It is dark, so you cannot see the colors. What is the smallest number of socks you must take to guarantee that at least two are the same color?', hint: 'The worst first two picks are one red and one blue.', answer: '3', accepted: ['three'], explanation: 'With two colors, the first two socks could be different. The third must match one of them.' },
-  { day: 41, type: 'Logic', title: 'The First Light', prompt: 'You enter a dark room with one match, a candle, an oil lamp, and a fireplace. What do you light first?', hint: 'None of the other things can be lit until one small item is burning.', answer: 'the match', accepted: ['match'], explanation: 'You must strike and light the match first.' },
-  { day: 42, type: 'Math & Sequence', title: 'Find the Average', prompt: 'What is the average of 4, 8, 10, and 14?', hint: 'Add all four numbers, then divide by four.', answer: '9', accepted: ['nine'], explanation: '(4 + 8 + 10 + 14) ÷ 4 = 36 ÷ 4 = 9.' },
-  { day: 43, type: 'Word & Cipher', title: 'Morse Code', prompt: 'Decode this Morse code: ... --- ...', hint: 'The first symbol is three dots; the next is three dashes.', answer: 'SOS', accepted: [], explanation: '... is S, --- is O, and ... is S. The message is SOS.' },
-  { day: 44, type: 'Spatial', title: 'The Inner Cubes', prompt: 'A cube is made from 4 small cubes along each edge. All six outside faces are painted. How many small cubes have no paint at all?', hint: 'Only the completely internal cubes have no painted face. Remove the outside layer from every side.', answer: '8', accepted: ['eight'], explanation: 'Removing one outer layer leaves a 2-by-2-by-2 interior: 2 × 2 × 2 = 8 unpainted cubes.' },
-  { day: 45, type: 'Deduction', title: 'The Three Envelopes', prompt: 'A ticket is in exactly one of three envelopes. A says, “The ticket is not in envelope 1.” B says, “The ticket is in envelope 2.” C says, “The ticket is not in envelope 2.” Exactly one statement is true. Which envelope has the ticket?', hint: 'Test envelope 1, 2, and 3. Count how many statements become true in each case.', answer: 'envelope 1', accepted: ['1', 'one', 'first envelope'], explanation: 'If the ticket is in envelope 1, A is false, B is false, and C is true. That gives exactly one true statement. The other placements give two true statements.' },
-  { day: 46, type: 'Logic', title: 'Bottle and Cork', prompt: 'A bottle and a cork cost $1.10 together. The bottle costs exactly $1.00 more than the cork. How much does the cork cost?', hint: 'If the cork costs 5 cents, the bottle costs $1.05. Check the total.', answer: '5 cents', accepted: ['0.05', '$0.05', 'five cents', '5 cent'], explanation: 'Let the cork cost x. The bottle costs x + $1.00, so 2x + $1.00 = $1.10. Therefore x = $0.05.' },
-  { day: 47, type: 'Math & Sequence', title: 'Powers of Five', prompt: 'Follow the pattern: 1 = 5, 2 = 25, 3 = 125, 4 = 625. What does 5 equal?', hint: 'Each result is multiplied by 5 to get the next one.', answer: '3125', accepted: ['three thousand one hundred twenty five', 'three thousand one hundred and twenty five'], explanation: 'The values are powers of 5. The next is 625 × 5 = 3,125.' },
-  { day: 48, type: 'Word & Cipher', title: 'The Many Teeth', prompt: 'I have many teeth but cannot bite. What am I?', hint: 'You might use it to tidy your hair.', answer: 'comb', accepted: [], explanation: 'A comb has teeth, but they are not for biting.' },
-  { day: 49, type: 'Spatial', title: 'One Painted Face', prompt: 'A cube is made from 4 small cubes along each edge. All six outside faces are painted. How many small cubes have exactly one painted face?', hint: 'On each large face, count only the small cubes that are not on an edge or corner.', answer: '24', accepted: ['twenty four', 'twenty-four'], explanation: 'Each face has (4 − 2) × (4 − 2) = 4 interior face cubes. Six faces give 6 × 4 = 24.' },
-  { day: 50, type: 'Deduction', title: 'The Final Accusation', prompt: 'Exactly one of A, B, and C is guilty, and exactly one person tells the truth. A says, “I am not guilty.” B says, “C is guilty.” C says, “B is lying.” Who is guilty?', hint: 'B and C make opposite claims, so one of them is true. That means A must be lying.', answer: 'A', accepted: ['person a', 'a is guilty', 'A is guilty'], explanation: 'A must be lying, so A is guilty. B’s claim that C is guilty is false. C’s claim that B is lying is true. Exactly one statement is true.' }
-]);
+const FILES = 'abcdefgh';
 
-export function normalizePuzzleAnswer(value) {
-  return String(value ?? '')
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/&/g, ' and ')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
-    .replace(/\s+/g, ' ');
+const ALL_TRANSFORMS = [
+  { id: 'original', map: (f, r) => [f, r] },
+  { id: 'mirror-files', map: (f, r) => [7 - f, r] },
+  { id: 'mirror-ranks', map: (f, r) => [f, 7 - r] },
+  { id: 'rotate-180', map: (f, r) => [7 - f, 7 - r] },
+  { id: 'rotate-90', map: (f, r) => [7 - r, f] },
+  { id: 'rotate-270', map: (f, r) => [r, 7 - f] },
+  { id: 'transpose', map: (f, r) => [r, f] },
+  { id: 'anti-transpose', map: (f, r) => [7 - r, 7 - f] }
+];
+
+const PAWN_SAFE_TRANSFORMS = [
+  ALL_TRANSFORMS[0],
+  ALL_TRANSFORMS[1],
+  { ...ALL_TRANSFORMS[2], swapColors: true, turn: 'b' },
+  { ...ALL_TRANSFORMS[3], swapColors: true, turn: 'b' }
+];
+
+function transformSquare(square, transform) {
+  const file = FILES.indexOf(square[0]);
+  const row = 8 - Number(square[1]);
+  const [nextFile, nextRow] = transform.map(file, row);
+  return FILES[nextFile] + (8 - nextRow);
 }
 
-export function isPuzzleAnswerCorrect(puzzle, value) {
-  if (!puzzle || typeof value !== 'string') return false;
-  const submitted = normalizePuzzleAnswer(value);
-  if (!submitted) return false;
-  return [puzzle.answer, ...(puzzle.accepted || [])]
-    .some(candidate => normalizePuzzleAnswer(candidate) === submitted);
+function swapPieceColor(piece) {
+  return piece === piece.toUpperCase() ? piece.toLowerCase() : piece.toUpperCase();
 }
+
+function makeFen(pieces, turn) {
+  const board = Array.from({ length: 8 }, () => Array(8).fill(null));
+  for (const [square, piece] of pieces) {
+    const file = FILES.indexOf(square[0]);
+    const row = 8 - Number(square[1]);
+    if (file < 0 || row < 0 || row > 7 || board[row][file]) {
+      throw new Error('Invalid or overlapping puzzle square: ' + square);
+    }
+    board[row][file] = piece;
+  }
+  const ranks = board.map(row => {
+    let empty = 0;
+    let result = '';
+    for (const piece of row) {
+      if (!piece) {
+        empty += 1;
+      } else {
+        if (empty) result += empty;
+        result += piece;
+        empty = 0;
+      }
+    }
+    if (empty) result += empty;
+    return result;
+  });
+  return ranks.join('/') + ' ' + turn + ' - - 0 1';
+}
+
+function expandTemplate(template, transforms) {
+  return transforms.map(transform => {
+    const pieces = template.pieces.map(([square, piece]) => [
+      transformSquare(square, transform),
+      transform.swapColors ? swapPieceColor(piece) : piece
+    ]);
+    const [from, to, promotion] = [
+      transformSquare(template.solution.slice(0, 2), transform),
+      transformSquare(template.solution.slice(2, 4), transform),
+      template.solution[4] || ''
+    ];
+    const targetSquare = template.targetSquare
+      ? transformSquare(template.targetSquare, transform)
+      : null;
+    return {
+      fen: makeFen(pieces, transform.turn || 'w'),
+      solution: from + to + promotion,
+      targetSquare,
+      type: template.type,
+      title: template.title,
+      rating: template.rating,
+      hint: template.hint,
+      explanation: template.explanation,
+      goal: template.goal
+    };
+  });
+}
+
+const QUEEN_MATE = {
+  type: 'Mate in 1',
+  title: 'Queen checkmate',
+  pieces: [['h8', 'k'], ['f6', 'K'], ['g6', 'Q']],
+  solution: 'g6g7',
+  goal: 'mate',
+  rating: 650,
+  hint: 'Bring your queen next to the enemy king, but make sure your own king protects it.',
+  explanation: 'Checkmate. Your king protects the queen, while the queen controls every escape square.'
+};
+
+const QUEEN_LIFT_MATE = {
+  ...QUEEN_MATE,
+  title: 'Queen lift',
+  pieces: [['h8', 'k'], ['f6', 'K'], ['g5', 'Q']],
+  solution: 'g5g7',
+  rating: 720,
+  hint: 'Look for a queen move to the square protected by your king.',
+  explanation: 'The queen reaches the mating square with protection from your king. The black king has no legal escape.'
+};
+
+const QUEEN_WITH_EXTRA_PIECES = {
+  ...QUEEN_MATE,
+  title: 'Queen mate under pressure',
+  pieces: [['h8', 'k'], ['f6', 'K'], ['g6', 'Q'], ['b8', 'n'], ['a1', 'R']],
+  rating: 820,
+  hint: 'The queen is more important than the extra pieces. Find the protected checking square.',
+  explanation: 'The queen delivers mate on the protected square. The extra pieces do not create an escape.'
+};
+
+const ROOK_NET = {
+  type: 'Mate in 1',
+  title: 'Rook net',
+  pieces: [['a8', 'k'], ['h7', 'R'], ['b6', 'K'], ['c6', 'N']],
+  solution: 'h7a7',
+  goal: 'mate',
+  rating: 900,
+  hint: 'The rook can give check along the edge. Check who protects its destination and who covers b8.',
+  explanation: 'The rook gives check on the a-file. Your king protects the rook, and the knight controls the last escape square.'
+};
+
+const KNIGHT_FORK_ONE = {
+  type: 'Knight fork',
+  title: 'Knight fork',
+  pieces: [['h8', 'k'], ['d6', 'q'], ['e5', 'N'], ['a1', 'K']],
+  solution: 'e5f7',
+  targetSquare: 'd6',
+  goal: 'fork',
+  rating: 980,
+  hint: 'A knight check can attack a second valuable piece at the same time.',
+  explanation: 'Check and queen fork. The knight checks the king while attacking the queen on the same move.'
+};
+
+const KNIGHT_FORK_TWO = {
+  type: 'Knight fork',
+  title: 'Royal fork',
+  pieces: [['a8', 'k'], ['e6', 'q'], ['b5', 'N'], ['h1', 'K']],
+  solution: 'b5c7',
+  targetSquare: 'e6',
+  goal: 'fork',
+  rating: 1050,
+  hint: 'Find a knight jump that checks the king and attacks the queen.',
+  explanation: 'The knight checks the king on a8 and attacks the queen on e6. The king must answer the check first.'
+};
+
+const BACK_RANK_MATE = {
+  type: 'Back-rank mate',
+  title: 'Back-rank finish',
+  pieces: [['g8', 'k'], ['f7', 'p'], ['g7', 'p'], ['h7', 'p'], ['g1', 'K'], ['e1', 'R']],
+  solution: 'e1e8',
+  goal: 'mate',
+  rating: 1120,
+  hint: 'The enemy king is trapped by its own pawns. Can your rook use the open rank?',
+  explanation: 'Back-rank checkmate. The rook checks across the eighth rank, and the king is boxed in by its own pawns.'
+};
+
+const candidateGroups = [
+  ...expandTemplate(QUEEN_MATE, ALL_TRANSFORMS),
+  ...expandTemplate(QUEEN_LIFT_MATE, ALL_TRANSFORMS),
+  ...expandTemplate(QUEEN_WITH_EXTRA_PIECES, ALL_TRANSFORMS),
+  ...expandTemplate(ROOK_NET, ALL_TRANSFORMS),
+  ...expandTemplate(KNIGHT_FORK_ONE, ALL_TRANSFORMS),
+  ...expandTemplate(BACK_RANK_MATE, PAWN_SAFE_TRANSFORMS),
+  ...expandTemplate(KNIGHT_FORK_TWO, ALL_TRANSFORMS)
+];
+
+const seen = new Set();
+const uniqueCandidates = candidateGroups.filter(puzzle => {
+  if (seen.has(puzzle.fen)) return false;
+  seen.add(puzzle.fen);
+  return true;
+});
+
+if (uniqueCandidates.length < 50) {
+  throw new Error('The chess puzzle catalog must contain at least 50 unique positions.');
+}
+
+export const DAILY_PUZZLES = Object.freeze(
+  uniqueCandidates.slice(0, 50).map((puzzle, index) => Object.freeze({
+    day: index + 1,
+    ...puzzle,
+    solution: Object.freeze([puzzle.solution])
+  }))
+);
 
 export function getPuzzleDayIndex(startDate, currentDate) {
   const parse = value => {
     const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (!match) throw new TypeError('Dates must use YYYY-MM-DD.');
-    const year = Number(match[1]), month = Number(match[2]), day = Number(match[3]);
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
     const date = new Date(Date.UTC(year, month - 1, day));
-    if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+    if (date.getUTCFullYear() !== year ||
+        date.getUTCMonth() !== month - 1 ||
+        date.getUTCDate() !== day) {
       throw new RangeError('Invalid calendar date: ' + value);
     }
     return date.getTime();
