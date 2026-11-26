@@ -71,6 +71,8 @@ function mountDailyPuzzles() {
   if (!header) return;
 
   let progress = readProgress();
+  void saveEngine.saveData({ localStorage: { dailyPuzzleProgress: progress } })
+    .catch(error => console.warn('Daily puzzle progress could not be copied into the account save.', error));
   const openButton = document.createElement('button');
   openButton.id = 'gc-daily-puzzle';
   openButton.type = 'button';
@@ -125,6 +127,9 @@ function mountDailyPuzzles() {
     if (JSON.stringify(merged) === JSON.stringify(progress)) return;
     progress = merged;
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(progress)); } catch {}
+    void saveEngine.saveData({ localStorage: { dailyPuzzleProgress: progress } })
+      .then(() => window.GlassChessCloud?.queueSync?.())
+      .catch(error => console.warn('Merged daily puzzle progress could not be saved.', error));
     updateProgressUI();
     if (dialog.open) renderPuzzle();
   }
