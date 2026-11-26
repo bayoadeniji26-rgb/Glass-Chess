@@ -5,6 +5,7 @@
  * Guest play and local IndexedDB saves remain available without either service.
  */
 import { saveEngine } from './save-engine.js';
+import { CloudSyncQueue } from './cloud-sync-queue.js';
 import './cloud-auth.css';
 
 const CLERK_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || '';
@@ -21,9 +22,31 @@ let profileAvatarUrl = '';
 let authMenuOpen = false;
 let cloudGames = [];
 let cloudProfile = {};
-let syncTimer = null;
-let syncInProgress = false;
+let authGeneration = 0;
+let cloudReady = false;
 let supabaseLoadPromise = null;
+const cloudSyncQueue = new CloudSyncQueue({
+  canRun: () => Boolean(cloudReady && activeUser?.emailVerified && SUPABASE_URL && SUPABASE_KEY),
+  delayMs: 900,
+  retryDelayMs: 250,
+  run: async () => {
+    const ownerId = activeUser?.id;
+    if (!ownerId || !activeUser?.emailVerified) return;
+    const snapshot = await saveEngine.getCommittedData();
+    if (activeUser?.id !== ownerId || !activeUser.emailVerified) return;
+    try { await cloudAdapter.push(snapshot); }
+    catch (error) { if (activeUser?.id !== ownerId) return; throw error; }
+    if (activeUser?.id !== ownerId) return;
+    cloudProfile = snapshot;
+    cloudGames = Array.isArray(snapshot.games) ? snapshot.games.slice(-150) : [];
+    renderVault();
+    setSyncStatus('Synced to Cloud', 'synced');
+  },
+  onError: error => {
+    console.warn('Automatic Glass Chess cloud sync failed:', error);
+    if (activeUser?.emailVerified) setSyncStatus('Sync paused · retry', 'error');
+  }
+});
 
 function toast(message, isError = false) {
   let node = $('gc-save-toast');
@@ -139,7 +162,12 @@ function handleClerkUser(user) {
   window.dispatchEvent(new CustomEvent('glasschess:auth-change'));
   if (nextKey === authStateKey) return;
   authStateKey = nextKey;
+  const generation = ++authGeneration;
+  cloudReady = false;
+  cloudSyncQueue.cancel();
+  saveEngine.setCloudAdapter(null);
   if (!activeUser) {
+    cloudSyncQueue.cancel();
     saveEngine.setCloudAdapter(null);
     cloudGames = [];
     cloudProfile = {};
@@ -148,11 +176,12 @@ function handleClerkUser(user) {
     return;
   }
   if (!activeUser.emailVerified) {
+    cloudSyncQueue.cancel();
     saveEngine.setCloudAdapter(null);
     setSyncStatus('Verify email with Clerk to sync', 'pending');
     return;
   }
-  void syncOnSignIn(user);
+  void syncOnSignIn(user, generation);
 }
 
 function mountAuthWidget() {
@@ -287,50 +316,56 @@ function mergeCloudAndLocal(remote, local) {
 
 const cloudAdapter = {
   async push(state) {
-    if (!activeUser || !activeUser.emailVerified) throw new Error('Verify your email before saving to the cloud.');
+    const owner = activeUser ? { ...activeUser } : null;
+    if (!owner?.id || !owner.emailVerified) throw new Error('Verify your email before saving to the cloud.');
+    const ownerId = owner.id;
+    const avatar = profileAvatarUrl;
     const client = await loadSupabase();
+    if (activeUser?.id !== ownerId || !activeUser.emailVerified) {
+      throw new Error('The signed-in account changed before the cloud save completed. Retry the sync for the current account.');
+    }
+    const updatedAt = new Date().toISOString();
     const payload = {
       ...state,
       schema: 1,
       games: Array.isArray(state.games) ? state.games.slice(-150) : [],
       chatLog: Array.isArray(state.chatLog) ? state.chatLog.slice(-300) : [],
-      profileAvatarUrl: profileAvatarUrl || state.profileAvatarUrl || '',
+      profileAvatarUrl: avatar || state.profileAvatarUrl || '',
       profile: {
-        id: activeUser.id,
-        email: activeUser.email || '',
-        displayName: activeUser.displayName || '',
-        photoURL: activeUser.photoURL || ''
+        id: ownerId,
+        email: owner.email || '',
+        displayName: owner.displayName || '',
+        photoURL: owner.photoURL || ''
       },
-      updatedAt: new Date().toISOString()
+      updatedAt
     };
     const { error } = await client.from('glass_chess_saves').upsert({
-      user_id: activeUser.id,
+      user_id: ownerId,
       payload,
-      updated_at: new Date().toISOString()
+      updated_at: updatedAt
     }, { onConflict: 'user_id' });
     if (error) throw error;
     return { syncedAt: payload.updatedAt, gameCount: payload.games.length };
   },
   async pull() {
-    if (!activeUser || !activeUser.emailVerified) throw new Error('Sign in with a verified email to load cloud saves.');
+    const ownerId = activeUser?.id;
+    if (!ownerId || !activeUser.emailVerified) throw new Error('Sign in with a verified email to load cloud saves.');
     const client = await loadSupabase();
+    if (activeUser?.id !== ownerId || !activeUser.emailVerified) {
+      throw new Error('The signed-in account changed before the cloud download completed. Retry the sync for the current account.');
+    }
     const { data, error } = await client.from('glass_chess_saves')
       .select('payload')
-      .eq('user_id', activeUser.id)
+      .eq('user_id', ownerId)
       .maybeSingle();
     if (error) throw error;
     return data?.payload && typeof data.payload === 'object' ? data.payload : null;
   }
 };
 
-async function syncOnSignIn(user) {
-  activeUser = {
-    uid: user.id, id: user.id,
-    email: user.primaryEmailAddress?.emailAddress || '',
-    emailVerified: emailIsVerified(user),
-    displayName: user.fullName || user.username || '',
-    photoURL: user.imageUrl || ''
-  };
+async function syncOnSignIn(user, generation) {
+  const isCurrentAccount = () => generation === authGeneration && activeUser?.id === user.id;
+  if (!isCurrentAccount()) return;
   if (!activeUser.emailVerified) {
     saveEngine.setCloudAdapter(null);
     setSyncStatus('Verify email with Clerk to sync', 'pending');
@@ -341,26 +376,40 @@ async function syncOnSignIn(user) {
   setSyncStatus('Connecting private saves…', 'syncing');
   try {
     await loadSupabase();
+    if (!isCurrentAccount()) return;
     saveEngine.setCloudAdapter(cloudAdapter);
-    const [remote, local] = await Promise.all([cloudAdapter.pull(), saveEngine.loadData()]);
+    const remote = await cloudAdapter.pull();
+    if (!isCurrentAccount()) return;
+    // Read local data after the network round-trip so moves made while the
+    // cloud record was loading are included in the merge, not overwritten.
+    const local = await saveEngine.getCommittedData();
+    if (!isCurrentAccount()) return;
     if (remote) {
       cloudProfile = remote;
       cloudGames = Array.isArray(remote.games) ? remote.games.slice(-150) : [];
       const merged = mergeCloudAndLocal(remote, local);
       await saveEngine.replaceData(merged);
+      if (!isCurrentAccount()) return;
       profileAvatarUrl = merged.profileAvatarUrl || user.imageUrl || '';
       cloudProfile = merged;
       cloudGames = Array.isArray(merged.games) ? merged.games.slice(-150) : [];
-      await applyCloudProfile(merged);
+      await applyCloudProfile(merged, isCurrentAccount);
+      if (!isCurrentAccount()) return;
       await saveEngine.saveToCloud();
     } else {
       cloudProfile = local;
       cloudGames = Array.isArray(local.games) ? local.games.slice(-150) : [];
       await saveEngine.saveToCloud();
     }
+    if (!isCurrentAccount()) return;
+    cloudReady = true;
+    cloudSyncQueue.cancel();
+    cloudSyncQueue.queue();
     renderVault();
     setSyncStatus('Synced to Cloud', 'synced');
   } catch (error) {
+    if (!isCurrentAccount()) return;
+    cloudReady = false;
     saveEngine.setCloudAdapter(null);
     setSyncStatus('Cloud setup needed', 'error');
     console.warn('Glass Chess cloud sync could not start:', error);
@@ -368,58 +417,46 @@ async function syncOnSignIn(user) {
   }
 }
 
-async function applyCloudProfile(profile) {
+async function applyCloudProfile(profile, isCurrentAccount = () => true) {
   profileAvatarUrl = profile.profileAvatarUrl || profile.avatarUrl || profileAvatarUrl;
   renderAuth();
   await Promise.resolve(window.GlassChessKingPawn?.applyCloudProfile?.({
     ...profile,
     avatarUrl: profileAvatarUrl
   }));
+  if (!isCurrentAccount()) return;
   window.GlassChessDailyPuzzles?.applyCloudProgress?.(profile.localStorage?.dailyPuzzleProgress);
+  if (!isCurrentAccount()) return;
   window.dispatchEvent(new CustomEvent('glasschess:cloud-profile', { detail: { profile } }));
 }
 
 async function syncNow() {
   if (!activeUser) throw new Error('Sign in to sync your Glass Chess games.');
   if (!activeUser.emailVerified) throw new Error('Verify your email with Clerk before cloud syncing.');
-  if (syncInProgress) return;
-  syncInProgress = true;
+  if (!cloudReady) throw new Error('Your private account is still being restored. Try syncing again in a moment.');
+  const ownerId = activeUser.id;
   setSyncStatus('Syncing…', 'syncing');
   try {
-    await saveEngine.saveToCloud();
+    await cloudSyncQueue.flush({ force: true });
+    if (activeUser?.id !== ownerId) throw new Error('The signed-in account changed during sync. Try again.');
     const refreshed = await cloudAdapter.pull();
+    if (activeUser?.id !== ownerId) throw new Error('The signed-in account changed during sync. Try again.');
     cloudProfile = refreshed || cloudProfile;
     cloudGames = Array.isArray(refreshed?.games) ? refreshed.games : [];
     renderVault();
     setSyncStatus('Synced to Cloud', 'synced');
     toast('Glass Chess is synced to your private account.');
   } catch (error) {
-    setSyncStatus('Sync failed', 'error');
-    toast('Cloud sync failed: ' + error.message, true);
+    if (activeUser?.id === ownerId) {
+      setSyncStatus('Sync failed', 'error');
+      toast('Cloud sync failed: ' + error.message, true);
+    }
     throw error;
-  } finally {
-    syncInProgress = false;
   }
 }
 
 function queueCloudSync() {
-  if (!activeUser?.emailVerified || !SUPABASE_URL || !SUPABASE_KEY) return;
-  clearTimeout(syncTimer);
-  syncTimer = setTimeout(() => {
-    if (!activeUser?.emailVerified || syncInProgress) return;
-    syncInProgress = true;
-    setSyncStatus('Syncing…', 'syncing');
-    saveEngine.loadData().then(async snapshot => {
-      await saveEngine.saveToCloud();
-      cloudProfile = snapshot;
-      cloudGames = Array.isArray(snapshot.games) ? snapshot.games.slice(-150) : [];
-      renderVault();
-      setSyncStatus('Synced to Cloud', 'synced');
-    }).catch(error => {
-      console.warn('Automatic Glass Chess cloud sync failed:', error);
-      setSyncStatus('Sync paused · retry', 'error');
-    }).finally(() => { syncInProgress = false; });
-  }, 900);
+  cloudSyncQueue.queue();
 }
 
 function mountVault() {
