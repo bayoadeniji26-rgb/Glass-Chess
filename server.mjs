@@ -287,6 +287,7 @@ io.on('connection', socket => {
     const code = cleanCode(payload.code);
     const room = rooms.get(code);
     if (!room) return done({ ok: false, error: 'Room not found. Check the code.' });
+    if (room.abandoned) return done({ ok: false, error: 'This game has already ended.' });
     if (room.invitationExpiresAt && Date.now() > room.invitationExpiresAt && !room.players.b) {
       rooms.delete(code);
       if (room.players.w?.playerId) activePlayers.delete(room.players.w.playerId);
