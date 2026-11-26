@@ -257,6 +257,8 @@ io.on('connection', socket => {
       return done({ ok: false, error: 'Invalid square coordinates.' });
     }
     try {
+      const movingPiece = room.game.get(move.from);
+      const isCastle = movingPiece?.type === 'k' && Math.abs(move.to.charCodeAt(0) - move.from.charCodeAt(0)) === 2;
       const legalMove = { from: move.from, to: move.to };
       if (['q', 'r', 'b', 'n'].includes(move.promotion)) legalMove.promotion = move.promotion;
       const applied = room.game.move(legalMove);
