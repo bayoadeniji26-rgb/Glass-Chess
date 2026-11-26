@@ -23,9 +23,10 @@ let authMenuOpen = false;
 let cloudGames = [];
 let cloudProfile = {};
 let authGeneration = 0;
+let cloudReady = false;
 let supabaseLoadPromise = null;
 const cloudSyncQueue = new CloudSyncQueue({
-  canRun: () => Boolean(activeUser?.emailVerified && SUPABASE_URL && SUPABASE_KEY),
+  canRun: () => Boolean(cloudReady && activeUser?.emailVerified && SUPABASE_URL && SUPABASE_KEY),
   delayMs: 900,
   retryDelayMs: 250,
   run: async () => {
@@ -162,6 +163,9 @@ function handleClerkUser(user) {
   if (nextKey === authStateKey) return;
   authStateKey = nextKey;
   const generation = ++authGeneration;
+  cloudReady = false;
+  cloudSyncQueue.cancel();
+  saveEngine.setCloudAdapter(null);
   if (!activeUser) {
     cloudSyncQueue.cancel();
     saveEngine.setCloudAdapter(null);
@@ -394,11 +398,14 @@ async function syncOnSignIn(user, generation) {
       await saveEngine.saveToCloud();
     }
     if (!isCurrentAccount()) return;
+    cloudReady = true;
     cloudSyncQueue.cancel();
+    cloudSyncQueue.queue();
     renderVault();
     setSyncStatus('Synced to Cloud', 'synced');
   } catch (error) {
     if (!isCurrentAccount()) return;
+    cloudReady = false;
     saveEngine.setCloudAdapter(null);
     setSyncStatus('Cloud setup needed', 'error');
     console.warn('Glass Chess cloud sync could not start:', error);
@@ -422,6 +429,7 @@ async function applyCloudProfile(profile, isCurrentAccount = () => true) {
 async function syncNow() {
   if (!activeUser) throw new Error('Sign in to sync your Glass Chess games.');
   if (!activeUser.emailVerified) throw new Error('Verify your email with Clerk before cloud syncing.');
+  if (!cloudReady) throw new Error('Your private account is still being restored. Try syncing again in a moment.');
   const ownerId = activeUser.id;
   setSyncStatus('Syncing…', 'syncing');
   try {
