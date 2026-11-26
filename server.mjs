@@ -95,6 +95,8 @@ function createMatchedRoom(firstSocket, firstPlayer, secondSocket, secondPlayer)
     resigned: null
   };
   rooms.set(code, room);
+  activePlayers.set(whitePlayer.playerId, code);
+  activePlayers.set(blackPlayer.playerId, code);
   for (const [client, role] of [[whiteSocket, 'w'], [blackSocket, 'b']]) {
     client.join(code);
     client.data.roomCode = code;
@@ -141,6 +143,7 @@ io.on('connection', socket => {
     if (!playerId) return done({ ok: false, error: 'A valid player identity is required. Refresh the page and try again.' });
     const player = { socketId: socket.id, playerId, name: cleanName(payload.name) };
     const result = matchmaking.enqueue(player);
+    if (result.status === 'already_queued') return done({ ok: false, error: 'This player is already searching for an opponent in another tab.' });
     if (result.status !== 'matched') {
       socket.data.matchmaking = true;
       return done({ ok: true, waiting: true, queuedPlayers: matchmaking.size });
@@ -174,6 +177,7 @@ io.on('connection', socket => {
     removeSocketFromRoom(socket);
     const playerId = cleanPlayerId(payload.playerId);
     if (!playerId) return done({ ok: false, error: 'A valid local player identity is required. Refresh the page and try again.' });
+    if (activePlayers.has(playerId)) return done({ ok: false, error: 'You are already in an online game.' });
     const code = codeAvailable();
     const room = {
       code,
@@ -181,9 +185,11 @@ io.on('connection', socket => {
       players: { w: { id: socket.id, playerId, name: cleanName(payload.name) }, b: null },
       spectators: new Map(),
       game: new Chess(),
-      resigned: null
+      resigned: null,
+      invitationExpiresAt: Date.now() + INVITE_TTL_MS
     };
     rooms.set(code, room);
+    activePlayers.set(playerId, code);
     socket.join(code);
     socket.data.roomCode = code;
     socket.data.role = 'w';
@@ -253,8 +259,21 @@ io.on('connection', socket => {
     try {
       const legalMove = { from: move.from, to: move.to };
       if (['q', 'r', 'b', 'n'].includes(move.promotion)) legalMove.promotion = move.promotion;
-      room.game.move(legalMove);
-      done({ ok: true });
+      const applied = room.game.move(legalMove);
+      room.lastMove = {
+        ply: room.game.history().length,
+        from: applied.from, to: applied.to, san: applied.san,
+        uci: applied.from + applied.to + (applied.promotion || ''),
+        color: applied.color,
+        fx: {
+          isCapture: Boolean(applied.captured),
+          capturedPiece: applied.captured || null,
+          isCheck: room.game.isCheck(),
+          isCheckmate: room.game.isCheckmate(),
+          isCastle
+        }
+      };
+      done({ ok: true, move: room.lastMove });
       broadcast(room);
     } catch {
       done({ ok: false, error: 'That move is not legal in the server position.' });
