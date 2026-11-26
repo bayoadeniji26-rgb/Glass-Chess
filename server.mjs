@@ -9,6 +9,10 @@ const HOST = process.env.HOST || '0.0.0.0';
 const rooms = new Map();
 const matchmaking = new MatchmakingQueue();
 const activePlayers = new Map();
+function releasePlayerLock(playerId, roomCode) {
+  // A stale expiry timer must not unlock a player who has already joined a newer room.
+  if (playerId && activePlayers.get(playerId) === roomCode) activePlayers.delete(playerId);
+}
 const INVITE_TTL_MS = Math.max(100, Number(process.env.GC_INVITE_TTL_MS) || 15 * 60 * 1000);
 const DISCONNECT_GRACE_MS = 30 * 1000;
 const ENDED_ROOM_TTL_MS = Math.max(100, Number(process.env.GC_ENDED_ROOM_TTL_MS) || 60 * 60 * 1000);
@@ -115,7 +119,7 @@ function expireRoom(room, reason = 'expired') {
   if (room.cleanupTimer) clearTimeout(room.cleanupTimer);
   for (const player of Object.values(room.players || {})) {
     if (player?.disconnectTimer) clearTimeout(player.disconnectTimer);
-    if (player?.playerId) activePlayers.delete(player.playerId);
+    if (player?.playerId) releasePlayerLock(player.playerId, room.code);
   }
   const members = [...(io.sockets.adapter.rooms.get(room.code) || [])];
   for (const socketId of members) {
@@ -207,7 +211,7 @@ function removeSocketFromRoom(socket, { disconnected = false } = {}) {
         const playerId = player.playerId;
         if (room.abandoned || room.resigned || room.game.isGameOver()) {
           player.disconnectTimer = null;
-          activePlayers.delete(playerId);
+          releasePlayerLock(playerId, code);
         } else {
           player.disconnectTimer = setTimeout(() => {
             const current = rooms.get(code);
@@ -215,14 +219,14 @@ function removeSocketFromRoom(socket, { disconnected = false } = {}) {
             if (!current || currentPlayer?.playerId !== playerId || currentPlayer.connected || current.abandoned || current.resigned || current.game.isGameOver()) return;
             current.abandoned = side;
             currentPlayer.disconnectTimer = null;
-            activePlayers.delete(playerId);
+            releasePlayerLock(playerId, code);
             broadcast(current);
           }, DISCONNECT_GRACE_MS);
           player.disconnectTimer.unref?.();
         }
       } else {
         if (player.disconnectTimer) clearTimeout(player.disconnectTimer);
-        activePlayers.delete(player.playerId);
+        releasePlayerLock(player.playerId, code);
         room.players[side] = null;
       }
     }
@@ -474,7 +478,7 @@ io.on('connection', socket => {
         leavingPlayer.id = null;
         leavingPlayer.connected = false;
         if (!room.abandoned && !room.resigned && !room.game.isGameOver()) room.abandoned = side;
-        activePlayers.delete(leavingPlayer.playerId);
+        releasePlayerLock(leavingPlayer.playerId, code);
         socket.leave(code);
         socket.data.roomCode = null;
         socket.data.role = null;
@@ -484,7 +488,7 @@ io.on('connection', socket => {
         if (room.cleanupTimer) clearTimeout(room.cleanupTimer);
         if (leavingPlayer.disconnectTimer) clearTimeout(leavingPlayer.disconnectTimer);
         rooms.delete(code);
-        activePlayers.delete(leavingPlayer.playerId);
+        releasePlayerLock(leavingPlayer.playerId, code);
         socket.leave(code);
         socket.data.roomCode = null;
         socket.data.role = null;
