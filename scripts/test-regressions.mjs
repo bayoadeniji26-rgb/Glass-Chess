@@ -136,8 +136,8 @@ assert.match(onlineClient, /exitOnlineSession\(options = \{\}\) \{ return leaveR
 assert.match(onlineClient, /let onlineRequestActive = false;[\s\S]*?let offlineIntent = false;/, 'Pending create and join requests must be tracked until they finish or are cancelled.');
 assert.match(onlineClient, /generation !== onlineRequestGeneration \|\| offlineIntent/, 'Late room-create and room-join responses must be ignored after the user starts offline play.');
 assert.match(onlineClient, /offlineIntent \|\| \(!matchmakingActive && !online\.code\)/, 'Late match-found events must not re-enter online mode after cancellation.');
-assert.match(onlineClient, /async function leaveRoom[\s\S]*?emitAck\('queue:cancel'\)/, 'Leaving online mode must cancel an active matchmaking queue.');
-assert.match(onlineClient, /async function leaveRoom[\s\S]*?emitAck\('room:leave'\)/, 'Leaving online mode must leave an active room on the server.');
+assert.match(onlineClient, /if \(wasSearching && socket\?\.connected\) \{\s*try \{ await emitAck\('queue:cancel'\); \} catch \{\}/, 'Leaving online mode must cancel an active matchmaking queue.');
+assert.match(onlineClient, /if \(roomCode && socket\?\.connected\) \{\s*try \{ await emitAck\('room:leave'\); \} catch \{\}/, 'Leaving online mode must leave an active room on the server.');
 assert.match(onlineClient, /localStorage\.removeItem\('glass-chess-online-room-code'\)/, 'Leaving online mode must clear the saved room-resume pointer.');
 assert.match(onlineClient, /url\.searchParams\.delete\('room'\)/, 'Leaving an invite room must remove the auto-join URL parameter.');
 assert.match(onlineClient, /async function startDailyChallenge\(\)[\s\S]*?leaveRoom\(\{ restoreMode: false \}\)/, 'Starting a solo daily challenge must also exit online mode.');
