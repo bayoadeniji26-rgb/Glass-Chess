@@ -492,10 +492,21 @@ function showRoomState(snapshot) {
   root.querySelector('#gc-plus-room-people').textContent = `${Number(snapshot.spectators || 0)} spectators`;
   renderRoomButtons();
   window.setTimeout(() => { online.syncing = false; }, 0);
-  if (snapshot.checkmate || snapshot.resigned || snapshot.abandoned) {
+  if (snapshot.gameOver || snapshot.resigned || snapshot.abandoned) {
     if (snapshot.checkmate) awardAchievement('first-mate');
     showVictory(snapshot.result || 'Game over');
   }
+}
+
+function handleExpiredRoom(payload = {}) {
+  if (!online.code || payload.code !== online.code) return;
+  const message = payload.reason === 'invitation-expired'
+    ? 'This invitation expired. Create a new room to challenge a friend.'
+    : 'This online room expired and has been closed. Start a new match.';
+  void leaveRoom({ restoreMode: true }).then(() => {
+    root.querySelector('#gc-plus-room-status').textContent = message;
+    toast('Online room closed.');
+  });
 }
 
 function makeSocket() {
@@ -513,8 +524,20 @@ function makeSocket() {
     if (online.code && online.resumeToken) {
       root.querySelector('#gc-plus-room-status').textContent = 'Reconnecting to your game…';
       socket.timeout(7000).emit('room:resume', { code: online.code, playerId: CLIENT_ID, resumeToken: online.resumeToken }, (timeoutError, result) => {
-        if (timeoutError || !result?.ok) {
-          root.querySelector('#gc-plus-room-status').textContent = result?.error || 'Could not restore the online game. Your session may have expired.';
+        if (timeoutError) {
+          root.querySelector('#gc-plus-room-status').textContent = 'The reconnect request timed out. Your saved session is being kept for another attempt.';
+          renderRoomButtons();
+          return;
+        }
+        if (!result?.ok) {
+          const message = result?.error || 'Could not restore the online game.';
+          if (/no longer be resumed|invalid or expired|room not found/i.test(message)) {
+            void leaveRoom({ restoreMode: true }).then(() => {
+              root.querySelector('#gc-plus-room-status').textContent = message;
+            });
+          } else {
+            root.querySelector('#gc-plus-room-status').textContent = message;
+          }
           renderRoomButtons();
           return;
         }
@@ -546,6 +569,7 @@ function makeSocket() {
     renderRoomButtons();
   });
   socket.on('room:state', snapshot => showRoomState(snapshot));
+  socket.on('room:expired', handleExpiredRoom);
   socket.on('match:found', result => {
     // A cancelled search or an offline-game request can race with a late match event.
     // Do not let that stale event put the board back into online mode.
@@ -575,6 +599,7 @@ function emitAck(event, payload = {}) {
 }
 
 function applyRoomJoin(result) {
+  lastCheckToastPly = 0;
   offlineIntent = false;
   online.code = result.code;
   online.role = result.role;
@@ -781,6 +806,7 @@ async function leaveRoom({ restoreMode = true } = {}) {
   online.resumeToken = '';
   online.lastState = null;
   online.syncing = false;
+  lastCheckToastPly = 0;
   matchmakingActive = false;
   onlineRequestActive = false;
   api.setReplayLock(false);
