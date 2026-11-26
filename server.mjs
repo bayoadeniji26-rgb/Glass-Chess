@@ -2,10 +2,12 @@ import http from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { Server } from 'socket.io';
 import { Chess } from 'chess.js';
+import { MatchmakingQueue } from './src/matchmaking-queue.js';
 
 const PORT = Number(process.env.PORT || 3001);
 const HOST = process.env.HOST || '0.0.0.0';
 const rooms = new Map();
+const matchmaking = new MatchmakingQueue();
 const httpServer = http.createServer((req, res) => {
   res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' });
   res.end('Glass Chess online server is running.');
@@ -65,7 +67,37 @@ function broadcast(room) {
   io.to(room.code).emit('room:state', publicRoom(room));
 }
 
+function createMatchedRoom(firstSocket, firstPlayer, secondSocket, secondPlayer) {
+  const code = codeAvailable();
+  const firstIsWhite = randomBytes(1)[0] % 2 === 0;
+  const whiteSocket = firstIsWhite ? firstSocket : secondSocket;
+  const blackSocket = firstIsWhite ? secondSocket : firstSocket;
+  const whitePlayer = firstIsWhite ? firstPlayer : secondPlayer;
+  const blackPlayer = firstIsWhite ? secondPlayer : firstPlayer;
+  const room = {
+    code,
+    ownerId: whiteSocket.id,
+    players: {
+      w: { id: whiteSocket.id, playerId: whitePlayer.playerId, name: whitePlayer.name },
+      b: { id: blackSocket.id, playerId: blackPlayer.playerId, name: blackPlayer.name }
+    },
+    spectators: new Map(),
+    game: new Chess(),
+    resigned: null
+  };
+  rooms.set(code, room);
+  for (const [client, role] of [[whiteSocket, 'w'], [blackSocket, 'b']]) {
+    client.join(code);
+    client.data.roomCode = code;
+    client.data.role = role;
+    client.data.matchmaking = false;
+  }
+  return { room, whiteSocket, blackSocket };
+}
+
 function removeSocketFromRoom(socket) {
+  matchmaking.remove(socket.id);
+  socket.data.matchmaking = false;
   const code = socket.data.roomCode;
   if (!code) return;
   const room = rooms.get(code);
@@ -88,6 +120,41 @@ function removeSocketFromRoom(socket) {
 }
 
 io.on('connection', socket => {
+  socket.on('queue:join', (payload = {}, done = () => {}) => {
+    if (socket.data.roomCode) return done({ ok: false, error: 'Leave your current game before finding another opponent.' });
+    const playerId = cleanPlayerId(payload.playerId);
+    if (!playerId) return done({ ok: false, error: 'A valid player identity is required. Refresh the page and try again.' });
+    const player = { socketId: socket.id, playerId, name: cleanName(payload.name) };
+    const result = matchmaking.enqueue(player);
+    if (result.status !== 'matched') {
+      socket.data.matchmaking = true;
+      return done({ ok: true, waiting: true, queuedPlayers: matchmaking.size });
+    }
+    const opponentSocket = io.sockets.sockets.get(result.opponent.socketId);
+    if (!opponentSocket?.connected) {
+      matchmaking.remove(result.opponent.socketId);
+      const retry = matchmaking.enqueue(player);
+      socket.data.matchmaking = retry.status === 'waiting';
+      return done({ ok: true, waiting: true, queuedPlayers: matchmaking.size });
+    }
+    const { room, whiteSocket, blackSocket } = createMatchedRoom(socket, player, opponentSocket, result.opponent);
+    const state = publicRoom(room);
+    const joiningRole = socket.id === whiteSocket.id ? 'w' : 'b';
+    const opponentRole = joiningRole === 'w' ? 'b' : 'w';
+    done({ ok: true, waiting: false, matched: true, code: room.code, role: joiningRole, state });
+    opponentSocket.emit('match:found', {
+      code: room.code,
+      role: opponentRole,
+      state
+    });
+    broadcast(room);
+  });
+
+  socket.on('queue:cancel', (done = () => {}) => {
+    const removed = matchmaking.remove(socket.id);
+    socket.data.matchmaking = false;
+    done({ ok: true, cancelled: removed });
+  });
   socket.on('room:create', (payload = {}, done = () => {}) => {
     removeSocketFromRoom(socket);
     const playerId = cleanPlayerId(payload.playerId);
