@@ -18,6 +18,7 @@ const CHESS_QUESTION_PATTERNS = [
   /\b(?:famous|greatest|immortal)\s+chess\s+(?:game|match|player|players)\b/i,
   /\b(?:explain|analy[sz]e|review|evaluate)\s+(?:this|my|the|last)\s+(?:game|move|position|opening|line)\b/i
 ];
+const CHESS_NOTATION_QUESTION = /\b(?:[KQRBN]?[a-h][1-8](?:x[a-h][1-8])?[+#]?|O-O(?:-O)?|0-0(?:-0)?)\b/i;
 const CLEARLY_OFF_TOPIC = [
   /\bwhat\s+time\s+is\s+it\b/i,
   /\b(?:dogs?\s+or\s+cats?|cats?\s+or\s+dogs?)\b/i,
@@ -35,7 +36,7 @@ export const OFF_TOPIC_REPLY = 'I’m King Pawn, the chess-only advisor inside G
 const SYSTEM_PROMPT = 'You are King Pawn, the chess-only AI advisor for Glass Chess. Give a useful direct answer to any chess-related question, not just a list of definitions. Chess includes its history, rules, openings, tactics, strategy, endgames, famous players and games, rating systems, training, tournament formats, chess software, and the live board. Use the supplied recent conversation to understand short follow-up questions. Use the live FEN, PGN, moves, turn, check status, and material only when relevant. Explain ideas clearly for a beginner, give examples when useful, distinguish official rules from strategic advice, and say when a claim is uncertain or debated. Never invent engine output, exact statistics, quotations, or a guaranteed winning move. Do not make moves for the player. If the question is not chess-related, reply only with this redirect: "' + OFF_TOPIC_REPLY + '"';
 
 function hasChessSignal(question) {
-  return CHESS_TERMS.test(question) || CHESS_QUESTION_PATTERNS.some(pattern => pattern.test(question));
+  return CHESS_TERMS.test(question) || CHESS_QUESTION_PATTERNS.some(pattern => pattern.test(question)) || CHESS_NOTATION_QUESTION.test(question);
 }
 
 export function isChessQuestion(question, context = {}) {
