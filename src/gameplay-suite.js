@@ -84,6 +84,15 @@ let inspectedFullHistory = null;
 let currentStartFen = START_FEN;
 let cachedMatchSaved = '';
 let lastAutoReviewKey = '';
+let personaWaitTimer = null;
+let personaWaitDeadline = null;
+
+function clearPersonaWait() {
+  if (personaWaitTimer !== null) window.clearInterval(personaWaitTimer);
+  if (personaWaitDeadline !== null) window.clearTimeout(personaWaitDeadline);
+  personaWaitTimer = null;
+  personaWaitDeadline = null;
+}
 
 function safeHistory() {
   try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]').slice(0,100); }
@@ -1275,8 +1284,15 @@ function buildControls() {
   $id('gcl-editor-analysis').addEventListener('click',()=>applyEditor('analysis'));
   $id('gcl-persona').addEventListener('change',updatePersonaNote);
   $id('gcl-persona-apply').addEventListener('click',()=>void applyPersona());
-  if(api.engineReady)window.setTimeout(()=>void applyPersona(),350);
-  else {const personaWait=window.setInterval(()=>{if(api.engineReady){window.clearInterval(personaWait);void applyPersona();}},650);}
+  clearPersonaWait();
+  if(api.engineReady)window.setTimeout(()=>{if(root?.isConnected)void applyPersona();},350);
+  else {
+    personaWaitTimer=window.setInterval(()=>{
+      if(!root?.isConnected){clearPersonaWait();return;}
+      if(api.engineReady){clearPersonaWait();void applyPersona();}
+    },650);
+    personaWaitDeadline=window.setTimeout(clearPersonaWait,20000);
+  }
   $id('gcl-match-filter').addEventListener('input',renderMatchHistory);
   $id('gcl-puzzle-start').addEventListener('click',startPuzzle);
   $id('gcl-puzzle-next').addEventListener('click',startPuzzle);
@@ -1355,7 +1371,7 @@ function render() {
   lastArrowOrientation=orient;
   document.getElementById('gcl-eval-bar')?.setAttribute('data-orientation',orient);
 }
-function unmount(){stopClock();stopRush();stopReview();}
+function unmount(){clearPersonaWait();stopClock();stopRush();stopReview();}
 
 export function mountGameplaySuite(chessApi,premiumRoot) {
   if(!chessApi||!premiumRoot||window.GlassChessGameplaySuite)return;
