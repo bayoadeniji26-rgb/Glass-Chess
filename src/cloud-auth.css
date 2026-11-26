@@ -314,3 +314,5 @@ body.gc-custom-background #gc-floating-hub .gc-hub-drawer {
   .gc-email-auth { padding: 10px; }
   .gc-email-auth-card { padding: 17px; border-radius: 16px; }
 }
+
+#gc-auth-menu button[hidden] { display: none !important; }
