@@ -488,7 +488,7 @@ function showRoomState(snapshot) {
   root.querySelector('#gc-plus-room-people').textContent = `${Number(snapshot.spectators || 0)} spectators`;
   renderRoomButtons();
   window.setTimeout(() => { online.syncing = false; }, 0);
-  if (snapshot.checkmate || snapshot.resigned || snapshot.abandoned) {
+  if (snapshot.gameOver || snapshot.resigned || snapshot.abandoned) {
     if (snapshot.checkmate) awardAchievement('first-mate');
     showVictory(snapshot.result || 'Game over');
   }
