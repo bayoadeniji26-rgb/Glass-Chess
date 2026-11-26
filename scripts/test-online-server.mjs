@@ -168,7 +168,7 @@ try {
 
   // A dropped socket gets a grace period and can recover the same game with its token.
   const reconnectSide = matchedForB.role === 'w' ? 'w' : 'b';
-  const reconnectId = matchedForB.role === 'w' ? ids.black : ids.black;
+  const reconnectId = matchedForB.role === 'w' ? ids.black : ids.white;
   const reconnectToken = matchedForB.role === 'w' ? matchedForB.resumeToken : foundA.resumeToken;
   const remainingSide = matchedForB.role === 'w' ? playerA : playerB;
   const disconnectedState = nextEvent(remainingSide, 'room:state', value => value?.players?.[reconnectSide]?.connected === false);
