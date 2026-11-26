@@ -31,7 +31,7 @@ const cloudSyncQueue = new CloudSyncQueue({
   run: async () => {
     const ownerId = activeUser?.id;
     if (!ownerId || !activeUser?.emailVerified) return;
-    const snapshot = await saveEngine.loadData();
+    const snapshot = await saveEngine.getCommittedData();
     if (activeUser?.id !== ownerId || !activeUser.emailVerified) return;
     try { await cloudAdapter.push(snapshot); }
     catch (error) { if (activeUser?.id !== ownerId) return; throw error; }
@@ -374,7 +374,7 @@ async function syncOnSignIn(user, generation) {
     await loadSupabase();
     if (!isCurrentAccount()) return;
     saveEngine.setCloudAdapter(cloudAdapter);
-    const [remote, local] = await Promise.all([cloudAdapter.pull(), saveEngine.loadData()]);
+    const [remote, local] = await Promise.all([cloudAdapter.pull(), saveEngine.getCommittedData()]);
     if (!isCurrentAccount()) return;
     if (remote) {
       cloudProfile = remote;
