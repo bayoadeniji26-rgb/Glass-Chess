@@ -194,7 +194,7 @@ try {
   const friendB = await connectClient(url);
   const created = await ack(friendA, 'room:create', { playerId: ids.friendA, name: 'Friend A' });
   assert.equal(created?.ok, true);
-  const activePlayerInviteAttempt = await ack(white, 'room:join', { code: created.code, playerId: whiteId, name: 'Player Already Playing' });
+  const activePlayerInviteAttempt = await ack(resumedClient, 'room:join', { code: created.code, playerId: whiteId, name: 'Player Already Playing' });
   assert.equal(activePlayerInviteAttempt?.ok, false, 'An active player must not take a seat in a second room.');
   assert.match(created.code, /^[A-Z0-9]{8}$/);
   assert.equal(typeof created.resumeToken, 'string');
