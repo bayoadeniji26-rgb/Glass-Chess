@@ -140,7 +140,7 @@ export class SaveEngine {
   }
 
   async exportSave() {
-    await this.writeQueue;
+    await this.waitForWrites();
     const state = await this.loadData();
     return JSON.stringify({
       format: 'glass-chess.kingpawn-save',
@@ -165,10 +165,18 @@ export class SaveEngine {
     this.cloudAdapter = adapter;
   }
 
+  async waitForWrites() {
+    // New saves can be appended while an earlier promise is settling. Loop
+    // until the queue reference stops changing so the snapshot is truly stable.
+    let observedQueue;
+    do {
+      observedQueue = this.writeQueue;
+      await observedQueue;
+    } while (observedQueue !== this.writeQueue);
+  }
+
   async getCommittedData() {
-    // Read only after every accepted write has settled. Cloud snapshots and
-    // exports must never race an import, profile restore, or queued local save.
-    await this.writeQueue;
+    await this.waitForWrites();
     return this.loadData();
   }
 
@@ -180,7 +188,7 @@ export class SaveEngine {
 
   async loadFromCloud() {
     if (!this.cloudAdapter) throw new Error('Cloud sync is not configured. Export a save file to move data between devices.');
-    await this.writeQueue;
+    await this.waitForWrites();
     const remote = await this.cloudAdapter.pull();
     if (!remote || typeof remote !== 'object') throw new Error('The cloud service returned an invalid save.');
     return this.replaceData(remote);
