@@ -88,6 +88,8 @@ let victoryPresentationTimer = null;
 let previousVictoryFocus = null;
 let socketBound = false;
 let matchmakingActive = false;
+let matchmakingGeneration = 0;
+let offlineIntent = false;
 let toastTimer = null;
 let lastCheckToastPly = 0;
 
@@ -543,9 +545,14 @@ function makeSocket() {
   });
   socket.on('room:state', snapshot => showRoomState(snapshot));
   socket.on('match:found', result => {
+    // A cancelled search or an offline-game request can race with a late match event.
+    // Do not let that stale event put the board back into online mode.
+    if (offlineIntent || (!matchmakingActive && !online.code)) {
+      void emitAck('room:leave').catch(() => {});
+      return;
+    }
+    if (online.code) return; // The queue acknowledgement already applied this match.
     matchmakingActive = false;
-    online.previousMode = api.mode;
-    online.previousColor = api.playerColor;
     applyRoomJoin(result);
     root.querySelector('#gc-plus-room-status').textContent = 'Opponent found! You are playing as ' + (result.role === 'w' ? 'White.' : 'Black.');
     toast('Match found. Good luck!');
@@ -566,6 +573,7 @@ function emitAck(event, payload = {}) {
 }
 
 function applyRoomJoin(result) {
+  offlineIntent = false;
   online.code = result.code;
   online.role = result.role;
   online.side = result.role === 'w' || result.role === 'b' ? result.role : '';
@@ -589,18 +597,29 @@ function applyRoomJoin(result) {
 }
 
 async function findMatch() {
-  if (online.code) return;
+  if (online.code || matchmakingActive) return;
+  offlineIntent = false;
+  const generation = ++matchmakingGeneration;
+  online.previousMode = api.mode;
+  online.previousColor = api.playerColor;
   try {
     if (!socket?.connected) makeSocket();
     await waitForSocket();
+    if (generation !== matchmakingGeneration || offlineIntent) return;
     matchmakingActive = true;
     renderRoomButtons();
     root.querySelector('#gc-plus-room-status').textContent = 'Looking for another player… Keep this page open. You can cancel at any time.';
     const result = await emitAck('queue:join', { name: getPublicPlayerName(), playerId: CLIENT_ID });
+    if (generation !== matchmakingGeneration || offlineIntent) {
+      if (result?.matched && socket?.connected) {
+        try { await emitAck('room:leave'); } catch {}
+      }
+      return;
+    }
+    // The match:found event may arrive before the queue acknowledgement.
+    if (online.code) return;
     if (result.matched) {
       matchmakingActive = false;
-      online.previousMode = api.mode;
-      online.previousColor = api.playerColor;
       applyRoomJoin(result);
       toast('Opponent found. Game starting!');
     } else {
@@ -608,6 +627,7 @@ async function findMatch() {
       root.querySelector('#gc-plus-room-status').textContent = 'Searching for an opponent… You will be connected automatically when someone joins.';
     }
   } catch (error) {
+    if (generation !== matchmakingGeneration || offlineIntent) return;
     matchmakingActive = false;
     renderRoomButtons();
     root.querySelector('#gc-plus-room-status').textContent = error.message;
@@ -616,6 +636,7 @@ async function findMatch() {
 
 async function cancelMatch() {
   if (!matchmakingActive) return;
+  ++matchmakingGeneration;
   try { if (socket?.connected) await emitAck('queue:cancel'); }
   catch (error) { root.querySelector('#gc-plus-room-status').textContent = error.message; }
   matchmakingActive = false;
@@ -624,6 +645,7 @@ async function cancelMatch() {
 }
 
 async function createRoom() {
+  offlineIntent = false;
   try {
     if (!socket?.connected) makeSocket();
     await waitForSocket();
@@ -647,6 +669,7 @@ function waitForSocket() {
 }
 
 async function joinRoom(spectate = false) {
+  offlineIntent = false;
   try {
     if (!socket?.connected) makeSocket();
     await waitForSocket();
@@ -687,21 +710,57 @@ function handleLocalMove(move) {
   return true;
 }
 
-async function leaveRoom() {
-  if (!online.code) return;
-  try { if (socket?.connected) await emitAck('room:leave'); } catch {}
+async function leaveRoom({ restoreMode = true } = {}) {
+  const roomCode = online.code;
+  const wasSearching = matchmakingActive;
+  const previousMode = online.previousMode || 'computer';
+  const previousColor = online.previousColor || api.playerColor || 'white';
+  offlineIntent = true;
+  ++matchmakingGeneration;
+
+  // Cancel both queue searches and active rooms before allowing local play.
+  if (wasSearching && socket?.connected) {
+    try { await emitAck('queue:cancel'); } catch {}
+  }
+  if (roomCode && socket?.connected) {
+    try { await emitAck('room:leave'); } catch {}
+  }
+
   try {
-    localStorage.removeItem(`glass-chess-online-resume:${online.code}`);
+    const savedCode = localStorage.getItem('glass-chess-online-room-code') || '';
+    for (const code of new Set([roomCode, savedCode].filter(Boolean))) {
+      localStorage.removeItem(`glass-chess-online-resume:${code}`);
+    }
     localStorage.removeItem('glass-chess-online-room-code');
   } catch { /* Local storage may be disabled. */ }
-  online.code = ''; online.role = ''; online.side = ''; online.resumeToken = ''; online.lastState = null;
+
+  online.code = '';
+  online.role = '';
+  online.side = '';
+  online.resumeToken = '';
+  online.lastState = null;
+  online.syncing = false;
+  matchmakingActive = false;
   api.setReplayLock(false);
   api.setOnlineMatchActive?.(false);
-  api.setMode(online.previousMode || 'computer');
-  if (online.previousColor) api.setOnlineSide(online.previousColor === 'black' ? 'b' : 'w');
-  root.querySelector('#gc-plus-room-status').textContent = 'You left the room.';
+  if (restoreMode) api.setMode(previousMode);
+  if (previousColor) api.setOnlineSide(previousColor === 'black' ? 'b' : 'w');
+
+  // An invitation URL must not silently rejoin after leaving or starting a solo game.
+  try {
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('room')) {
+      url.searchParams.delete('room');
+      window.history.replaceState(window.history.state, '', url);
+    }
+  } catch { /* URL cleanup is optional. */ }
+
+  root.querySelector('#gc-plus-room-status').textContent = roomCode
+    ? 'You left the room.'
+    : wasSearching ? 'Matchmaking cancelled.' : 'Ready for offline play.';
   root.querySelector('#gc-plus-room-people').textContent = 'No room';
   renderRoomButtons();
+  return true;
 }
 
 async function copyInvite() {
@@ -728,9 +787,9 @@ function addFriend() {
   if (state.friends.length >= 5) awardAchievement('five-friends');
 }
 
-function startDailyChallenge() {
-  if (online.code) { toast('Leave your online room before starting a solo challenge.'); return; }
+async function startDailyChallenge() {
   if (api.history.length && !window.confirm('Starting the daily challenge replaces the current board. Save your game first if you need it. Continue?')) return;
+  if (online.code || matchmakingActive) await leaveRoom({ restoreMode: false });
   const challenge = DAILY_CHALLENGES[Number(todayKey().replaceAll('-', '')) % DAILY_CHALLENGES.length];
   dailyChallenge = { active: true, solution: challenge.solution, notation: challenge.notation, solved: false, rewardEligible: state.lastChallenge !== todayKey() };
   const fen = challenge.fen;
@@ -1009,6 +1068,8 @@ export function mountOnlinePlus(chessApi, premiumRoot) {
   installPieceObserver();
   window.GlassChessOnlinePlus = {
     isOnline() { return Boolean(online.code); },
+    isMatchmaking() { return matchmakingActive; },
+    exitOnlineSession(options = {}) { return leaveRoom(options); },
     getPlayers() { return online.lastState?.players || null; },
     canMove(side = api.turn) {
       return Boolean(
