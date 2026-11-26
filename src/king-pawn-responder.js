@@ -39,7 +39,7 @@ export function createKingPawnResponder(options = {}) {
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: payload.question, board: payload.board }),
+      body: JSON.stringify({ systemPrompt: payload.systemPrompt, question: payload.question, board: payload.board }),
       signal: payload.signal,
       credentials: 'same-origin'
     });
