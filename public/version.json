@@ -1,13 +1,12 @@
 {
-  "version": "2026.11.26.12",
+  "version": "2026.11.26.13",
   "name": "Glass Chess Required Update",
   "updatedAt": "2026-11-26",
   "notes": [
-    "Moves Tools into the top navigation and removes the floating launcher",
-    "Adds descriptive Tools category cards linked to the existing feature tabs",
-    "Adds Play Online to the Play menu and opens the existing Online + Club area",
-    "Automatically closes the Play drawer when Start Game is selected",
-    "Keeps Tools reachable during fullscreen focus mode",
-    "Preserves the existing game systems, settings, training modules and all 50 daily puzzles"
+    "Fixes Tools popup sizing so it uses the available screen height",
+    "Makes the feature area scroll independently while keeping controls clickable",
+    "Removes the obsolete purple floating launcher and its reserved bottom gap",
+    "Compacts the Tools category shortcuts and removes the sticky tab overlap",
+    "Preserves existing chess, Stockfish, training and online features"
   ]
 }
