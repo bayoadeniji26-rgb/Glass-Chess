@@ -348,11 +348,13 @@ async function syncOnSignIn(user) {
       const merged = mergeCloudAndLocal(remote, local);
       await saveEngine.replaceData(merged);
       profileAvatarUrl = merged.profileAvatarUrl || user.imageUrl || '';
+      cloudProfile = merged;
+      cloudGames = Array.isArray(merged.games) ? merged.games.slice(-150) : [];
       await applyCloudProfile(merged);
       await saveEngine.saveToCloud();
     } else {
-      cloudProfile = {};
-      cloudGames = [];
+      cloudProfile = local;
+      cloudGames = Array.isArray(local.games) ? local.games.slice(-150) : [];
       await saveEngine.saveToCloud();
     }
     renderVault();
@@ -404,7 +406,11 @@ function queueCloudSync() {
     if (!activeUser?.emailVerified || syncInProgress) return;
     syncInProgress = true;
     setSyncStatus('Syncing…', 'syncing');
-    saveEngine.saveToCloud().then(() => {
+    saveEngine.loadData().then(async snapshot => {
+      await saveEngine.saveToCloud();
+      cloudProfile = snapshot;
+      cloudGames = Array.isArray(snapshot.games) ? snapshot.games.slice(-150) : [];
+      renderVault();
       setSyncStatus('Synced to Cloud', 'synced');
     }).catch(error => {
       console.warn('Automatic Glass Chess cloud sync failed:', error);
