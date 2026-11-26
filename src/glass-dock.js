@@ -11,12 +11,12 @@ import "./glass-dock.css";
   ];
 
   const categories = [
-    { id: "analysis", label: "Analysis", icon: "◉", terms: ["analysis", "evaluation", "best move", "captures", "engine"] },
-    { id: "play", label: "Play & online", icon: "♟", terms: ["online", "room", "invite", "friend", "spectat", "game mode", "play"] },
-    { id: "progress", label: "Progress", icon: "✦", terms: ["profile", "rating", "statistic", "achievement", "mission", "xp", "streak"] },
-    { id: "learn", label: "Learn", icon: "▤", terms: ["puzzle", "opening", "lesson", "daily challenge", "game of the day"] },
-    { id: "style", label: "Appearance", icon: "◈", terms: ["theme", "piece", "avatar", "banner", "customiz", "sound", "animation"] },
-    { id: "settings", label: "Settings", icon: "⚙", terms: ["setting", "preference", "option", "personality"] }
+    { id: "analysis", label: "Engine", icon: "◉", terms: ["live engine lab", "engine analysis", "evaluation", "best move"] },
+    { id: "play", label: "Online", icon: "♟", terms: ["online multiplayer", "online", "room", "invite", "friend", "spectat"] },
+    { id: "progress", label: "Progress", icon: "✦", terms: ["daily missions", "achievements", "player profile", "rating", "statistic", "xp", "streak"] },
+    { id: "learn", label: "Learn", icon: "▤", terms: ["puzzle training", "training routine", "opening explorer", "puzzle", "opening"] },
+    { id: "style", label: "Appearance", icon: "◈", terms: ["board themes", "piece appearance", "theme", "customiz", "sound", "animation"] },
+    { id: "settings", label: "Settings", icon: "⚙", terms: ["focus & accessibility", "move preferences", "preference", "option", "personality"] }
   ];
 
   function findPanel() {
@@ -33,7 +33,7 @@ import "./glass-dock.css";
     button.className = `gc-hub-icon-button ${className}`.trim();
     button.setAttribute("aria-label", label);
     button.title = label;
-    button.innerHTML = `<span aria-hidden="true">${icon}</span>`;
+    button.innerHTML = `<span aria-hidden="true">${icon}</span><small>${label === "Show all tools" ? "All" : label}</small>`;
     return button;
   }
 
@@ -48,11 +48,10 @@ import "./glass-dock.css";
         <header class="gc-hub-header">
           <div class="gc-hub-brand">
             <span class="gc-hub-brand-mark" aria-hidden="true">♛</span>
-            <span><strong>Glass Hub</strong><small>All your chess tools, together</small></span>
+            <span><strong>Tools</strong><small>Training, online play, progress and settings</small></span>
           </div>
           <div class="gc-hub-header-actions">
-            <button class="gc-hub-density" type="button" aria-pressed="false" title="Toggle compact layout">↕</button>
-            <button class="gc-hub-close" type="button" aria-label="Close Glass Hub" title="Close">×</button>
+            <button class="gc-hub-close" type="button" aria-label="Close tools" title="Close">×</button>
           </div>
         </header>
         <nav class="gc-hub-shortcuts" aria-label="Quick sections"></nav>
@@ -74,7 +73,6 @@ import "./glass-dock.css";
     const content = dock.querySelector(".gc-hub-content");
     const shortcuts = dock.querySelector(".gc-hub-shortcuts");
     const scroll = dock.querySelector(".gc-hub-scroll");
-    const density = dock.querySelector(".gc-hub-density");
 
     // Move the existing right-hand panel; do not clone it, so its buttons and app logic keep working.
     const anchor = document.createElement("div");
@@ -126,35 +124,44 @@ import "./glass-dock.css";
       }
     }
 
+    function publishToolsState(open) {
+      window.dispatchEvent(new CustomEvent("glasschess:tools-state", { detail: { open } }));
+    }
+
     function openHub() {
       dock.classList.add("gc-hub-open");
       orb.setAttribute("aria-expanded", "true");
       drawer.setAttribute("aria-hidden", "false");
-      orb.setAttribute("aria-label", "Close Glass Hub");
-      orb.title = "Close Glass Hub";
+      orb.setAttribute("aria-label", "Close Tools");
+      orb.title = "Close Tools";
+      publishToolsState(true);
     }
 
     function closeHub() {
       dock.classList.remove("gc-hub-open");
       orb.setAttribute("aria-expanded", "false");
       drawer.setAttribute("aria-hidden", "true");
-      orb.setAttribute("aria-label", "Open Glass Hub");
-      orb.title = "Open Glass Hub";
+      orb.setAttribute("aria-label", "Open Tools");
+      orb.title = "Open Tools";
+      publishToolsState(false);
+    }
+
+    function toggleHub() {
+      if (dock.classList.contains("gc-hub-open")) closeHub();
+      else openHub();
     }
 
     window.GlassChessTools = {
       open: openHub,
       close: closeHub,
-      toggle: () => dock.classList.contains("gc-hub-open") ? closeHub() : openHub()
+      toggle: toggleHub,
+      isOpen: () => dock.classList.contains("gc-hub-open")
     };
-    orb.addEventListener("click", () => dock.classList.contains("gc-hub-open") ? closeHub() : openHub());
+    window.addEventListener("glasschess:toggle-tools", toggleHub);
+    orb.addEventListener("click", toggleHub);
     backdrop.addEventListener("click", closeHub);
     close.addEventListener("click", closeHub);
-    density.addEventListener("click", () => {
-      const enabled = dock.classList.toggle("gc-hub-compact");
-      density.setAttribute("aria-pressed", String(enabled));
-      density.title = enabled ? "Use comfortable spacing" : "Toggle compact layout";
-    });
+    publishToolsState(false);
     document.addEventListener("keydown", event => {
       if (event.key === "Escape" && dock.classList.contains("gc-hub-open")) closeHub();
     });
