@@ -7,3 +7,6 @@
 .gc-update-close[hidden]{display:none}
 .gc-update-banner{max-width:calc(100vw - 24px)}
 @media(prefers-reduced-motion:reduce){.gc-update-banner,.gc-update-overlay,.gc-update-dialog{transition:none!important;animation:none!important}}
+
+.gc-update-install{display:block;width:100%;min-height:42px;margin-top:20px;padding:0 16px;border:1px solid rgba(255,223,182,.4);border-radius:11px;color:#302014;background:linear-gradient(120deg,#ffdcaa,#edb878);font-size:11px;font-weight:900;letter-spacing:.06em;cursor:pointer}
+.gc-update-install:disabled{opacity:.6;cursor:wait}

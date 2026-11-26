@@ -190,7 +190,8 @@ import { APP_VERSION } from './version.js';
       makeUpdateUI();updateOverlay.classList.add('is-open');
       updateOverlay.querySelector('#gc-update-close').hidden=false;
       button.disabled=false;button.textContent='RETRY UPDATE →';
-      if(modalButton)modalButton.disabled=false;
+      const retryModalButton=updateOverlay?.querySelector('#gc-update-install');
+      if(retryModalButton)retryModalButton.disabled=false;
     }finally{updating=false;}
   }
 
