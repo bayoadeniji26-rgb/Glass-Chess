@@ -121,6 +121,17 @@ assert.equal((onlineClient.match(/name: getPublicPlayerName\(\), playerId: CLIEN
 assert.match(authUi, /glasschess:auth-change/, 'Account changes must refresh the board nameplates.');
 assert.match(appHtml, /id="opponent-name"/, 'The top player nameplate must have a separate name element.');
 assert.match(appHtml, /id="player-name"/, 'The bottom player nameplate must have a separate name element.');
+assert.match(mainUi, /onlineSession\?\.isOnline\?\.\(\) \|\| onlineSession\?\.isMatchmaking\?\.\(\)/, 'Starting a regular game must detect active online rooms and matchmaking searches.');
+assert.match(mainUi, /exitOnlineSession\?\.\(\{ restoreMode: false \}\)/, 'Starting an offline game must leave online mode before resetting the board.');
+assert.match(onlineClient, /isMatchmaking\(\) \{ return matchmakingActive; \}/, 'The main game must be able to detect an in-progress matchmaking search.');
+assert.match(onlineClient, /exitOnlineSession\(options = \{\}\) \{ return leaveRoom\(options\); \}/, 'Online Plus must expose a reusable online-session exit action.');
+assert.match(onlineClient, /offlineIntent \|\| \(!matchmakingActive && !online\.code\)/, 'Late match-found events must not re-enter online mode after cancellation.');
+assert.match(onlineClient, /if \(wasSearching && socket\?\.connected\)[\s\S]*?queue:cancel/, 'Leaving online mode must cancel an active matchmaking queue.');
+assert.match(onlineClient, /if \(roomCode && socket\?\.connected\)[\s\S]*?room:leave/, 'Leaving online mode must leave an active room on the server.');
+assert.match(onlineClient, /localStorage\.removeItem\('glass-chess-online-room-code'\)/, 'Leaving online mode must clear the saved room-resume pointer.');
+assert.match(onlineClient, /url\.searchParams\.delete\('room'\)/, 'Leaving an invite room must remove the auto-join URL parameter.');
+assert.match(onlineClient, /async function startDailyChallenge\(\)[\s\S]*?leaveRoom\(\{ restoreMode: false \}\)/, 'Starting a solo daily challenge must also exit online mode.');
+
 
 console.log('50 legal daily chess puzzles and regression suite passed.');
 
