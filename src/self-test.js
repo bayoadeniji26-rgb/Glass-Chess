@@ -96,9 +96,12 @@ function runSyncChecks() {
 async function runEngineCheck() {
   const api = window.GlassChess;
   if (!api) return makeResult("Stockfish returns a legal move", false, "Glass Chess bridge is not mounted.");
-  if (api.thinking) return makeResult("Stockfish returns a legal move", true, "Skipped: engine is already busy.");
-  if (!api.engineReady) return makeResult("Stockfish returns a legal move", true, "Skipped: Stockfish is not ready.");
+  if (api.thinking) {
+    return makeResult("Stockfish returns a legal move", false, "The engine is already busy. The requested engine check was not run.");
+  }
 
+  // api.search() starts Stockfish when needed. An uninitialized engine must not
+  // be reported as a successful test merely because no search was attempted.
   const beforeFen = api.fen;
   try {
     const result = await api.search(beforeFen, 3);

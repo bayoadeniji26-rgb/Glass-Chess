@@ -174,7 +174,6 @@ assert.match(supportUi, /lastEmailRequestAt/, 'Message submissions must respect 
 
 const firstRunGuide = readFileSync(new URL('../src/first-run-guide.js', import.meta.url), 'utf8');
 const firstRunCss = readFileSync(new URL('../src/first-run-guide.css', import.meta.url), 'utf8');
-const appHtml = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 assert.match(firstRunGuide, /glass-chess-first-run-v1/, 'The first-run guide must remember when the welcome flow was completed.');
 assert.match(firstRunGuide, /data-guide-action="play"/, 'The welcome flow must offer a direct path to Play.');
 assert.match(firstRunGuide, /data-guide-action="puzzle"/, 'The welcome flow must offer a direct path to Daily Puzzle.');

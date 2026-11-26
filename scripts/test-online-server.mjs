@@ -90,7 +90,13 @@ try {
   const url = `http://127.0.0.1:${port}`;
   serverProcess = spawn(process.execPath, ['server.mjs'], {
     cwd: process.cwd(),
-    env: { ...process.env, PORT: String(port), HOST: '127.0.0.1' },
+    env: {
+      ...process.env,
+      PORT: String(port),
+      HOST: '127.0.0.1',
+      GC_INVITE_TTL_MS: '1500',
+      GC_ENDED_ROOM_TTL_MS: '1200'
+    },
     stdio: ['ignore', 'pipe', 'pipe']
   });
   serverProcess.stdout.on('data', chunk => { serverOutput += chunk.toString(); });
@@ -218,6 +224,7 @@ try {
 
   // Leaving an active two-player game forfeits instead of opening the seat to strangers.
   const abandonedState = nextEvent(friendB, 'room:state', value => value?.abandoned === true);
+  const endedRoomPromise = nextEvent(friendB, 'room:expired', value => value?.code === created.code, 4000);
   const leaveResult = await ack(friendA, 'room:leave');
   assert.equal(leaveResult?.ok, true);
   const abandoned = await abandonedState;
@@ -235,7 +242,26 @@ try {
   });
   assert.equal(intruderJoin?.ok, false, 'A player must not occupy a seat after the game has ended.');
 
-  console.log('Online integration tests passed: health, queue cancellation, duplicate identity guard, matchmaking, legal/stale move rejection, reconnect grace and token validation, friend invites, chat throttling, and forfeits.');
+  // Ended rooms must be deleted after the retention window, not accumulate forever.
+  const endedRoom = await endedRoomPromise;
+  assert.equal(endedRoom.reason, 'game-ended');
+  const deletedRoomJoin = await ack(intruder, 'room:join', {
+    code: created.code, playerId: '40000000-0000-4000-8000-000000000001', name: 'Late Guest'
+  });
+  assert.equal(deletedRoomJoin?.ok, false);
+  assert.match(deletedRoomJoin?.error || '', /Room not found/);
+
+  // An invitation with no second player must also expire automatically.
+  const unusedInvite = await ack(friendB, 'room:create', { playerId: ids.friendB, name: 'Unused Invite' });
+  assert.equal(unusedInvite?.ok, true);
+  const expiredInvite = await nextEvent(friendB, 'room:expired', value => value?.code === unusedInvite.code, 4000);
+  assert.equal(expiredInvite.reason, 'invitation-expired');
+  const lateInviteJoin = await ack(intruder, 'room:join', {
+    code: unusedInvite.code, playerId: '40000000-0000-4000-8000-000000000001', name: 'Late Guest'
+  });
+  assert.equal(lateInviteJoin?.ok, false);
+
+  console.log('Online integration tests passed: health, matchmaking, queue cancellation, legal/stale moves, reconnect, friend invites, chat throttling, forfeits, ended-room cleanup, and unused-invite expiry.');
 } catch (error) {
   console.error(error);
   if (serverOutput) console.error('Online server output:\n' + serverOutput);
