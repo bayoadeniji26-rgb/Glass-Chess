@@ -68,8 +68,19 @@ import './glass-workspace.css';
     function openDrawer(which) {
       if (which === 'tools') {
         closeDrawer();
-        if (window.GlassChessTools?.toggle) window.GlassChessTools.toggle();
-        else window.dispatchEvent(new CustomEvent('glasschess:toggle-tools'));
+        if (window.GlassChessTools?.toggle) {
+          window.GlassChessTools.toggle();
+        } else {
+          // Premium tools mount asynchronously; keep the click and open them once ready.
+          const observer = new MutationObserver(() => {
+            if (!window.GlassChessTools?.open) return;
+            observer.disconnect();
+            window.GlassChessTools.open();
+          });
+          observer.observe(document.documentElement, { childList: true, subtree: true });
+          window.setTimeout(() => observer.disconnect(), 15000);
+          window.dispatchEvent(new CustomEvent('glasschess:toggle-tools'));
+        }
         return;
       }
 
