@@ -25,7 +25,6 @@ import './glass-final-ui.css';
   let queued = false;
   let focusMode = false;
   let settings = loadSettings();
-  let sizeBeforeFocus = settings.size;
   let lastTheme = '';
 
   function syncToolsButton() {
@@ -113,13 +112,31 @@ import './glass-final-ui.css';
     toolbar = document.createElement('div');
     toolbar.id = 'gc-final-toolbar';
     toolbar.innerHTML = `
-      <div class="gc-final-actions" aria-label="Board view">
-        <button type="button" data-gc-analysis-focus aria-pressed="false" title="Show the board without surrounding panels">Focus</button>
+      <div class="gc-final-brand">
+        <span class="gc-final-crown" aria-hidden="true">♛</span>
+        <span class="gc-final-brand-copy"><strong>GLASS CHESS</strong><small>THE BOARD IS YOURS</small></span>
+      </div>
+      <div class="gc-final-actions">
+        <label class="gc-final-size-label" for="gc-final-size">Board</label>
+        <select id="gc-final-size" aria-label="Board size">
+          <option value="auto">Auto</option>
+          <option value="large">Large</option>
+          <option value="max">Maximum</option>
+        </select>
+        <button type="button" data-gc-analysis-focus aria-pressed="false" title="Open a focused analysis workspace">Analysis focus</button>
         <button type="button" data-gc-stage-fullscreen title="Enter fullscreen" aria-label="Enter fullscreen">⛶</button>
       </div>`;
     const boardFrame = board.closest('.board-frame');
     stage.insertBefore(toolbar, boardFrame || board);
 
+    const sizeSelect = toolbar.querySelector('#gc-final-size');
+    sizeSelect.value = settings.size;
+
+    sizeSelect.addEventListener('change', () => {
+      settings.size = sizeSelect.value;
+      saveSettings();
+      scheduleLayout();
+    });
 
     toolbar.querySelector('[data-gc-analysis-focus]').addEventListener('click', () => {
       focusMode = !focusMode;
@@ -129,12 +146,10 @@ import './glass-final-ui.css';
       syncToolsButton();
       const button = toolbar.querySelector('[data-gc-analysis-focus]');
       button.setAttribute('aria-pressed', String(focusMode));
-      button.textContent = focusMode ? 'Exit focus' : 'Focus';
+      button.textContent = focusMode ? 'Exit focus' : 'Analysis focus';
       if (focusMode) {
-        sizeBeforeFocus = settings.size;
         settings.size = 'max';
-      } else {
-        settings.size = sizeBeforeFocus || 'large';
+        sizeSelect.value = 'max';
       }
       saveSettings();
       scheduleLayout();
@@ -441,15 +456,13 @@ import './glass-final-ui.css';
       return;
     }
     focusMode = false;
-    settings.size = sizeBeforeFocus || 'large';
-    saveSettings();
     document.documentElement.classList.remove('gc-final-focus-mode');
     document.body.classList.remove('gc-final-focus-mode');
     syncToolsButton();
     const button = toolbar?.querySelector('[data-gc-analysis-focus]');
     if (button) {
       button.setAttribute('aria-pressed', 'false');
-      button.textContent = 'Focus';
+      button.textContent = 'Analysis focus';
     }
     scheduleLayout();
   });
