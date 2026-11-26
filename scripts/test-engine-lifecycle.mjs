@@ -117,9 +117,18 @@ try {
   assert.equal(engine.activeSearch, null);
   assert.equal(engine.stopPromise, null);
 
-  // A new search works after cancellation.
+  // A second request arriving during the stop acknowledgement waits behind
+  // the cancelled search instead of failing with a transient busy error.
+  worker.autoBestMove = false;
+  const stoppingSearch = engine.search(startFen, { depth: 4 });
+  await tick(0);
+  const stopAcknowledgement = engine.stop();
   worker.autoBestMove = true;
-  const afterStop = await engine.search(startFen, { depth: 4 });
+  const queuedAfterStop = engine.search(startFen, { depth: 4 });
+  const stoppingResult = await stoppingSearch;
+  const afterStop = await queuedAfterStop;
+  await stopAcknowledgement;
+  assert.equal(stoppingResult.cancelled, true);
   assert.equal(afterStop.bestMove, 'e2e4');
   assert.equal(afterStop.cancelled, false);
 
