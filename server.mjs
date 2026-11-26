@@ -79,21 +79,25 @@ function allowKingPawnRequest(req) {
 async function readKingPawnBody(req) {
   const chunks = [];
   let size = 0;
+  let tooLarge = false;
   return new Promise((resolve, reject) => {
     req.on('data', chunk => {
+      if (tooLarge) return;
       size += chunk.length;
       if (size > API_MAX_BODY_BYTES) {
+        tooLarge = true;
         reject(Object.assign(new Error('Request body is too large.'), { statusCode: 413 }));
-        req.pause();
+        req.resume();
         return;
       }
       chunks.push(chunk);
     });
     req.on('end', () => {
+      if (tooLarge) return;
       try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8'))); }
       catch { reject(Object.assign(new Error('The request must contain valid JSON.'), { statusCode: 400 })); }
     });
-    req.on('error', reject);
+    req.on('error', error => { if (!tooLarge) reject(error); });
   });
 }
 
