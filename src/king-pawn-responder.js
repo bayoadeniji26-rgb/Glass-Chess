@@ -147,6 +147,9 @@ export function createKingPawnResponder(options = {}) {
       if (remoteError?.code === 'KING_PAWN_PROVIDER_NOT_CONFIGURED' || remoteError?.status === 503) {
         return 'Your internet connection is working. King Pawn’s server is online, but its AI provider has not been configured yet. The site owner needs to add the private AI key to the backend service. This is a server setup issue, not a problem with your internet.';
       }
+      if (remoteError?.status) {
+        return 'King Pawn’s backend replied, but could not complete the AI request: ' + String(remoteError.message || 'provider error');
+      }
       return 'I could not reach King Pawn’s answer service just now. Check the connection to the Glass Chess service and try again. The on-device fallback currently covers chess questions.';
     }
 
