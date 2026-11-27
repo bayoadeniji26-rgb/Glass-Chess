@@ -613,3 +613,5 @@ body.gc-analysis-mode #gc-analysis-eval-rail { display: flex; }
   font-size: 10px;
   line-height: 1.5;
 }
+
+.gc-stockfish-seat > [data-gc-avatar="opponent"] { display: none !important; }
