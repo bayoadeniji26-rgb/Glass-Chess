@@ -883,7 +883,7 @@ async function startDailyChallenge() {
 
 function showVictory(message) {
   const checkmate = Boolean(api?.checkmate) || /checkmate/i.test(String(message));
-  if (!state.animations) {
+  if (!state.animations && !checkmate) {
     toast(message);
     return;
   }
@@ -915,7 +915,7 @@ function showVictory(message) {
     overlay.setAttribute('aria-labelledby', 'gc-plus-victory-title');
     overlay.setAttribute('aria-describedby', 'gc-plus-victory-message');
     overlay.tabIndex = -1;
-    const confetti = checkmate && !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const confetti = checkmate && state.animations && !window.matchMedia('(prefers-reduced-motion: reduce)').matches
       ? '<div class="gc-victory-confetti" aria-hidden="true">' + Array.from({ length: 42 }, (_, index) =>
           '<i style="--gc-confetti-x:' + ((index * 37) % 100) + '%;--gc-confetti-delay:' + ((index % 9) * -0.13) + 's;--gc-confetti-turn:' + ((index * 71) % 360) + 'deg"></i>'
         ).join('') + '</div>'
@@ -952,7 +952,7 @@ function showVictory(message) {
     if (!checkmate) playChime('victory');
   };
 
-  if (checkmate && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  if (checkmate && state.animations && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     victoryPresentationTimer = window.setTimeout(present, 1500);
   } else {
     present();
