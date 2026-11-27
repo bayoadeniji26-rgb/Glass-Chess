@@ -108,26 +108,25 @@ try {
   const missingRoute = await fetch(url + '/missing');
   assert.equal(missingRoute.status, 404, 'Unknown HTTP routes should not masquerade as health checks.');
 
-  // King Pawn refuses unrelated topics at the server boundary before any model key is needed.
-  const offTopicResponse = await fetch(url + '/api/king-pawn', {
+  // General questions are no longer blocked by a chess-only filter. Without a provider key,
+  // both general and chess questions report missing server configuration honestly.
+  const generalQuestionResponse = await fetch(url + '/api/king-pawn', {
     method: 'POST',
     headers: { 'content-type': 'application/json', origin: 'https://glass-chess-pro.onrender.com' },
-    body: JSON.stringify({ question: 'Dogs or cats?', board: { fen: START_FEN } })
+    body: JSON.stringify({ question: 'Dogs or cats?' })
   });
-  assert.equal(offTopicResponse.status, 200);
-  const offTopicBody = await offTopicResponse.json();
-  assert.equal(offTopicBody.mode, 'chess-only-filter');
-  assert.match(offTopicBody.answer, /chess-only advisor/i);
+  assert.equal(generalQuestionResponse.status, 503);
+  assert.match((await generalQuestionResponse.json()).error, /not configured/i);
 
   const timeQuestionResponse = await fetch(url + '/api/king-pawn', {
     method: 'POST',
     headers: { 'content-type': 'application/json', origin: 'https://glass-chess-pro.onrender.com' },
     body: JSON.stringify({ question: 'What time is it?' })
   });
-  assert.equal(timeQuestionResponse.status, 200);
-  assert.match((await timeQuestionResponse.json()).answer, /chess-only advisor/i);
+  assert.equal(timeQuestionResponse.status, 503);
+  assert.match((await timeQuestionResponse.json()).error, /not configured/i);
 
-  // A valid chess question reaches the AI setup and reports missing server configuration honestly.
+  // A valid chess question also reaches the AI setup and reports missing server configuration honestly.
   const missingAIKey = await fetch(url + '/api/king-pawn', {
     method: 'POST',
     headers: { 'content-type': 'application/json', origin: 'https://glass-chess-pro.onrender.com' },
