@@ -14,7 +14,7 @@ import './glass-final-ui.css';
     sunset:   { light: '#f7dfc8', dark: '#b85f50' },
     carbon:   { light: '#d5d9df', dark: '#3a4657' }
   };
-  const SIZE_FACTORS = { auto: 0.90, large: 0.97, max: 1 }; 
+  const SIZE_FACTORS = { auto: 0.94, large: 0.98, max: 1 }; 
 
   let board = null;
   let stage = null;
@@ -317,9 +317,9 @@ import './glass-final-ui.css';
       vv?.height || window.innerHeight
     );
 
-    const widthReserve = viewportWidth < 760 ? 14 : 30;
+    const widthReserve = viewportWidth < 760 ? 14 : 28;
     const widthCap = Math.max(280, viewportWidth - widthReserve);
-    const hardCap = viewportWidth < 760 ? 720 : 920;
+    const hardCap = viewportWidth < 760 ? 720 : 1100;
     const toolbarHeight = Math.max(
       42,
       toolbar?.getBoundingClientRect().height || 44
@@ -332,11 +332,11 @@ import './glass-final-ui.css';
     // Keep every control in the same visible workspace as the board.
     // Focus mode reserves compact space for player labels, toolbar and actions.
     const surroundingUI = focusMode
-      ? (viewportWidth < 600 ? 158 : 166)
-      : (viewportWidth < 600 ? 205 : 190);
+      ? (viewportWidth < 600 ? 150 : 158)
+      : (viewportWidth < 600 ? 184 : 152);
     const verticalCap = focusMode
-      ? Math.max(180, viewportHeight - toolbarHeight - surroundingUI - 18)
-      : Math.max(180, Math.min(viewportHeight * 0.70, viewportHeight - toolbarHeight - surroundingUI - 72));
+      ? Math.max(180, viewportHeight - toolbarHeight - surroundingUI - 12)
+      : Math.max(180, Math.min(viewportHeight * 0.84, viewportHeight - toolbarHeight - surroundingUI - 28));
 
     const factor = SIZE_FACTORS[settings.size] || 1;
     const baseSize = Math.min(widthCap, verticalCap, hardCap);
