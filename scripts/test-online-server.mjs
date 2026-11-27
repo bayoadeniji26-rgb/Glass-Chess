@@ -117,6 +117,7 @@ try {
   });
   assert.equal(generalQuestionResponse.status, 503);
   assert.match((await generalQuestionResponse.json()).error, /not configured/i);
+  assert.match((await fetch(url + '/api/king-pawn', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ question: 'What is science?' }) })).status.toString(), /^503$/, 'Missing AI configuration must be reported by the online server, not as an internet issue.');
 
   const timeQuestionResponse = await fetch(url + '/api/king-pawn', {
     method: 'POST',
