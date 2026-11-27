@@ -712,6 +712,8 @@ function updateStockfishMark(enabled) {
     $("opponent-name").before(mark);
   }
 }
+document.addEventListener('glasschess:premium-ready', () => updateLabels());
+
 function updateLabels() {
   const online = window.GlassChessOnlinePlus;
   const isOnlineMatch = online?.isOnline?.() === true;
