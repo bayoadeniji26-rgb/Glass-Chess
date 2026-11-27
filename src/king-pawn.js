@@ -104,6 +104,7 @@ function applyBackground(dataUrl) {
 }
 
 function createAvatar(label, side, initial) {
+  if (side === 'opponent' && document.getElementById('opponent-name')?.textContent === 'Stockfish') return null;
   const inputId = 'gc-avatar-file-' + side;
   let button = document.querySelector('[data-gc-avatar="' + side + '"]');
   if (!button) {
@@ -155,13 +156,15 @@ function applyAvatar(side, dataUrl) {
   } else {
     button.style.removeProperty('background-image');
     button.classList.remove('has-image');
-    button.textContent = side === 'player' ? '♔' : '♚';
+    button.textContent = side === 'player' ? (window.GlassChessOnlinePlus?.getPlayerAvatar?.() || '♔') : '♚';
   }
 }
 
 function mountPersonalization() {
   createAvatar('opponent', 'opponent', '♚');
   createAvatar('player', 'player', '♔');
+  applyAvatar('player', avatarImages.player || '');
+  document.addEventListener('glasschess:avatar-change', () => applyAvatar('player', avatarImages.player || ''));
   installBoardExportActions();
 
   const options = $('gc-options');
@@ -633,17 +636,17 @@ function mountKingPawn() {
   dock.innerHTML = [
     '<button type="button" id="gc-king-pawn-launcher" aria-expanded="false" aria-controls="gc-king-pawn-panel"><span aria-hidden="true">♛</span><small>KING PAWN</small></button>',
     '<section id="gc-king-pawn-panel" aria-label="King Pawn chess assistant" hidden>',
-    '<header><span class="gc-kp-crown">♛</span><div><strong>King Pawn</strong><small>Chess-only AI · Board-aware</small></div><button type="button" id="gc-king-pawn-close" aria-label="Close King Pawn">×</button></header>',
+    '<header><span class="gc-kp-crown">♛</span><div><strong>King Pawn</strong><small>General AI · Chessboard-aware</small></div><button type="button" id="gc-king-pawn-close" aria-label="Close King Pawn">×</button></header>',
     '<div class="gc-kp-context" id="gc-kp-context">Connected to your current board and move list.</div>',
-    '<div class="gc-kp-prompts" aria-label="Quick chess questions">' +
+    '<div class="gc-kp-prompts" aria-label="Suggested questions">' +
       '<button type="button" data-kp-prompt="Analyze my current position">Analyze position</button>' +
+      '<button type="button" data-kp-prompt="Explain photosynthesis in simple words">Explain science</button>' +
+      '<button type="button" data-kp-prompt="Help me understand a topic for school">Study helper</button>' +
       '<button type="button" data-kp-prompt="Why was my last move good or bad?">Review last move</button>' +
-      '<button type="button" data-kp-prompt="What opening are we playing?">Identify opening</button>' +
-      '<button type="button" data-kp-prompt="Suggest a strategic plan">Strategic plan</button>' +
     '</div>',
     '<div id="gc-king-pawn-messages" aria-live="polite"></div>',
-    '<form id="gc-king-pawn-form"><label class="gc-kp-sr-only" for="gc-king-pawn-input">Ask King Pawn a chess question</label><textarea id="gc-king-pawn-input" rows="2" maxlength="1200" placeholder="Ask about a move, opening, tactic, or rule…"></textarea><button type="submit">Ask King Pawn</button></form>',
-    '<footer>CHESS-ONLY AI COACH · LIVE STOCKFISH POSITION ANALYSIS</footer>',
+    '<form id="gc-king-pawn-form"><label class="gc-kp-sr-only" for="gc-king-pawn-input">Ask King Pawn a question</label><textarea id="gc-king-pawn-input" rows="2" maxlength="1200" placeholder="Ask me anything — or ask about your chess position…"></textarea><button type="submit">Ask King Pawn</button></form>',
+    '<footer>GENERAL AI ASSISTANT · LIVE CHESS POSITION CONTEXT</footer>',
     '</section>'
   ].join('');
   document.body.appendChild(dock);
