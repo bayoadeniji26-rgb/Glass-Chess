@@ -83,7 +83,7 @@ export function createKingPawnResponder(options = {}) {
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: payload.question, board: payload.board, conversation: payload.board.recentConversation }),
+      body: JSON.stringify({ question: payload.question, board: payload.board, conversation: payload.conversation }),
       signal: payload.signal,
       credentials: 'same-origin'
     });
@@ -99,6 +99,12 @@ export function createKingPawnResponder(options = {}) {
     try { context = getContext() || {}; }
     catch (error) { console.warn('King Pawn could not read the live board:', error); }
     const isChess = isChessQuestion(question, context);
+    const conversation = Array.isArray(context.recentConversation)
+      ? context.recentConversation.slice(-8).map(message => ({
+          role: message?.role === 'assistant' ? 'assistant' : 'user',
+          content: String(message?.content || '').slice(0, 700)
+        }))
+      : [];
     const board = isChess ? {
       fen: String(context.fen || ''),
       pgn: String(context.pgn || '').slice(0, 12000),
@@ -108,12 +114,7 @@ export function createKingPawnResponder(options = {}) {
       inCheck: Boolean(context.inCheck),
       checkState: String(context.checkState || ''),
       material: context.material && typeof context.material === 'object' ? context.material : {},
-      recentConversation: Array.isArray(context.recentConversation)
-        ? context.recentConversation.slice(-8).map(message => ({
-            role: message?.role === 'assistant' ? 'assistant' : 'user',
-            content: String(message?.content || '').slice(0, 700)
-          }))
-        : []
+      recentConversation: conversation
     } : {};
 
     const adapter = customAdapter || (endpoint ? endpointAdapter : null);
@@ -124,6 +125,7 @@ export function createKingPawnResponder(options = {}) {
           systemPrompt: SYSTEM_PROMPT,
           question,
           board,
+          conversation,
           signal: controller.signal
         })), 14000, controller);
         const answer = typeof result === 'string' ? result : result?.answer;
