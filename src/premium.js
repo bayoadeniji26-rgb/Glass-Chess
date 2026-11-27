@@ -210,7 +210,7 @@ function buildInterface() {
             <span class="gc-piece-style-preview">♘</span><strong>Glass Classic</strong><small>Original translucent pieces</small>
           </button>
           <button type="button" class="gc-piece-style-option" data-piece-style="medieval" aria-pressed="false">
-            <span class="gc-piece-style-preview gc-medieval-preview">♞</span><strong>Medieval</strong><small>Carved, traditional silhouettes</small>
+            <span class="gc-piece-style-preview gc-medieval-preview"><svg viewBox="0 0 100 100" aria-hidden="true"><path d="M15 88h70l-5 8H20zM23 80h54v8H23zM29 80c2-9 8-17 18-23-7-5-12-12-13-21-1-11 6-19 17-20L48 7l17 13c6-1 12 2 16 8l-8 9c7 6 10 15 7 23-2 6-7 10-12 13 0 3 2 5 5 7z"/></svg></span><strong>Medieval</strong><small>Carved, traditional silhouettes</small>
           </button>
           <button type="button" class="gc-piece-style-option" data-piece-style="modern" aria-pressed="false">
             <span class="gc-piece-style-preview gc-modern-preview">♘</span><strong>Modern</strong><small>Clean geometric pieces</small>
