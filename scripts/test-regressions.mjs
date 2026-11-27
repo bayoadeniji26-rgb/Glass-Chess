@@ -284,5 +284,6 @@ assert.match(onlinePreferencesSource, /getPlayerAvatar\(\)/, 'The selected avata
 assert.match(onlinePreferencesSource, /'♔', '♕', '♖'/, 'The avatar picker must offer chess-piece icon choices.');
 assert.match(finalMainSource, /dataset\.gcBoardTheme = selectedTheme/, 'The selected board theme must be explicit and persistent.');
 assert.match(finalPremiumSource, /dataset\.gcBoardTheme = theme/, 'Premium appearance updates must preserve the selected board theme.');
+assert.match(finalPremiumSource, /const boardTheme = api\.appearance\?\.theme/, 'Premium startup must not overwrite the main Settings board theme with an older saved value.');
 assert.match(finalUiSource, /savedSettings\.theme/, 'Delayed theme rendering must read the saved board theme rather than revert it.');
 assert.match(finalMainSource, /medieval: \{[\s\S]*?modern: \{/, 'The refined Medieval and Modern piece artwork must both be present.');
