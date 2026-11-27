@@ -74,6 +74,14 @@ import './glass-final-ui.css';
   }
 
   function themeName() {
+    // main.js owns the saved setting. Read its explicit value first so a delayed
+    // cosmetic repaint can never revert a theme to an old Premium default.
+    const current = document.body?.dataset?.gcBoardTheme;
+    if (PALETTES[current]) return current;
+    try {
+      const savedSettings = JSON.parse(localStorage.getItem('glass-chess-settings') || '{}');
+      if (PALETTES[savedSettings.theme]) return savedSettings.theme;
+    } catch {}
     for (const name of Object.keys(PALETTES)) {
       if (document.body.classList.contains(`gc-theme-${name}`)) return name;
     }
