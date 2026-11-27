@@ -1019,8 +1019,8 @@ function updateAnalysisEvalRail(info, side) {
   if (!rail || !info) return;
   let type = "", value = null;
   if (typeof info === "string") {
-    const cp = info.match(/\\bscore cp (-?\\d+)/);
-    const mate = info.match(/\\bscore mate (-?\\d+)/);
+    const cp = info.match(/\bscore cp (-?\d+)/);
+    const mate = info.match(/\bscore mate (-?\d+)/);
     if (mate) { type = "mate"; value = Number(mate[1]); }
     else if (cp) { type = "cp"; value = Number(cp[1]); }
   } else if (info.score) {
@@ -1037,7 +1037,14 @@ function updateAnalysisEvalRail(info, side) {
   const whitePercent = type === "mate"
     ? (whiteValue > 0 ? 96 : whiteValue < 0 ? 4 : 50)
     : Math.max(4, Math.min(96, 50 + whiteValue / 100 * 8));
-  $("gc-analysis-eval-fill").style.height = whitePercent + "%";
+  const fill = $("gc-analysis-eval-fill");
+  if (rail.dataset.orientation === "horizontal") {
+    fill.style.width = whitePercent + "%";
+    fill.style.height = "100%";
+  } else {
+    fill.style.width = "100%";
+    fill.style.height = whitePercent + "%";
+  }
   rail.setAttribute("aria-label", `Analysis evaluation ${scoreText}, depth ${info.depth || "updating"}`);
 }
 function updateAnalysisRailLayout() {
