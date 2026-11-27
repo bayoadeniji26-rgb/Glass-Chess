@@ -282,6 +282,9 @@ assert.match(finalPremiumSource, /opponentRating = Number\(api\.botRating\)/, 'T
 assert.match(onlinePreferencesSource, /gc-victory-confetti/, 'Checkmate results must include a confetti animation.');
 assert.match(onlinePreferencesSource, /getPlayerAvatar\(\)/, 'The selected avatar icon must be available to the board UI.');
 assert.match(onlinePreferencesSource, /'♔', '♕', '♖'/, 'The avatar picker must offer chess-piece icon choices.');
+assert.match(onlinePreferencesSource, /AVATARS\.includes\(value\.avatar\)/, 'Older animal avatars must migrate to the current icon set.');
+assert.match(onlinePreferencesSource, /if \(!state\.animations && !checkmate\)/, 'Disabling animation must not hide a checkmate result.');
+assert.match(onlinePreferencesSource, /checkmate && state\.animations/, 'Checkmate confetti must respect motion preferences.');
 assert.match(finalMainSource, /dataset\.gcBoardTheme = selectedTheme/, 'The selected board theme must be explicit and persistent.');
 assert.match(finalPremiumSource, /dataset\.gcBoardTheme = theme/, 'Premium appearance updates must preserve the selected board theme.');
 assert.match(finalPremiumSource, /const boardTheme = api\.appearance\?\.theme/, 'Premium startup must not overwrite the main Settings board theme with an older saved value.');
