@@ -155,7 +155,7 @@ function buildInterface() {
   root.innerHTML = `
     <div class="gc-head"><div><div class="gc-brand">GLASS CHESS</div><div class="gc-muted">Your premium chess workspace</div></div><span class="gc-tag">PREMIUM SUITE</span></div>
     <nav class="gc-tabs" aria-label="Premium features">
-      <button class="active" data-tab="home">Overview</button><button data-tab="train">Train</button><button data-tab="review">Review</button><button data-tab="custom">Customize</button>
+      <button class="active" data-tab="home">Overview</button><button data-tab="train">Train</button><button data-tab="review">Review</button>
     </nav>
     <section class="gc-view active" data-view="home">
       <div class="gc-card"><div class="gc-row"><div><div class="gc-stat-label">Player profile</div><div class="gc-stat" id="gc-player-name">Player</div><div class="gc-muted">Local rating · saved on this device</div></div><div class="gc-stat" id="gc-rating">1200</div></div><div class="gc-actions"><input id="gc-name-input" maxlength="22" aria-label="Player name" placeholder="Your display name"><button id="gc-save-name">Save name</button></div></div>
@@ -229,7 +229,7 @@ function buildInterface() {
   panel.appendChild(root);
 }
 
-function $(id) { return root.querySelector(`#${id}`); }
+function $(id) { return document.getElementById(id) || root.querySelector(`#${id}`); }
 
 function switchTab(name) {
   root.querySelectorAll('[data-tab]').forEach(button => button.classList.toggle('active', button.dataset.tab === name));
@@ -276,10 +276,11 @@ function playTone(kind = 'move') {
 function applyTheme(name) {
   const theme = THEMES[name] ? name : 'midnight';
   Object.keys(THEMES).forEach(key => document.body.classList.toggle(`gc-theme-${key}`, key === theme));
+  document.body.dataset.gcBoardTheme = theme;
   api.updateAppearance?.({ theme });
   data.theme = theme;
   saveData();
-  root.querySelectorAll('[data-theme]').forEach(button => button.classList.toggle('active', button.dataset.theme === theme));
+  document.querySelectorAll('#gc-settings-appearance [data-theme], #gc-theme-list [data-theme]').forEach(button => button.classList.toggle('active', button.dataset.theme === theme));
   const boardSquares = [...document.querySelectorAll('[data-square]')];
   const colors = THEMES[theme];
   boardSquares.forEach(square => {
@@ -372,7 +373,8 @@ function recordFinishedGame() {
   else if (result === 'loss') data.losses += 1;
   else data.draws += 1;
   if (api.mode === 'computer') {
-    const expected = 1 / (1 + Math.pow(10, (1500 - data.rating) / 400));
+    const opponentRating = Number(api.botRating) || 1500;
+    const expected = 1 / (1 + Math.pow(10, (opponentRating - data.rating) / 400));
     const actual = result === 'win' ? 1 : result === 'draw' ? 0.5 : 0;
     data.rating = Math.max(100, Math.round(data.rating + 24 * (actual - expected)));
   }
@@ -983,6 +985,7 @@ export function mount(chessApi) {
     $('gc-puzzle-status').textContent = 'Create a puzzle from the current position, or begin a new game to track a full game from move one.';
   }
   window.GlassChessPremium = {
+    getRating: () => Math.round(Number(data.rating) || 1200),
     onMove,
     onReset,
     onUndo,
