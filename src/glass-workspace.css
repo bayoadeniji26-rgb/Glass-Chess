@@ -524,3 +524,30 @@ body.gc-analysis-mode #gc-analysis-eval-rail { display: flex; }
 @media (prefers-reduced-motion: reduce) {
   .gc-analysis-rail-track > span { transition: none; }
 }
+
+#gc-settings-online-preferences {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin-top: 12px;
+}
+#gc-settings-online-preferences > .gc-card {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid rgba(208,220,250,.13);
+  border-radius: 14px;
+  background: rgba(255,255,255,.035);
+}
+#gc-settings-online-preferences h4 {
+  margin-top: 0;
+  color: #e9d5a3;
+}
+#gc-settings-online-preferences .gc-plus-field,
+#gc-settings-online-preferences label {
+  max-width: 100%;
+}
+#gc-settings-online-preferences .gc-plus-skins {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 8px;
+}
