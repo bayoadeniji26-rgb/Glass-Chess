@@ -5,6 +5,7 @@ import { DAILY_PUZZLES, getPuzzleDayIndex } from '../src/daily-puzzle-data.js';
 import { calculatePositionHistory, isFlagFallDraw } from '../src/chess-position-tools.js';
 import { remainingSeconds } from '../src/gameplay-timers.js';
 import { MatchmakingQueue } from '../src/matchmaking-queue.js';
+import { isKingPawnQuestion } from '../src/king-pawn-responder.js';
 
 const uci = move => move.from + move.to + (move.promotion || '');
 
@@ -248,3 +249,40 @@ assert.ok(premiumUi.includes('liveAnalysisEngine.stop()'), 'Position changes and
 assert.ok(premiumUi.includes('liveAnalysisSuppressed = true'), 'Live Engine Lab must stay out of the way while a training puzzle is active.');
 const liveRunner = premiumUi.slice(premiumUi.indexOf('async function runLiveAnalysis'), premiumUi.indexOf('function moveClass(loss)'));
 assert.ok(!liveRunner.includes('api.search('), 'Live Engine Lab must not use the main game thinking lock.');
+
+assert.equal(isKingPawnQuestion('What is photosynthesis?'), true, 'King Pawn must accept general questions.');
+assert.equal(isKingPawnQuestion(''), false, 'King Pawn must reject empty questions.');
+
+const responderSource = readFileSync(new URL('../src/king-pawn-responder.js', import.meta.url), 'utf8');
+assert.match(responderSource, /friendly general-purpose assistant/, 'King Pawn must be a general-purpose assistant.');
+assert.match(responderSource, /secure AI service is available/, 'King Pawn must be honest when general AI is offline.');
+const kingPawnServerSource = readFileSync(new URL('../server.mjs', import.meta.url), 'utf8');
+assert.match(kingPawnServerSource, /isKingPawnQuestion\(question\)/, 'The server must accept general non-empty questions.');
+assert.doesNotMatch(kingPawnServerSource, /isChessQuestion\(question/, 'The server must not keep the old chess-only request gate.');
+assert.match(kingPawnServerSource, /age-appropriate/, 'King Pawn must use age-appropriate response guidance.');
+
+const workspaceSource = readFileSync(new URL('../src/glass-workspace.js', import.meta.url), 'utf8');
+const onlinePreferencesSource = readFileSync(new URL('../src/onlineplus.js', import.meta.url), 'utf8');
+const finalMainSource = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+const finalWorkspaceCss = readFileSync(new URL('../src/glass-workspace.css', import.meta.url), 'utf8');
+const finalDockSource = readFileSync(new URL('../src/glass-dock.js', import.meta.url), 'utf8');
+const finalUiSource = readFileSync(new URL('../src/glass-final-ui.js', import.meta.url), 'utf8');
+const finalPremiumSource = readFileSync(new URL('../src/premium.js', import.meta.url), 'utf8');
+assert.match(finalMainSource, /gc-stockfish-mark/, 'The computer opponent must display a Stockfish engine icon.');
+assert.match(finalMainSource, /BOT_PROFILE_INFO/, 'Stockfish must offer multiple named difficulty levels.');
+assert.match(finalMainSource, /ratingLabel/, 'The Stockfish nameplate must show an explicitly estimated rating.');
+assert.match(finalMainSource, /gc-analysis-eval-rail/, 'Analysis Studio must create an evaluation rail alongside the board.');
+assert.match(finalWorkspaceCss, /gc-analysis-rail-track/, 'The Analysis Studio evaluation rail must have modern styling.');
+assert.match(workspaceSource, /gc-settings-online-preferences/, 'The Settings drawer must host profile and appearance preferences.');
+assert.match(workspaceSource, /#gc-plus-skins/, 'Piece finishes must be moved to Settings.');
+assert.match(workspaceSource, /#gc-plus-sound/, 'Sound and animation preferences must be moved to Settings.');
+assert.doesNotMatch(finalDockSource, /id: "style", label: "Appearance"/, 'Appearance must not remain a Tools category.');
+assert.match(finalPremiumSource, /getRating:/, 'The local player Elo must be exposed to the main game UI.');
+assert.match(finalPremiumSource, /opponentRating = Number\(api\.botRating\)/, 'The rating update must use the selected Stockfish level.');
+assert.match(onlinePreferencesSource, /gc-victory-confetti/, 'Checkmate results must include a confetti animation.');
+assert.match(onlinePreferencesSource, /getPlayerAvatar\(\)/, 'The selected avatar icon must be available to the board UI.');
+assert.match(onlinePreferencesSource, /'♔', '♕', '♖'/, 'The avatar picker must offer chess-piece icon choices.');
+assert.match(finalMainSource, /data\.gcBoardTheme = selectedTheme/, 'The selected board theme must be explicit and persistent.');
+assert.match(finalPremiumSource, /data\.gcBoardTheme = theme/, 'Premium appearance updates must preserve the selected board theme.');
+assert.match(finalUiSource, /savedSettings\.theme/, 'Delayed theme rendering must read the saved board theme rather than revert it.');
+assert.match(finalMainSource, /medieval: \{[\s\S]*?modern: \{/, 'The refined Medieval and Modern piece artwork must both be present.');
