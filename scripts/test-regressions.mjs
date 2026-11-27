@@ -255,7 +255,7 @@ assert.equal(isKingPawnQuestion(''), false, 'King Pawn must reject empty questio
 
 const responderSource = readFileSync(new URL('../src/king-pawn-responder.js', import.meta.url), 'utf8');
 assert.match(responderSource, /friendly general-purpose assistant/, 'King Pawn must be a general-purpose assistant.');
-assert.match(responderSource, /secure AI service is available/, 'King Pawn must be honest when general AI is offline.');
+assert.match(responderSource, /internet connection is working|could not reach King Pawn’s answer service/, 'King Pawn must distinguish backend setup errors from actual connection errors.');
 const kingPawnServerSource = readFileSync(new URL('../server.mjs', import.meta.url), 'utf8');
 assert.match(kingPawnServerSource, /isKingPawnQuestion\(question\)/, 'The server must accept general non-empty questions.');
 assert.doesNotMatch(kingPawnServerSource, /isChessQuestion\(question/, 'The server must not keep the old chess-only request gate.');
