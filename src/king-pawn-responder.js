@@ -99,7 +99,7 @@ export function createKingPawnResponder(options = {}) {
     try { context = getContext() || {}; }
     catch (error) { console.warn('King Pawn could not read the live board:', error); }
     const isChess = isChessQuestion(question, context);
-    const board = {
+    const board = isChess ? {
       fen: String(context.fen || ''),
       pgn: String(context.pgn || '').slice(0, 12000),
       history: Array.isArray(context.history) ? context.history.slice(-160) : [],
@@ -114,7 +114,7 @@ export function createKingPawnResponder(options = {}) {
             content: String(message?.content || '').slice(0, 700)
           }))
         : []
-    };
+    } : {};
 
     const adapter = customAdapter || (endpoint ? endpointAdapter : null);
     if (adapter) {
