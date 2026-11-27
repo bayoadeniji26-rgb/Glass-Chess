@@ -25,11 +25,17 @@ import './glass-workspace.css';
       premiumHost.appendChild(customize);
     }
 
-    for (const id of ['gc-plus-avatar-select', 'gc-plus-banner-select']) {
-      const select = document.getElementById(id);
-      const field = select?.closest('label');
-      if (field && field.parentElement?.id !== 'gc-settings-avatar-content') {
-        avatarHost.appendChild(field);
+    const preferences = $('#gc-settings-online-preferences');
+    const preferenceCards = [
+      '#gc-plus-avatar-select',
+      '#gc-plus-skins',
+      '#gc-plus-sound'
+    ];
+    for (const selector of preferenceCards) {
+      const control = $(selector);
+      const card = control?.closest('.gc-card');
+      if (card && preferences && card.parentElement !== preferences) {
+        preferences.appendChild(card);
       }
     }
   }
@@ -80,8 +86,8 @@ import './glass-workspace.css';
           <p class="eyebrow">APPEARANCE & BOARD</p>
           <p class="gc-settings-intro">Your board themes, piece designs, colors, sounds, avatars and visual preferences live here.</p>
           <div id="gc-settings-core"></div>
-          <section id="gc-settings-premium-content" aria-label="Premium appearance settings"></section>
-          <section id="gc-settings-avatar-content" aria-label="Profile icons and banners"></section>
+          <section id="gc-settings-premium-content" aria-label="Board themes and piece appearance"></section>
+          <section id="gc-settings-online-preferences" aria-label="Player identity, piece finishes, sound and animation"></section>
         </section>
       `;
     }
