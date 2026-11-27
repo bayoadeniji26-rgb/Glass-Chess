@@ -19,13 +19,19 @@ const PIECES = {
   bk: "♚", bq: "♛", br: "♜", bb: "♝", bn: "♞", bp: "♟︎"
 };
 
-const PROFILES = {
-  casual: 3,
-  tactical: 7,
-  positional: 11,
-  master: 16,
-  maximum: 20
+const BOT_PROFILE_INFO = {
+  beginner: { label: "Beginner", skillLevel: 0, rating: 650, ratingLabel: "≈650 Elo · estimate" },
+  casual: { label: "Casual", skillLevel: 3, rating: 950, ratingLabel: "≈950 Elo · estimate" },
+  club: { label: "Club", skillLevel: 6, rating: 1250, ratingLabel: "≈1250 Elo · estimate" },
+  tactical: { label: "Tactical", skillLevel: 9, rating: 1550, ratingLabel: "≈1550 Elo · estimate" },
+  positional: { label: "Positional", skillLevel: 12, rating: 1900, ratingLabel: "≈1900 Elo · estimate" },
+  expert: { label: "Expert", skillLevel: 16, rating: 2300, ratingLabel: "≈2300 Elo · estimate" },
+  master: { label: "Master", skillLevel: 19, rating: 2800, ratingLabel: "≈2800 Elo · estimate" },
+  maximum: { label: "Maximum", skillLevel: 20, rating: 3200, ratingLabel: "3200+ Elo · estimate" }
 };
+const PROFILES = Object.fromEntries(
+  Object.entries(BOT_PROFILE_INFO).map(([key, value]) => [key, value.skillLevel])
+);
 
 const THEMES = {
   midnight: ["#d9dfeb", "#52647f"],
@@ -225,6 +231,7 @@ function applyBoardTheme(theme, syncPremium = true, shouldRender = true) {
     Object.keys(THEMES).forEach(name => {
       document.body.classList.toggle(`gc-theme-${name}`, name === selectedTheme);
     });
+    document.body.dataset.gcBoardTheme = selectedTheme;
   }
 
   const selector = $("gc-theme");
@@ -686,6 +693,25 @@ function formatSeatRating(player) {
     : "Elo: Unrated";
 }
 
+function updateStockfishMark(enabled) {
+  const label = $("opponent-name")?.closest(".player-label");
+  if (!label) return;
+  let mark = label.querySelector(":scope > .gc-stockfish-mark");
+  if (!enabled) {
+    mark?.remove();
+    label.classList.remove("gc-stockfish-seat");
+    return;
+  }
+  label.classList.add("gc-stockfish-seat");
+  if (!mark) {
+    mark = document.createElement("span");
+    mark.className = "gc-stockfish-mark";
+    mark.setAttribute("aria-hidden", "true");
+    mark.title = "Stockfish chess engine";
+    mark.innerHTML = '<svg viewBox="0 0 32 32" focusable="false"><path d="M5 25.5c2.7-2.7 3.1-6.4 2.1-10.2C6 10.8 8.8 5.2 14.1 4.3c3.4-.6 6.3.9 8.1 3.3l5-1.2-1.1 5.1c2.3 2.7 2.5 6.3.8 9.1-1.8 3.1-5.3 4.8-9.8 4.8H5Z" fill="currentColor"/><path d="M13 11.6c1.2-1.2 3.1-1.2 4.2 0m-3.3 4.5h.1" fill="none" stroke="#10251b" stroke-width="1.8" stroke-linecap="round"/><path d="M9 25.5h17" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/></svg>';
+    $("opponent-name").before(mark);
+  }
+}
 function updateLabels() {
   const online = window.GlassChessOnlinePlus;
   const isOnlineMatch = online?.isOnline?.() === true;
@@ -694,20 +720,24 @@ function updateLabels() {
   const topMeta = $("opponent-label");
   const bottomMeta = $("player-label");
   if (!topName || !bottomName || !topMeta || !bottomMeta) return;
+  document.body.classList.toggle("gc-analysis-mode", gameMode === "analysis" && !isOnlineMatch);
+  updateAnalysisRailLayout();
 
-  // Stockfish is a seat label only in a game where the computer is actually the opponent.
   if (gameMode === "computer" && !isOnlineMatch) {
+    updateStockfishMark(true);
+    const bot = BOT_PROFILE_INFO[profile] || BOT_PROFILE_INFO.casual;
+    const localRating = Number(window.GlassChessPremium?.getRating?.());
     topName.textContent = "Stockfish";
-    topMeta.textContent = "Computer";
+    topMeta.textContent = `${bot.ratingLabel} · Level ${bot.skillLevel}`;
     bottomName.textContent = "You";
-    bottomMeta.textContent = playerColor === "white" ? "White" : "Black";
+    bottomMeta.textContent = `${playerColor === "white" ? "White" : "Black"} · ${Number.isFinite(localRating) ? Math.round(localRating) + " Elo" : "Unrated"}`;
     return;
   }
+  updateStockfishMark(false);
 
   const topSide = boardIsFlipped() ? "w" : "b";
   const bottomSide = topSide === "w" ? "b" : "w";
   const sideName = side => side === "w" ? "White" : "Black";
-
   if (gameMode === "analysis" && !isOnlineMatch) {
     topName.textContent = sideName(topSide);
     topMeta.textContent = "Analysis board";
@@ -715,7 +745,6 @@ function updateLabels() {
     bottomMeta.textContent = "Analysis board";
     return;
   }
-
   const players = isOnlineMatch ? online.getPlayers?.() || null : null;
   const signedInName = getSignedInDisplayName();
   const signedInSide = playerColor === "white" ? "w" : "b";
@@ -727,7 +756,6 @@ function updateLabels() {
     return side === signedInSide ? signedInName : "Anonymous";
   };
   const ratingForSide = side => formatSeatRating(players?.[side]);
-
   topName.textContent = nameForSide(topSide);
   topMeta.textContent = `${sideName(topSide)} · ${ratingForSide(topSide)}`;
   bottomName.textContent = nameForSide(bottomSide);
@@ -986,8 +1014,57 @@ function getEngineMove(uci) {
 // ENGINE EVALUATION
 // ============================================
 
+function updateAnalysisEvalRail(info, side) {
+  const rail = $("gc-analysis-eval-rail");
+  if (!rail || !info) return;
+  let type = "", value = null;
+  if (typeof info === "string") {
+    const cp = info.match(/\\bscore cp (-?\\d+)/);
+    const mate = info.match(/\\bscore mate (-?\\d+)/);
+    if (mate) { type = "mate"; value = Number(mate[1]); }
+    else if (cp) { type = "cp"; value = Number(cp[1]); }
+  } else if (info.score) {
+    type = String(info.score.type || "").toLowerCase();
+    value = Number(info.score.value);
+  }
+  if (!Number.isFinite(value)) return;
+  const whiteValue = side === "b" ? -value : value;
+  const scoreText = type === "mate"
+    ? `M${whiteValue}`
+    : (whiteValue > 0 ? "+" : "") + (whiteValue / 100).toFixed(2);
+  $("gc-analysis-eval-score").textContent = scoreText;
+  $("gc-analysis-eval-depth").textContent = info.depth ? `DEPTH ${info.depth}` : "LIVE";
+  const whitePercent = type === "mate"
+    ? (whiteValue > 0 ? 96 : whiteValue < 0 ? 4 : 50)
+    : Math.max(4, Math.min(96, 50 + whiteValue / 100 * 8));
+  $("gc-analysis-eval-fill").style.height = whitePercent + "%";
+  rail.setAttribute("aria-label", `Analysis evaluation ${scoreText}, depth ${info.depth || "updating"}`);
+}
+function updateAnalysisRailLayout() {
+  const rail = $("gc-analysis-eval-rail");
+  const boardElement = $("board");
+  const host = document.querySelector(".board-section");
+  if (!rail || !boardElement || !host) return;
+  const boardRect = boardElement.getBoundingClientRect();
+  const hostRect = host.getBoundingClientRect();
+  const room = boardRect.left - hostRect.left;
+  if (room >= 42) {
+    rail.dataset.orientation = "vertical";
+    rail.style.left = Math.max(2, room - 38) + "px";
+    rail.style.top = (boardRect.top - hostRect.top) + "px";
+    rail.style.width = "30px";
+    rail.style.height = boardRect.height + "px";
+  } else {
+    rail.dataset.orientation = "horizontal";
+    rail.style.left = Math.max(0, boardRect.left - hostRect.left) + "px";
+    rail.style.top = Math.max(0, boardRect.top - hostRect.top - 25) + "px";
+    rail.style.width = boardRect.width + "px";
+    rail.style.height = "18px";
+  }
+}
 function updateEvaluation(info, side) {
   window.GlassChessGameplaySuite?.setEvaluation?.(info, side);
+  updateAnalysisEvalRail(info, side);
   if (!settings.evaluation || !info) return;
 
   let type = "";
@@ -1118,40 +1195,59 @@ async function computerMove() {
 
 function createAnalysisStudio() {
   const panel = document.querySelector(".analysis-panel");
-  if (!panel || $("gc-analysis-studio")) return;
+  const boardSection = document.querySelector(".board-section");
+  if (!panel || !boardSection || $("gc-analysis-studio")) return;
+
+  const rail = document.createElement("aside");
+  rail.id = "gc-analysis-eval-rail";
+  rail.dataset.orientation = "vertical";
+  rail.innerHTML = `
+    <strong id="gc-analysis-eval-score">0.00</strong>
+    <div class="gc-analysis-rail-track"><span id="gc-analysis-eval-fill"></span><i></i></div>
+    <small id="gc-analysis-eval-depth">LIVE</small>
+  `;
+  rail.hidden = false;
+  boardSection.appendChild(rail);
 
   const studio = document.createElement("section");
   studio.id = "gc-analysis-studio";
-  studio.style.marginTop = "18px";
-  studio.style.paddingTop = "16px";
-  studio.style.borderTop = "1px solid var(--border, #777)";
-
   studio.innerHTML = `
-    <h3>Analysis Studio</h3>
-    <p id="gc-analysis-status">Choose Analysis Studio to begin.</p>
-    <label for="gc-analysis-depth">Analysis depth</label>
-    <select id="gc-analysis-depth">
-      <option value="7">Quick · Depth 7</option>
-      <option value="12" selected>Balanced · Depth 12</option>
-      <option value="18">Deep · Depth 18</option>
-    </select>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+    <header class="gc-analysis-studio-head">
+      <div><p class="eyebrow">STOCKFISH WORKSPACE</p><h3>Analysis Studio</h3></div>
+      <span class="gc-analysis-live-pill"><i></i> LIVE ENGINE</span>
+    </header>
+    <p id="gc-analysis-status" class="gc-analysis-status">Choose Analysis Studio to begin.</p>
+    <div class="gc-analysis-controls">
+      <label for="gc-analysis-depth">Search depth
+        <select id="gc-analysis-depth">
+          <option value="7">Quick · 7</option>
+          <option value="12" selected>Balanced · 12</option>
+          <option value="18">Deep · 18</option>
+        </select>
+      </label>
       <button type="button" id="gc-analyze">Analyze position</button>
       <button type="button" id="gc-play-best">Play best move</button>
     </div>
-    <p id="gc-analysis-recommendation">No recommendation yet.</p>
+    <div class="gc-analysis-recommendation-card">
+      <small>ENGINE RECOMMENDATION</small>
+      <p id="gc-analysis-recommendation">Waiting for a position to analyze.</p>
+    </div>
   `;
-
   panel.appendChild(studio);
+  const align = () => updateAnalysisRailLayout();
+  window.addEventListener("resize", align, { passive: true });
+  window.addEventListener("orientationchange", align, { passive: true });
+  if (typeof ResizeObserver === "function") {
+    const observer = new ResizeObserver(align);
+    observer.observe(boardSection);
+    observer.observe($("board"));
+  }
+  requestAnimationFrame(align);
 
   $("gc-analysis-depth").addEventListener("change", event => {
     analysisDepth = Number(event.target.value) || 12;
   });
-
-  $("gc-analyze").addEventListener("click", () => {
-    void analyzePosition();
-  });
-
+  $("gc-analyze").addEventListener("click", () => void analyzePosition());
   $("gc-play-best").addEventListener("click", playBestMove);
 }
 
@@ -1304,10 +1400,10 @@ async function startGame() {
     ? (Math.random() < 0.5 ? "white" : "black")
     : chosen;
   const requestedProfile = $("profile").value;
-  const skillLevel = window.GlassChessOnlinePlus?.getEngineSkillLevel?.()
+  const skillLevel = BOT_PROFILE_INFO[requestedProfile]?.skillLevel
     ?? PROFILES[requestedProfile] ?? 10;
   const labOptions = window.GlassChessGameplaySuite?.getEngineOptions?.();
-  const options = labOptions || { skillLevel };
+  const options = { ...(labOptions || {}), skillLevel };
 
   const token = ++gameToken;
   const onlineSession = window.GlassChessOnlinePlus;
@@ -1750,6 +1846,7 @@ function installGlassChessPremiumBridge() {
     get engineReady() { return Boolean(engine.ready); },
     get thinking() { return thinking; },
     get profile() { return profile; },
+    get botRating() { return BOT_PROFILE_INFO[profile]?.rating ?? BOT_PROFILE_INFO.casual.rating; },
     get initialFen() { return gameStartFen; },
     get startFen() { return gameStartFen; },
     get isFlipped() { return boardIsFlipped(); },
@@ -1809,7 +1906,7 @@ function installGlassChessPremiumBridge() {
         if (typeof patch.blackPieceColor === "string" && /^#[0-9a-f]{6}$/i.test(patch.blackPieceColor)) {
           settings.blackPieceColor = patch.blackPieceColor;
         }
-        if (THEMES[patch.theme]) {
+            if (THEMES[patch.theme]) {
           settings.theme = patch.theme;
           applyBoardTheme(patch.theme, false, false);
         }
