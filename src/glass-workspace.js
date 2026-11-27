@@ -10,8 +10,7 @@ import './glass-workspace.css';
   function moveSettingsContent() {
     const core = $('#gc-settings-core');
     const premiumHost = $('#gc-settings-premium-content');
-    const avatarHost = $('#gc-settings-avatar-content');
-    if (!core || !premiumHost || !avatarHost) return;
+    if (!core || !premiumHost) return;
 
     const options = $('#gc-options');
     if (options && options.parentElement !== core) core.appendChild(options);
