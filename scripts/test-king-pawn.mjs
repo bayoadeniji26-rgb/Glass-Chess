@@ -100,6 +100,8 @@ assert.match(capturedPayload.systemPrompt, /general-purpose assistant/i);
 const generalAnswer = await responder.ask('What is photosynthesis?');
 assert.equal(generalAnswer, 'A real AI answer about chess.');
 assert.equal(remoteCalls, 2, 'General knowledge questions must reach the configured AI provider.');
+assert.deepEqual(capturedPayload.board, {}, 'General questions must not send unnecessary live board data.');
+assert.equal(capturedPayload.conversation[0].content, 'How do I improve at chess?', 'General follow-ups should retain conversation context.');
 
 responder.setAIAdapter(async () => { throw new Error('Simulated provider outage.'); });
 const fallback = await responder.ask('When was chess invented?');
