@@ -164,7 +164,11 @@ function mountPersonalization() {
   createAvatar('opponent', 'opponent', '♚');
   createAvatar('player', 'player', '♔');
   applyAvatar('player', avatarImages.player || '');
-  document.addEventListener('glasschess:avatar-change', () => applyAvatar('player', avatarImages.player || ''));
+  document.addEventListener('glasschess:avatar-change', () => {
+    avatarImages.player = '';
+    applyAvatar('player', '');
+    queueSave({ avatars: { player: '' } });
+  });
   installBoardExportActions();
 
   const options = $('gc-options');
