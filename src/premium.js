@@ -1010,5 +1010,6 @@ export function mount(chessApi) {
     if (liveAnalysisTimer !== null) clearTimeout(liveAnalysisTimer);
     void liveAnalysisEngine?.stop?.();
   }, { once: true });
+  document.dispatchEvent(new CustomEvent('glasschess:premium-ready'));
   console.log('Glass Chess Premium Suite loaded.');
 }
