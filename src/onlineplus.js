@@ -40,7 +40,7 @@ const SKIN_COLORS = {
   crimson: { white: "#f4f2ed", black: "#7a2038" },
   frost: { white: "#eaf5ff", black: "#547999" }
 };
-const AVATARS = ['♟', '♞', '♜', '♛', '♚', '⚡', '🐉', '🦊', '🦅', '🐺'];
+const AVATARS = ['♔', '♕', '♖', '♗', '♘', '♙', '♚', '♛', '✦', '◈', '◇', '⚡', '🌙', '⭐'];
 const BANNERS = [
   { id: 'aurora', label: 'Aurora', css: 'linear-gradient(120deg,#152a4f,#315e79 48%,#986bb3)' },
   { id: 'ember', label: 'Ember', css: 'linear-gradient(120deg,#351b28,#9a3f38 55%,#e0a55c)' },
@@ -102,7 +102,7 @@ function todayKey() {
 
 function defaultState() {
   return {
-    name: 'Player', avatar: '♞', banner: 'aurora', xp: 0, pieceSkin: 'custom', pieceSkinVersion: 2,
+    name: 'Player', avatar: '♔', banner: 'aurora', xp: 0, pieceSkin: 'custom', pieceSkinVersion: 2,
     personality: 'balanced', animations: true, sound: true, friends: [], achievements: [],
     missionDay: todayKey(), missionProgress: { moves: 0, puzzle: 0, review: 0 }, missionClaimed: [],
     lastChallenge: '',
@@ -119,6 +119,8 @@ function loadState() {
       value.pieceSkin = 'custom';
       value.pieceSkinVersion = 2;
     }
+    // Migrate previous animal/emoji avatars into the new chess-themed icon set.
+    if (!AVATARS.includes(value.avatar)) value.avatar = '♔';
     if (!Array.isArray(value.friends)) value.friends = [];
     if (!Array.isArray(value.achievements)) value.achievements = [];
     if (!Array.isArray(value.missionClaimed)) value.missionClaimed = [];
@@ -265,6 +267,14 @@ function injectStyles() {
     /* One restrained entrance and a quiet result surface replace the old confetti loop. */
     #gc-plus-victory{background:rgba(5,10,19,.66);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);animation:gc-victory-fade .2s ease-out both}
     #gc-plus-victory .card{width:min(400px,calc(100vw - 32px));padding:30px 26px 24px;border-radius:20px;border:1px solid rgba(224,211,177,.24);background:linear-gradient(150deg,rgba(24,35,55,.97),rgba(27,29,53,.97));box-shadow:0 24px 80px rgba(0,0,0,.38);animation:gc-victory-arrive .36s cubic-bezier(.2,.75,.25,1) both}
+    #gc-plus-victory .card{position:relative;z-index:2}
+    #gc-plus-victory .gc-victory-confetti{position:fixed;inset:0;z-index:1;overflow:hidden;pointer-events:none}
+    #gc-plus-victory .gc-victory-confetti i{position:absolute;top:-18px;left:var(--gc-confetti-x);width:8px;height:13px;border-radius:2px;background:#e9d5a3;opacity:0;transform:rotate(var(--gc-confetti-turn));animation:gc-checkmate-confetti 2.2s cubic-bezier(.2,.65,.35,1) var(--gc-confetti-delay) both}
+    #gc-plus-victory .gc-victory-confetti i:nth-child(3n){background:#78d6b2;width:6px;height:10px}
+    #gc-plus-victory .gc-victory-confetti i:nth-child(3n + 1){background:#98b9ff;border-radius:50%;width:7px;height:7px}
+    #gc-plus-victory .gc-victory-confetti i:nth-child(3n + 2){background:#f5a6bd;width:5px;height:12px}
+    @keyframes gc-checkmate-confetti{0%{opacity:0;transform:translate3d(0,-5vh,0) rotate(0)}10%{opacity:1}100%{opacity:0;transform:translate3d(22px,110vh,0) rotate(660deg)}}
+    @media(prefers-reduced-motion:reduce){#gc-plus-victory .gc-victory-confetti{display:none}}
     #gc-plus-victory .gc-victory-mark{width:68px;height:68px;display:grid;place-items:center;margin:0 auto 14px;border:1px solid rgba(232,207,151,.38);border-radius:21px;background:radial-gradient(circle at 35% 25%,rgba(237,214,169,.22),rgba(255,255,255,.035));color:#f0dcae;font-size:39px;filter:drop-shadow(0 5px 16px rgba(218,190,130,.17))}
     #gc-plus-victory .gc-victory-kicker{margin:0 0 8px;color:#b5c0d5;font-size:9px;font-weight:800;letter-spacing:.2em}
     #gc-plus-victory h2{margin:0 0 8px;color:#f4f0e8;font-size:25px;letter-spacing:.09em}
@@ -385,14 +395,16 @@ function renderProfile() {
   root.querySelector('#gc-plus-avatar').textContent = state.avatar;
   root.querySelector('#gc-plus-name').textContent = state.name;
   root.querySelector('#gc-plus-name-input').value = state.name;
-  root.querySelector('#gc-plus-avatar-select').value = state.avatar;
-  root.querySelector('#gc-plus-banner-select').value = state.banner;
+  const avatarSelect = document.getElementById('gc-plus-avatar-select');
+  const bannerSelect = document.getElementById('gc-plus-banner-select');
+  if (avatarSelect) avatarSelect.value = state.avatar;
+  if (bannerSelect) bannerSelect.value = state.banner;
   root.querySelector('#gc-plus-level').textContent = `Level ${level.level} · ${state.xp} XP · ${level.next} XP to next level`;
   root.querySelector('#gc-plus-xpbar').style.width = `${level.into / 250 * 100}%`;
   root.querySelector('#gc-plus-personality').value = state.personality;
   root.querySelector('#gc-plus-personality-note').textContent = PERSONALITIES[state.personality].note;
-  root.querySelector('#gc-plus-sound').checked = state.sound;
-  root.querySelector('#gc-plus-animations').checked = state.animations;
+  document.getElementById('gc-plus-sound').checked = state.sound;
+  document.getElementById('gc-plus-animations').checked = state.animations;
   applyBanner();
 }
 
@@ -416,16 +428,16 @@ function renderAchievements() {
 }
 
 function renderSkins() {
-  root.querySelector('#gc-plus-skin-xp').textContent = `${state.xp} XP`;
-  root.querySelector('#gc-plus-skins').innerHTML = SKINS.map(skin => {
+  document.getElementById('gc-plus-skin-xp').textContent = `${state.xp} XP`;
+  document.getElementById('gc-plus-skins').innerHTML = SKINS.map(skin => {
     const unlocked = state.xp >= skin.unlock;
     return `<button class="gc-plus-skin ${state.pieceSkin === skin.id ? 'active' : ''}" data-skin="${skin.id}" ${unlocked ? '' : 'disabled'}><span class="sample">${skin.icon} ♞</span><strong>${esc(skin.name)}</strong><div class="gc-plus-small">${unlocked ? esc(skin.desc) : `Unlock at ${skin.unlock} XP`}</div></button>`;
   }).join('');
   const current = SKINS.find(item => item.id === state.pieceSkin);
-  root.querySelector('#gc-plus-skin-current').textContent = current
+  document.getElementById('gc-plus-skin-current').textContent = current
     ? `${current.name} finish is active on the board. Select another finish or change a piece color to use a custom appearance.`
     : 'Custom piece colors are active. Your Glass, Medieval or Modern design stays selected.';
-  root.querySelectorAll('[data-skin]').forEach(button => button.addEventListener('click', () => {
+  document.querySelectorAll('#gc-plus-skins [data-skin]').forEach(button => button.addEventListener('click', () => {
     const skin = SKINS.find(item => item.id === button.dataset.skin);
     if (!skin || state.xp < skin.unlock) return;
     state.pieceSkin = skin.id;
@@ -873,7 +885,7 @@ async function startDailyChallenge() {
 
 function showVictory(message) {
   const checkmate = Boolean(api?.checkmate) || /checkmate/i.test(String(message));
-  if (!state.animations) {
+  if (!state.animations && !checkmate) {
     toast(message);
     return;
   }
@@ -905,7 +917,13 @@ function showVictory(message) {
     overlay.setAttribute('aria-labelledby', 'gc-plus-victory-title');
     overlay.setAttribute('aria-describedby', 'gc-plus-victory-message');
     overlay.tabIndex = -1;
+    const confetti = checkmate && state.animations && !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      ? '<div class="gc-victory-confetti" aria-hidden="true">' + Array.from({ length: 42 }, (_, index) =>
+          '<i style="--gc-confetti-x:' + ((index * 37) % 100) + '%;--gc-confetti-delay:' + ((index % 9) * -0.13) + 's;--gc-confetti-turn:' + ((index * 71) % 360) + 'deg"></i>'
+        ).join('') + '</div>'
+      : '';
     overlay.innerHTML = `
+      ${confetti}
       <section class="card">
         <span class="gc-victory-mark" aria-hidden="true">${checkmate ? '♛' : '♔'}</span>
         <p class="gc-victory-kicker">GLASS CHESS · RESULT</p>
@@ -936,7 +954,7 @@ function showVictory(message) {
     if (!checkmate) playChime('victory');
   };
 
-  if (checkmate && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  if (checkmate && state.animations && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     victoryPresentationTimer = window.setTimeout(present, 1500);
   } else {
     present();
@@ -957,8 +975,8 @@ function applyPieceSkin(applyPreset = false) {
       whitePieceColor: colors.white,
       blackPieceColor: colors.black
     });
-    const whitePicker = root.querySelector('#gc-white-piece-color');
-    const blackPicker = root.querySelector('#gc-black-piece-color');
+    const whitePicker = document.getElementById('gc-white-piece-color');
+    const blackPicker = document.getElementById('gc-black-piece-color');
     if (whitePicker) whitePicker.value = colors.white;
     if (blackPicker) blackPicker.value = colors.black;
   }
@@ -1034,9 +1052,11 @@ function renderRewards() {
 function bindUI() {
   root.querySelector('#gc-plus-profile-save').addEventListener('click', () => {
     state.name = root.querySelector('#gc-plus-name-input').value.trim().slice(0, 20) || 'Player';
-    state.avatar = root.querySelector('#gc-plus-avatar-select').value;
-    state.banner = root.querySelector('#gc-plus-banner-select').value;
-    saveState(); renderProfile(); toast('Player profile saved.');
+    state.avatar = document.getElementById('gc-plus-avatar-select')?.value || state.avatar;
+    state.banner = document.getElementById('gc-plus-banner-select')?.value || state.banner;
+    saveState(); renderProfile();
+    document.dispatchEvent(new CustomEvent('glasschess:avatar-change', { detail: { avatar: state.avatar } }));
+    toast('Player profile saved.');
   });
   root.querySelector('#gc-plus-find-match').addEventListener('click', findMatch);
   root.querySelector('#gc-plus-cancel-match').addEventListener('click', cancelMatch);
@@ -1063,9 +1083,9 @@ function bindUI() {
   });
   root.querySelector('#gc-plus-personality-apply').addEventListener('click', applyPersonality);
   root.querySelector('#gc-plus-settings-save').addEventListener('click', () => {
-    state.sound = root.querySelector('#gc-plus-sound').checked;
-    state.animations = root.querySelector('#gc-plus-animations').checked;
-    const legacySound = root.querySelector('#gc-sound-toggle');
+    state.sound = document.getElementById('gc-plus-sound').checked;
+    state.animations = document.getElementById('gc-plus-animations').checked;
+    const legacySound = document.getElementById('gc-sound-toggle');
     if (legacySound) { legacySound.checked = state.sound; legacySound.dispatchEvent(new Event('change', { bubbles: true })); }
     saveState(); applyPieceSkin(); toast('Sound and animation settings saved.');
   });
@@ -1135,6 +1155,7 @@ export function mountOnlinePlus(chessApi, premiumRoot) {
   applyPieceSkin();
   installPieceObserver();
   window.GlassChessOnlinePlus = {
+    getPlayerAvatar() { return state.avatar || '♔'; },
     isOnline() { return Boolean(online.code); },
     isMatchmaking() { return matchmakingActive || onlineRequestActive; },
     exitOnlineSession(options = {}) { return leaveRoom(options); },
@@ -1202,6 +1223,7 @@ export function mountOnlinePlus(chessApi, premiumRoot) {
       if (games >= 10) awardAchievement('ten-games');
     }
   };
+  document.dispatchEvent(new CustomEvent('glasschess:avatar-change', { detail: { avatar: state.avatar } }));
   if (api.engineReady) void applyPersonality();
   else {
     const wait = window.setInterval(() => {

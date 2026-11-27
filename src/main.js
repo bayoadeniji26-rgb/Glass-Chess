@@ -19,13 +19,19 @@ const PIECES = {
   bk: "♚", bq: "♛", br: "♜", bb: "♝", bn: "♞", bp: "♟︎"
 };
 
-const PROFILES = {
-  casual: 3,
-  tactical: 7,
-  positional: 11,
-  master: 16,
-  maximum: 20
+const BOT_PROFILE_INFO = {
+  beginner: { label: "Beginner", skillLevel: 0, rating: 650, ratingLabel: "≈650 Elo · estimate" },
+  casual: { label: "Casual", skillLevel: 3, rating: 950, ratingLabel: "≈950 Elo · estimate" },
+  club: { label: "Club", skillLevel: 6, rating: 1250, ratingLabel: "≈1250 Elo · estimate" },
+  tactical: { label: "Tactical", skillLevel: 9, rating: 1550, ratingLabel: "≈1550 Elo · estimate" },
+  positional: { label: "Positional", skillLevel: 12, rating: 1900, ratingLabel: "≈1900 Elo · estimate" },
+  expert: { label: "Expert", skillLevel: 16, rating: 2300, ratingLabel: "≈2300 Elo · estimate" },
+  master: { label: "Master", skillLevel: 19, rating: 2800, ratingLabel: "≈2800 Elo · estimate" },
+  maximum: { label: "Maximum", skillLevel: 20, rating: 3200, ratingLabel: "3200+ Elo · estimate" }
 };
+const PROFILES = Object.fromEntries(
+  Object.entries(BOT_PROFILE_INFO).map(([key, value]) => [key, value.skillLevel])
+);
 
 const THEMES = {
   midnight: ["#d9dfeb", "#52647f"],
@@ -47,20 +53,20 @@ const LEGACY_THEME_MAP = {
 
 const PIECE_SVG = {
   medieval: {
-    p: `<path d="M20 84h60l-5 10H25zM33 82c2-8 11-13 11-23 0-5-5-9-5-15 0-10 5-18 11-21 7 3 12 11 12 21 0 6-5 10-5 15 0 10 9 15 11 23z"/><circle cx="50" cy="14" r="10"/><path d="M29 88h42M42 57h16" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2.5"/>`,
-    r: `<path d="M23 15h12v11h10V15h10v11h10V15h12v27H23zM29 42h42l-5 40H34zM20 82h60l-5 12H25z"/><path d="M31 48v27M50 48v27M69 48v27" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2.5"/>`,
-    n: `<path d="M20 84h60l-5 10H25zM28 82c4-14 8-25 4-36l-5-12 15-17 20 7 14 19-5 39z"/><path d="M43 25c-1 10 6 14 15 16l8 12-9 6-11-12-11-2 6-12z"/><circle cx="48" cy="36" r="2.5" fill="var(--gc-piece-highlight)" stroke="none"/><path d="M36 72h30" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2.5"/>`,
-    b: `<path d="M20 84h60l-5 10H25zM33 82c2-12 8-17 9-27-8-6-10-17-3-27l11-15 11 15c7 10 5 21-3 27 1 10 7 15 9 27z"/><path d="M50 20l-6 17 7 8-6 9" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="3"/><path d="M30 88h40" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2.5"/>`,
-    q: `<path d="M20 84h60l-5 10H25zM29 82l-7-40 17 14 11-34 11 34 17-14-7 40z"/><circle cx="22" cy="37" r="6"/><circle cx="39" cy="54" r="5"/><circle cx="50" cy="18" r="6"/><circle cx="61" cy="54" r="5"/><circle cx="78" cy="37" r="6"/><path d="M33 72h34" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2.5"/>`,
-    k: `<path d="M20 84h60l-5 10H25zM32 82c2-13 8-17 8-29h20c0 12 6 16 8 29z"/><path d="M46 12h8v12h12v8H54v12h-8V32H34v-8h12z" /><path d="M30 88h40" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2.5"/>`
+    p: `<path d="M18 87h64l-5 8H23zM27 82h46l-4 5H31zM36 80c1-9 6-13 6-22 0-5-4-9-4-15 0-9 5-16 12-20 7 4 12 11 12 20 0 6-4 10-4 15 0 9 5 13 6 22z"/><circle cx="50" cy="17" r="11"/><path d="M29 89h42M42 56h16" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2"/>`,
+    r: `<path d="M18 14h14v13h8V14h20v13h8V14h14v27H18zM25 41h50l-5 39H30zM20 80h60v10H20z"/><path d="M31 46v29M50 46v29M69 46v29M24 35h52" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2"/>`,
+    n: `<path d="M18 87h64l-5 8H23zM25 82c5-12 8-22 5-34l-5-12 16-18 22 5 14 18-6 41z"/><path d="M40 24c-3 9 2 16 12 18l11 10-4 9-15-9-10-1 5-14" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2.5" stroke-linejoin="round"/><path d="M35 31l-8-10m18 1-4-12m17 15 10-7" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2.2" stroke-linecap="round"/><circle cx="49" cy="34" r="2.4" fill="var(--gc-piece-highlight)" stroke="none"/>`,
+    b: `<path d="M18 87h64l-5 8H23zM27 82h46l-4 5H31zM33 80c4-9 9-15 9-23-9-8-10-21-1-31l9-12 9 12c9 10 8 23-1 31 0 8 5 14 9 23z"/><path d="M50 18l-6 18 8 8-8 15" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2.7" stroke-linecap="round"/><path d="M30 88h40" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2"/>`,
+    q: `<path d="M18 87h64l-5 8H23zM27 82h46l-4 5H31zM30 80l-8-37 17 14 11-32 11 32 17-14-8 37z"/><path d="M31 70h38M24 43l-4-8m56 8 4-8M50 27v-9" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2.5" stroke-linecap="round"/><circle cx="22" cy="37" r="4.5"/><circle cx="39" cy="55" r="4"/><circle cx="50" cy="17" r="5"/><circle cx="61" cy="55" r="4"/><circle cx="78" cy="37" r="4.5"/>`,
+    k: `<path d="M18 87h64l-5 8H23zM27 82h46l-4 5H31zM32 80c3-12 8-17 8-29h20c0 12 5 17 8 29z"/><path d="M46 9h8v13h13v8H54v13h-8V30H33v-8h13z"/><path d="M31 72h38M36 88h28" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2.4" stroke-linecap="round"/>`
   },
   modern: {
-    p: `<path d="M22 84h56l-5 9H27zM34 80c2-13 8-16 8-27h16c0 11 6 14 8 27z"/><circle cx="50" cy="19" r="12"/><path d="M35 85h30" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="3"/>`,
-    r: `<path d="M24 13h13v13h8V13h10v13h8V13h13v30H24zM31 43h38v38H31zM21 81h58v12H21z"/><path d="M40 48v28M60 48v28" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="3"/>`,
-    n: `<path d="M22 84h56l-5 9H27zM29 81c5-11 5-24 1-35l17-26 25 13 7 23-12 25z"/><path d="M47 25l-3 19 19 8 3 13-20-5-12-12" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="51" cy="35" r="3" fill="var(--gc-piece-highlight)" stroke="none"/>`,
-    b: `<path d="M22 84h56l-5 9H27zM34 80c3-11 8-15 8-25-9-10-5-25 8-38 13 13 17 28 8 38 0 10 5 14 8 25z"/><path d="M50 22l-7 20 8 7-7 18" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="4" stroke-linecap="round"/>`,
-    q: `<path d="M22 84h56l-5 9H27zM29 80l-7-39 18 16 10-31 10 31 18-16-7 39z"/><circle cx="22" cy="37" r="5"/><circle cx="50" cy="20" r="5"/><circle cx="78" cy="37" r="5"/><path d="M34 70h32" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="3"/>`,
-    k: `<path d="M22 84h56l-5 9H27zM32 80c2-12 7-16 7-27h22c0 11 5 15 7 27z"/><path d="M46 10h8v14h14v8H54v14h-8V32H32v-8h14z"/><path d="M34 70h32" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="3"/>`
+    p: `<path d="M16 88h68l-5 7H21zM25 82h50v6H25zM34 79c3-10 7-15 7-24h18c0 9 4 14 7 24z"/><circle cx="50" cy="20" r="12.5"/><path d="M35 83h30" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2.2" stroke-linecap="round"/>`,
+    r: `<path d="M19 12h15v14h7V12h18v14h7V12h15v31H19zM27 43h46l-4 37H31zM20 80h60v10H20z"/><path d="M34 49v25M50 49v25M66 49v25M23 35h54" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2.2"/>`,
+    n: `<path d="M17 88h66l-5 7H22zM24 82c5-11 7-22 5-34l17-27 25 12 8 24-12 25z"/><path d="M46 25c-4 11 1 18 13 22l9 10-3 7-17-8-13-2 4-15" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="52" cy="35" r="2.6" fill="var(--gc-piece-highlight)" stroke="none"/><path d="M34 32 29 18m25 7 13-9" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2.5" stroke-linecap="round"/>`,
+    b: `<path d="M16 88h68l-5 7H21zM25 82h50v6H25zM33 79c3-10 8-16 8-25-10-10-6-25 9-39 15 14 19 29 9 39 0 9 5 15 8 25z"/><path d="M50 22 43 42l8 8-8 18" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>`,
+    q: `<path d="M16 88h68l-5 7H21zM25 82h50v6H25zM29 79l-8-40 18 16 11-34 11 34 18-16-8 40z"/><path d="M32 69h36M24 42l-4-9m60 9 4-9M50 27v-7" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2.6" stroke-linecap="round"/><circle cx="21" cy="37" r="4.5"/><circle cx="50" cy="19" r="5"/><circle cx="79" cy="37" r="4.5"/>`,
+    k: `<path d="M16 88h68l-5 7H21zM25 82h50v6H25zM32 79c3-11 7-16 7-27h22c0 11 4 16 7 27z"/><path d="M46 9h8v13h13v8H54v13h-8V30H33v-8h13z"/><path d="M33 68h34" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2.8" stroke-linecap="round"/>`
   }
 };
 
@@ -225,6 +231,7 @@ function applyBoardTheme(theme, syncPremium = true, shouldRender = true) {
     Object.keys(THEMES).forEach(name => {
       document.body.classList.toggle(`gc-theme-${name}`, name === selectedTheme);
     });
+    document.body.dataset.gcBoardTheme = selectedTheme;
   }
 
   const selector = $("gc-theme");
@@ -686,6 +693,27 @@ function formatSeatRating(player) {
     : "Elo: Unrated";
 }
 
+function updateStockfishMark(enabled) {
+  const label = $("opponent-name")?.closest(".player-label");
+  if (!label) return;
+  let mark = label.querySelector(":scope > .gc-stockfish-mark");
+  if (!enabled) {
+    mark?.remove();
+    label.classList.remove("gc-stockfish-seat");
+    return;
+  }
+  label.classList.add("gc-stockfish-seat");
+  if (!mark) {
+    mark = document.createElement("span");
+    mark.className = "gc-stockfish-mark";
+    mark.setAttribute("aria-hidden", "true");
+    mark.title = "Stockfish chess engine";
+    mark.innerHTML = '<svg viewBox="0 0 32 32" focusable="false"><path d="M5 25.5c2.7-2.7 3.1-6.4 2.1-10.2C6 10.8 8.8 5.2 14.1 4.3c3.4-.6 6.3.9 8.1 3.3l5-1.2-1.1 5.1c2.3 2.7 2.5 6.3.8 9.1-1.8 3.1-5.3 4.8-9.8 4.8H5Z" fill="currentColor"/><path d="M13 11.6c1.2-1.2 3.1-1.2 4.2 0m-3.3 4.5h.1" fill="none" stroke="#10251b" stroke-width="1.8" stroke-linecap="round"/><path d="M9 25.5h17" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/></svg>';
+    $("opponent-name").before(mark);
+  }
+}
+document.addEventListener('glasschess:premium-ready', () => updateLabels());
+
 function updateLabels() {
   const online = window.GlassChessOnlinePlus;
   const isOnlineMatch = online?.isOnline?.() === true;
@@ -694,20 +722,24 @@ function updateLabels() {
   const topMeta = $("opponent-label");
   const bottomMeta = $("player-label");
   if (!topName || !bottomName || !topMeta || !bottomMeta) return;
+  document.body.classList.toggle("gc-analysis-mode", gameMode === "analysis" && !isOnlineMatch);
+  updateAnalysisRailLayout();
 
-  // Stockfish is a seat label only in a game where the computer is actually the opponent.
   if (gameMode === "computer" && !isOnlineMatch) {
+    updateStockfishMark(true);
+    const bot = BOT_PROFILE_INFO[profile] || BOT_PROFILE_INFO.casual;
+    const localRating = Number(window.GlassChessPremium?.getRating?.());
     topName.textContent = "Stockfish";
-    topMeta.textContent = "Computer";
+    topMeta.textContent = `${bot.ratingLabel} · Level ${bot.skillLevel}`;
     bottomName.textContent = "You";
-    bottomMeta.textContent = playerColor === "white" ? "White" : "Black";
+    bottomMeta.textContent = `${playerColor === "white" ? "White" : "Black"} · ${Number.isFinite(localRating) ? Math.round(localRating) + " Elo" : "Unrated"}`;
     return;
   }
+  updateStockfishMark(false);
 
   const topSide = boardIsFlipped() ? "w" : "b";
   const bottomSide = topSide === "w" ? "b" : "w";
   const sideName = side => side === "w" ? "White" : "Black";
-
   if (gameMode === "analysis" && !isOnlineMatch) {
     topName.textContent = sideName(topSide);
     topMeta.textContent = "Analysis board";
@@ -715,7 +747,6 @@ function updateLabels() {
     bottomMeta.textContent = "Analysis board";
     return;
   }
-
   const players = isOnlineMatch ? online.getPlayers?.() || null : null;
   const signedInName = getSignedInDisplayName();
   const signedInSide = playerColor === "white" ? "w" : "b";
@@ -727,7 +758,6 @@ function updateLabels() {
     return side === signedInSide ? signedInName : "Anonymous";
   };
   const ratingForSide = side => formatSeatRating(players?.[side]);
-
   topName.textContent = nameForSide(topSide);
   topMeta.textContent = `${sideName(topSide)} · ${ratingForSide(topSide)}`;
   bottomName.textContent = nameForSide(bottomSide);
@@ -986,8 +1016,64 @@ function getEngineMove(uci) {
 // ENGINE EVALUATION
 // ============================================
 
+function updateAnalysisEvalRail(info, side) {
+  const rail = $("gc-analysis-eval-rail");
+  if (!rail || !info) return;
+  let type = "", value = null;
+  if (typeof info === "string") {
+    const cp = info.match(/\bscore cp (-?\d+)/);
+    const mate = info.match(/\bscore mate (-?\d+)/);
+    if (mate) { type = "mate"; value = Number(mate[1]); }
+    else if (cp) { type = "cp"; value = Number(cp[1]); }
+  } else if (info.score) {
+    type = String(info.score.type || "").toLowerCase();
+    value = Number(info.score.value);
+  }
+  if (!Number.isFinite(value)) return;
+  const whiteValue = side === "b" ? -value : value;
+  const scoreText = type === "mate"
+    ? `M${whiteValue}`
+    : (whiteValue > 0 ? "+" : "") + (whiteValue / 100).toFixed(2);
+  $("gc-analysis-eval-score").textContent = scoreText;
+  $("gc-analysis-eval-depth").textContent = info.depth ? `DEPTH ${info.depth}` : "LIVE";
+  const whitePercent = type === "mate"
+    ? (whiteValue > 0 ? 96 : whiteValue < 0 ? 4 : 50)
+    : Math.max(4, Math.min(96, 50 + whiteValue / 100 * 8));
+  const fill = $("gc-analysis-eval-fill");
+  if (rail.dataset.orientation === "horizontal") {
+    fill.style.width = whitePercent + "%";
+    fill.style.height = "100%";
+  } else {
+    fill.style.width = "100%";
+    fill.style.height = whitePercent + "%";
+  }
+  rail.setAttribute("aria-label", `Analysis evaluation ${scoreText}, depth ${info.depth || "updating"}`);
+}
+function updateAnalysisRailLayout() {
+  const rail = $("gc-analysis-eval-rail");
+  const boardElement = $("board");
+  const host = document.querySelector(".board-section");
+  if (!rail || !boardElement || !host) return;
+  const boardRect = boardElement.getBoundingClientRect();
+  const hostRect = host.getBoundingClientRect();
+  const room = boardRect.left - hostRect.left;
+  if (room >= 42) {
+    rail.dataset.orientation = "vertical";
+    rail.style.left = Math.max(2, room - 38) + "px";
+    rail.style.top = (boardRect.top - hostRect.top) + "px";
+    rail.style.width = "30px";
+    rail.style.height = boardRect.height + "px";
+  } else {
+    rail.dataset.orientation = "horizontal";
+    rail.style.left = Math.max(0, boardRect.left - hostRect.left) + "px";
+    rail.style.top = Math.max(0, boardRect.top - hostRect.top - 25) + "px";
+    rail.style.width = boardRect.width + "px";
+    rail.style.height = "18px";
+  }
+}
 function updateEvaluation(info, side) {
   window.GlassChessGameplaySuite?.setEvaluation?.(info, side);
+  updateAnalysisEvalRail(info, side);
   if (!settings.evaluation || !info) return;
 
   let type = "";
@@ -1118,40 +1204,59 @@ async function computerMove() {
 
 function createAnalysisStudio() {
   const panel = document.querySelector(".analysis-panel");
-  if (!panel || $("gc-analysis-studio")) return;
+  const boardSection = document.querySelector(".board-section");
+  if (!panel || !boardSection || $("gc-analysis-studio")) return;
+
+  const rail = document.createElement("aside");
+  rail.id = "gc-analysis-eval-rail";
+  rail.dataset.orientation = "vertical";
+  rail.innerHTML = `
+    <strong id="gc-analysis-eval-score">0.00</strong>
+    <div class="gc-analysis-rail-track"><span id="gc-analysis-eval-fill"></span><i></i></div>
+    <small id="gc-analysis-eval-depth">LIVE</small>
+  `;
+  rail.hidden = false;
+  boardSection.appendChild(rail);
 
   const studio = document.createElement("section");
   studio.id = "gc-analysis-studio";
-  studio.style.marginTop = "18px";
-  studio.style.paddingTop = "16px";
-  studio.style.borderTop = "1px solid var(--border, #777)";
-
   studio.innerHTML = `
-    <h3>Analysis Studio</h3>
-    <p id="gc-analysis-status">Choose Analysis Studio to begin.</p>
-    <label for="gc-analysis-depth">Analysis depth</label>
-    <select id="gc-analysis-depth">
-      <option value="7">Quick · Depth 7</option>
-      <option value="12" selected>Balanced · Depth 12</option>
-      <option value="18">Deep · Depth 18</option>
-    </select>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+    <header class="gc-analysis-studio-head">
+      <div><p class="eyebrow">STOCKFISH WORKSPACE</p><h3>Analysis Studio</h3></div>
+      <span class="gc-analysis-live-pill"><i></i> LIVE ENGINE</span>
+    </header>
+    <p id="gc-analysis-status" class="gc-analysis-status">Choose Analysis Studio to begin.</p>
+    <div class="gc-analysis-controls">
+      <label for="gc-analysis-depth">Search depth
+        <select id="gc-analysis-depth">
+          <option value="7">Quick · 7</option>
+          <option value="12" selected>Balanced · 12</option>
+          <option value="18">Deep · 18</option>
+        </select>
+      </label>
       <button type="button" id="gc-analyze">Analyze position</button>
       <button type="button" id="gc-play-best">Play best move</button>
     </div>
-    <p id="gc-analysis-recommendation">No recommendation yet.</p>
+    <div class="gc-analysis-recommendation-card">
+      <small>ENGINE RECOMMENDATION</small>
+      <p id="gc-analysis-recommendation">Waiting for a position to analyze.</p>
+    </div>
   `;
-
   panel.appendChild(studio);
+  const align = () => updateAnalysisRailLayout();
+  window.addEventListener("resize", align, { passive: true });
+  window.addEventListener("orientationchange", align, { passive: true });
+  if (typeof ResizeObserver === "function") {
+    const observer = new ResizeObserver(align);
+    observer.observe(boardSection);
+    observer.observe($("board"));
+  }
+  requestAnimationFrame(align);
 
   $("gc-analysis-depth").addEventListener("change", event => {
     analysisDepth = Number(event.target.value) || 12;
   });
-
-  $("gc-analyze").addEventListener("click", () => {
-    void analyzePosition();
-  });
-
+  $("gc-analyze").addEventListener("click", () => void analyzePosition());
   $("gc-play-best").addEventListener("click", playBestMove);
 }
 
@@ -1304,10 +1409,10 @@ async function startGame() {
     ? (Math.random() < 0.5 ? "white" : "black")
     : chosen;
   const requestedProfile = $("profile").value;
-  const skillLevel = window.GlassChessOnlinePlus?.getEngineSkillLevel?.()
+  const skillLevel = BOT_PROFILE_INFO[requestedProfile]?.skillLevel
     ?? PROFILES[requestedProfile] ?? 10;
   const labOptions = window.GlassChessGameplaySuite?.getEngineOptions?.();
-  const options = labOptions || { skillLevel };
+  const options = { ...(labOptions || {}), skillLevel };
 
   const token = ++gameToken;
   const onlineSession = window.GlassChessOnlinePlus;
@@ -1750,6 +1855,7 @@ function installGlassChessPremiumBridge() {
     get engineReady() { return Boolean(engine.ready); },
     get thinking() { return thinking; },
     get profile() { return profile; },
+    get botRating() { return BOT_PROFILE_INFO[profile]?.rating ?? BOT_PROFILE_INFO.casual.rating; },
     get initialFen() { return gameStartFen; },
     get startFen() { return gameStartFen; },
     get isFlipped() { return boardIsFlipped(); },
@@ -1809,7 +1915,7 @@ function installGlassChessPremiumBridge() {
         if (typeof patch.blackPieceColor === "string" && /^#[0-9a-f]{6}$/i.test(patch.blackPieceColor)) {
           settings.blackPieceColor = patch.blackPieceColor;
         }
-        if (THEMES[patch.theme]) {
+            if (THEMES[patch.theme]) {
           settings.theme = patch.theme;
           applyBoardTheme(patch.theme, false, false);
         }

@@ -6,7 +6,7 @@
 <link rel="manifest" href="/manifest.json">
 
   <meta charset="UTF-8">
-  <meta name="glass-chess-version" content="2026.11.26.14">
+  <meta name="glass-chess-version" content="2026.11.27.1">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#171a20">
   <title>Glass Chess</title>
@@ -39,13 +39,17 @@
 
         <div class="divider"></div>
         <p class="eyebrow">ENGINE PROFILE</p>
-        <select id="profile">
-          <option value="casual">Casual</option>
-          <option value="tactical">Tactical</option>
-          <option value="positional">Positional</option>
-          <option value="master">Master</option>
-          <option value="maximum">Maximum strength</option>
+        <select id="profile" aria-label="Stockfish opponent strength">
+          <option value="beginner">Beginner · ≈650 Elo</option>
+          <option value="casual" selected>Casual · ≈950 Elo</option>
+          <option value="club">Club · ≈1250 Elo</option>
+          <option value="tactical">Tactical · ≈1550 Elo</option>
+          <option value="positional">Positional · ≈1900 Elo</option>
+          <option value="expert">Expert · ≈2300 Elo</option>
+          <option value="master">Master · ≈2800 Elo</option>
+          <option value="maximum">Maximum · 3200+ Elo</option>
         </select>
+        <p class="gc-bot-rating-note">Bot ratings are approximate strength estimates, not official FIDE or online ratings.</p>
         <button class="primary-button" id="start-game">Start game</button>
       </aside>
 
