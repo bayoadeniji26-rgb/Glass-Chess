@@ -705,6 +705,13 @@ body.gc-analysis-mode #gc-analysis-eval-rail { display: flex; }
   text-shadow: 0 2px 0 rgba(80,54,27,.6), 0 4px 10px rgba(0,0,0,.35);
   transform: scale(1.08);
 }
+#gc-settings-appearance .gc-piece-style-option .gc-medieval-preview svg {
+  width: 44px;
+  height: 44px;
+  overflow: visible;
+  fill: currentColor;
+  filter: drop-shadow(0 3px 3px rgba(0,0,0,.3));
+}
 #gc-settings-appearance .gc-piece-style-option .gc-modern-preview {
   color: #cfe0f7;
   text-shadow: 0 3px 9px rgba(93,151,207,.42);
