@@ -282,7 +282,7 @@ assert.match(finalPremiumSource, /opponentRating = Number\(api\.botRating\)/, 'T
 assert.match(onlinePreferencesSource, /gc-victory-confetti/, 'Checkmate results must include a confetti animation.');
 assert.match(onlinePreferencesSource, /getPlayerAvatar\(\)/, 'The selected avatar icon must be available to the board UI.');
 assert.match(onlinePreferencesSource, /'♔', '♕', '♖'/, 'The avatar picker must offer chess-piece icon choices.');
-assert.match(finalMainSource, /data\.gcBoardTheme = selectedTheme/, 'The selected board theme must be explicit and persistent.');
-assert.match(finalPremiumSource, /data\.gcBoardTheme = theme/, 'Premium appearance updates must preserve the selected board theme.');
+assert.match(finalMainSource, /dataset\.gcBoardTheme = selectedTheme/, 'The selected board theme must be explicit and persistent.');
+assert.match(finalPremiumSource, /dataset\.gcBoardTheme = theme/, 'Premium appearance updates must preserve the selected board theme.');
 assert.match(finalUiSource, /savedSettings\.theme/, 'Delayed theme rendering must read the saved board theme rather than revert it.');
 assert.match(finalMainSource, /medieval: \{[\s\S]*?modern: \{/, 'The refined Medieval and Modern piece artwork must both be present.');
