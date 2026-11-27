@@ -295,7 +295,10 @@ const stockfishLogoSource = readFileSync(new URL('../src/stockfish-logo.js', imp
 assert.match(stockfishLogoSource, /data:image\/webp;base64,/, 'The official Stockfish logo must be bundled locally for offline display.');
 assert.match(finalMainSource, /import \{ STOCKFISH_LOGO_DATA_URL \} from "\.\/stockfish-logo\.js"/, 'The Stockfish player badge must use the supplied official logo asset.');
 assert.match(finalMainSource, /mark\.src = STOCKFISH_LOGO_DATA_URL/, 'The player nameplate must render the real Stockfish image, not a drawn substitute.');
-assert.match(finalMainSource, /M17 88h66l-6 8H23z/, 'Medieval knight must use the refined horse silhouette.');
+assert.match(finalMainSource, /M15 88h70l-5 8H20z/, 'Medieval knight must use the refined horse silhouette.');
+assert.match(finalPremiumSource, /gc-medieval-preview.*<svg/s, 'The Medieval piece selector must preview the refined knight silhouette.');
+const embeddedLogo = stockfishLogoSource.match(/base64,([A-Za-z0-9+/=]+)/)?.[1] || '';
+assert.ok(embeddedLogo.length > 2000 && embeddedLogo.length % 4 === 0, 'The official Stockfish logo data URL must be complete base64.');
 assert.match(finalPremiumSource, /data-piece-style="medieval"/, 'The Settings panel must offer a visible Medieval piece-style card.');
 assert.match(finalPremiumSource, /syncPieceStyleOptions/, 'Piece-style cards must reflect and update the saved design.');
 assert.match(finalPremiumSource, /gc-piece-style-options/, 'Piece design choices must be presented in a visible selector area.');
