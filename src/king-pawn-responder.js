@@ -87,8 +87,14 @@ export function createKingPawnResponder(options = {}) {
       signal: payload.signal,
       credentials: 'same-origin'
     });
-    if (!response.ok) throw new Error('The King Pawn service returned HTTP ' + response.status + '.');
-    return response.json();
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(body?.error || ('The King Pawn service returned HTTP ' + response.status + '.'));
+      error.status = response.status;
+      error.code = response.status === 503 ? 'KING_PAWN_PROVIDER_NOT_CONFIGURED' : 'KING_PAWN_HTTP_ERROR';
+      throw error;
+    }
+    return body;
   }
 
   async function ask(input) {
@@ -118,6 +124,7 @@ export function createKingPawnResponder(options = {}) {
     } : {};
 
     const adapter = customAdapter || (endpoint ? endpointAdapter : null);
+    let remoteError = null;
     if (adapter) {
       const controller = new AbortController();
       try {
@@ -131,11 +138,17 @@ export function createKingPawnResponder(options = {}) {
         const answer = typeof result === 'string' ? result : result?.answer;
         if (typeof answer === 'string' && answer.trim()) return answer.trim().slice(0, 12000);
       } catch (error) {
-        console.warn('King Pawn remote AI unavailable; using local response engine:', error);
+        remoteError = error;
+        console.warn('King Pawn remote AI request failed:', error);
       }
     }
 
-    if (!isChess) return 'I can answer general questions when the secure AI service is available. It is offline right now; reconnect the King Pawn service and try again. My on-device fallback currently covers chess questions.';
+    if (!isChess) {
+      if (remoteError?.code === 'KING_PAWN_PROVIDER_NOT_CONFIGURED' || remoteError?.status === 503) {
+        return 'Your internet connection is working. King Pawn’s server is online, but its AI provider has not been configured yet. The site owner needs to add the private AI key to the backend service. This is a server setup issue, not a problem with your internet.';
+      }
+      return 'I could not reach King Pawn’s answer service just now. Check the connection to the Glass Chess service and try again. The on-device fallback currently covers chess questions.';
+    }
 
     try {
       const local = await getKnowledgeAnswer(question, context);
