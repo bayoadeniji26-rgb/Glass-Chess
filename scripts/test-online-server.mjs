@@ -117,7 +117,7 @@ try {
   });
   assert.equal(generalQuestionResponse.status, 503);
   const generalQuestionBody = await generalQuestionResponse.json();
-  assert.match(generalQuestionBody.error, /not configured/i);
+  assert.match(generalQuestionBody.error, /not been configured/i);
   assert.match(generalQuestionBody.error, /server is online|internet connection problem/i,
     'A missing provider key must be clearly identified as server setup, not the player’s internet.');
 
@@ -127,7 +127,7 @@ try {
     body: JSON.stringify({ question: 'What time is it?' })
   });
   assert.equal(timeQuestionResponse.status, 503);
-  assert.match((await timeQuestionResponse.json()).error, /not configured/i);
+  assert.match((await timeQuestionResponse.json()).error, /not been configured/i);
 
   // A valid chess question also reaches the AI setup and reports missing server configuration honestly.
   const missingAIKey = await fetch(url + '/api/king-pawn', {
@@ -136,7 +136,7 @@ try {
     body: JSON.stringify({ question: 'How do I get better at chess?', board: { fen: START_FEN } })
   });
   assert.equal(missingAIKey.status, 503);
-  assert.match((await missingAIKey.json()).error, /not configured/i);
+  assert.match((await missingAIKey.json()).error, /not been configured/i);
 
   const preflight = await fetch(url + '/api/king-pawn', {
     method: 'OPTIONS',
