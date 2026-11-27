@@ -87,7 +87,7 @@ import './glass-workspace.css';
     }
 
     function prepareDrawer(panel, side, title) {
-      panel.classList.add('gc-workspace-drawer', side);
+      panel.classList.add('gc-workspace-drawer', ...side.split(/\\s+/).filter(Boolean));
       panel.setAttribute('aria-label', title);
       if (panel.querySelector(':scope > .gc-workspace-drawer-heading')) return;
       const close = document.createElement('button');
