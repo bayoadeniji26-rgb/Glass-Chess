@@ -1,12 +1,16 @@
 {
-  "version": "2026.11.26.14",
+  "version": "2026.11.27.1",
   "name": "Glass Chess Required Update",
-  "updatedAt": "2026-11-26",
+  "updatedAt": "2026-11-27",
   "notes": [
-    "Makes Live Engine Lab start automatically instead of waiting for an Analyze click",
-    "Keeps live evaluation updated as the board position changes",
-    "Runs the Live Engine Lab in a dedicated Stockfish worker so it does not block player moves or computer turns",
-    "Adds pause and resume controls and safely suppresses live hints during training puzzles",
-    "Preserves the Glass Chess Tools popup layout and click-target fixes"
+    "Adds a Stockfish engine icon and estimated strength rating beside the computer opponent",
+    "Adds a modern live evaluation rail to Analysis Studio with responsive board-side placement",
+    "Adds eight selectable Stockfish difficulty levels and shows the player's local Elo rating",
+    "Moves board themes, piece designs, colors, avatars, piece finishes, sounds and animation preferences into Settings",
+    "Fixes board theme persistence so Aurora, Royal, Sunset, Carbon and other themes remain selected after redraws",
+    "Refines the original Medieval and Modern chess-piece artwork",
+    "Adds checkmate confetti to the game-result popup",
+    "Expands King Pawn to general questions when the secure backend AI service is configured, with a chess-only offline fallback",
+    "Preserves automatic Live Engine Lab analysis and the Tools popup interaction fixes"
   ]
 }
