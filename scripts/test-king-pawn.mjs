@@ -107,7 +107,7 @@ responder.setAIAdapter(async () => { throw new Error('Simulated provider outage.
 const fallback = await responder.ask('When was chess invented?');
 assert.match(fallback, /Local chess fallback/);
 const generalOffline = await responder.ask('What is the solar system?');
-assert.match(generalOffline, /general questions when the secure AI service is available/);
+assert.match(generalOffline, /could not reach King Pawn’s answer service|check the connection/i);
 
 responder.setAIAdapter(null);
 assert.equal(typeof responder.mode, 'string');

@@ -1,16 +1,16 @@
 {
-  "version": "2026.11.27.1",
+  "version": "2026.11.27.2",
   "name": "Glass Chess Required Update",
   "updatedAt": "2026-11-27",
   "notes": [
-    "Adds a Stockfish engine icon and estimated strength rating beside the computer opponent",
-    "Adds a modern live evaluation rail to Analysis Studio with responsive board-side placement",
-    "Adds eight selectable Stockfish difficulty levels and shows the player's local Elo rating",
-    "Moves board themes, piece designs, colors, avatars, piece finishes, sounds and animation preferences into Settings",
-    "Fixes board theme persistence so Aurora, Royal, Sunset, Carbon and other themes remain selected after redraws",
-    "Refines the original Medieval and Modern chess-piece artwork",
-    "Adds checkmate confetti to the game-result popup",
-    "Expands King Pawn to general questions when the secure backend AI service is configured, with a chess-only offline fallback",
-    "Preserves automatic Live Engine Lab analysis and the Tools popup interaction fixes"
+    "Uses the supplied official Stockfish logo beside the Stockfish opponent name",
+    "Redesigns the Medieval knight silhouette and improves piece design selection with visible Glass Classic, Medieval and Modern cards",
+    "Moves the piece design selector above workspace background settings",
+    "Fixes empty workspace background swatches and makes all ten ready-made colors visibly selectable",
+    "Makes the Settings drawer more compact and improves the initial board size so the chessboard uses more available screen space",
+    "King Pawn now explains that a missing or invalid AI key is a backend configuration issue, not the player's internet connection",
+    "Uses the lower-cost everyday gpt-6.2-sol model by default for King Pawn, with clearer provider authentication, quota and model errors",
+    "Confirms the Supabase save table and own-user-only row policy; see CLOUD-SYNC-SETUP.md for the remaining Clerk and Render setup",
+    "Preserves Live Engine Lab automatic analysis, cloud save queue safeguards and existing Tools fixes"
   ]
 }

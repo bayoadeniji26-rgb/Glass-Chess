@@ -4,6 +4,7 @@ import { calculatePositionHistory, isFlagFallDraw } from "./chess-position-tools
 import "./micro-polish.css";
 import "./features.css";
 import { createBoardEffects } from "./board-effects.js";
+import { STOCKFISH_LOGO_DATA_URL } from "./stockfish-logo.js";
 
 // ============================================
 // GLASS CHESS — MAIN GAME
@@ -55,7 +56,7 @@ const PIECE_SVG = {
   medieval: {
     p: `<path d="M18 87h64l-5 8H23zM27 82h46l-4 5H31zM36 80c1-9 6-13 6-22 0-5-4-9-4-15 0-9 5-16 12-20 7 4 12 11 12 20 0 6-4 10-4 15 0 9 5 13 6 22z"/><circle cx="50" cy="17" r="11"/><path d="M29 89h42M42 56h16" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2"/>`,
     r: `<path d="M18 14h14v13h8V14h20v13h8V14h14v27H18zM25 41h50l-5 39H30zM20 80h60v10H20z"/><path d="M31 46v29M50 46v29M69 46v29M24 35h52" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2"/>`,
-    n: `<path d="M18 87h64l-5 8H23zM25 82c5-12 8-22 5-34l-5-12 16-18 22 5 14 18-6 41z"/><path d="M40 24c-3 9 2 16 12 18l11 10-4 9-15-9-10-1 5-14" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2.5" stroke-linejoin="round"/><path d="M35 31l-8-10m18 1-4-12m17 15 10-7" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2.2" stroke-linecap="round"/><circle cx="49" cy="34" r="2.4" fill="var(--gc-piece-highlight)" stroke="none"/>`,
+    n: `<path d="M15 88h70l-5 8H20zM23 80h54v8H23z"/><path d="M29 80c2-9 8-17 18-23-7-5-12-12-13-21-1-11 6-19 17-20L48 7l17 13c6-1 12 2 16 8l-8 9c7 6 10 15 7 23-2 6-7 10-12 13 0 3 2 5 5 7z"/><path d="M47 25c5 5 9 11 9 18m-14 12c7 6 14 10 21 13m7-28c4 4 5 9 4 14" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2.6" stroke-linecap="round"/><path d="M44 18l-2-11 16 13m7 1 10-9-2 15" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="42" cy="34" r="2.8" fill="var(--gc-piece-highlight)" stroke="none"/><path d="M32 42l7 2" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2.2" stroke-linecap="round"/>`,
     b: `<path d="M18 87h64l-5 8H23zM27 82h46l-4 5H31zM33 80c4-9 9-15 9-23-9-8-10-21-1-31l9-12 9 12c9 10 8 23-1 31 0 8 5 14 9 23z"/><path d="M50 18l-6 18 8 8-8 15" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2.7" stroke-linecap="round"/><path d="M30 88h40" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2"/>`,
     q: `<path d="M18 87h64l-5 8H23zM27 82h46l-4 5H31zM30 80l-8-37 17 14 11-32 11 32 17-14-8 37z"/><path d="M31 70h38M24 43l-4-8m56 8 4-8M50 27v-9" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2.5" stroke-linecap="round"/><circle cx="22" cy="37" r="4.5"/><circle cx="39" cy="55" r="4"/><circle cx="50" cy="17" r="5"/><circle cx="61" cy="55" r="4"/><circle cx="78" cy="37" r="4.5"/>`,
     k: `<path d="M18 87h64l-5 8H23zM27 82h46l-4 5H31zM32 80c3-12 8-17 8-29h20c0 12 5 17 8 29z"/><path d="M46 9h8v13h13v8H54v13h-8V30H33v-8h13z"/><path d="M31 72h38M36 88h28" fill="none" stroke="var(--gc-piece-highlight)" stroke-width="2.4" stroke-linecap="round"/>`
@@ -704,11 +705,13 @@ function updateStockfishMark(enabled) {
   }
   label.classList.add("gc-stockfish-seat");
   if (!mark) {
-    mark = document.createElement("span");
+    mark = document.createElement("img");
     mark.className = "gc-stockfish-mark";
+    mark.src = STOCKFISH_LOGO_DATA_URL;
+    mark.alt = "";
     mark.setAttribute("aria-hidden", "true");
+    mark.decoding = "async";
     mark.title = "Stockfish chess engine";
-    mark.innerHTML = '<svg viewBox="0 0 32 32" focusable="false"><path d="M5 25.5c2.7-2.7 3.1-6.4 2.1-10.2C6 10.8 8.8 5.2 14.1 4.3c3.4-.6 6.3.9 8.1 3.3l5-1.2-1.1 5.1c2.3 2.7 2.5 6.3.8 9.1-1.8 3.1-5.3 4.8-9.8 4.8H5Z" fill="currentColor"/><path d="M13 11.6c1.2-1.2 3.1-1.2 4.2 0m-3.3 4.5h.1" fill="none" stroke="#10251b" stroke-width="1.8" stroke-linecap="round"/><path d="M9 25.5h17" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/></svg>';
     $("opponent-name").before(mark);
   }
 }

@@ -134,7 +134,7 @@ async function handleKingPawnRequest(req, res) {
   const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
   if (!apiKey) {
     return sendKingPawnJson(res, 503, {
-      error: 'The secure King Pawn AI service is not configured yet. The local chess advisor is available as a fallback.'
+      error: 'King Pawn’s backend is online, but its private AI provider key has not been configured. This is a server setup issue, not an internet connection problem. A site administrator must add the private AI key to the backend service environment.'
     }, cors.headers);
   }
 
@@ -154,7 +154,7 @@ async function handleKingPawnRequest(req, res) {
   res.on('close', () => { if (!res.writableEnded) controller.abort(); });
 
   try {
-    const model = String(process.env.KING_PAWN_MODEL || 'gpt-6.2-astra').trim();
+    const model = String(process.env.KING_PAWN_MODEL || 'gpt-6.2-sol').trim();
     const providerResponse = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: {
@@ -171,8 +171,18 @@ async function handleKingPawnRequest(req, res) {
       signal: controller.signal
     });
     if (!providerResponse.ok) {
-      console.warn('King Pawn AI provider returned HTTP ' + providerResponse.status + '.');
-      return sendKingPawnJson(res, 502, { error: 'King Pawn AI could not complete that answer right now.' }, cors.headers);
+      const providerError = await providerResponse.json().catch(() => ({}));
+      const providerCode = String(providerError?.error?.code || providerError?.error?.type || '');
+      console.warn('King Pawn AI provider returned HTTP ' + providerResponse.status + ' (' + providerCode + ').');
+      let message = 'King Pawn could not complete that answer right now. Try again in a moment.';
+      if (providerResponse.status === 401 || providerResponse.status === 403) {
+        message = 'King Pawn is connected to the backend, but its AI credentials are not accepted. A site administrator must check the private OPENAI_API_KEY on the backend service.';
+      } else if (providerResponse.status === 429) {
+        message = 'King Pawn reached the AI provider limit or available usage quota. The site administrator must check the provider usage and billing limits.';
+      } else if (providerResponse.status === 404) {
+        message = 'King Pawn’s configured AI model is unavailable. Check the KING_PAWN_MODEL setting on the backend service.';
+      }
+      return sendKingPawnJson(res, 502, { error: message }, cors.headers);
     }
     const result = await providerResponse.json();
     const answer = (Array.isArray(result.output) ? result.output : [])

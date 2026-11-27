@@ -255,7 +255,7 @@ assert.equal(isKingPawnQuestion(''), false, 'King Pawn must reject empty questio
 
 const responderSource = readFileSync(new URL('../src/king-pawn-responder.js', import.meta.url), 'utf8');
 assert.match(responderSource, /friendly general-purpose assistant/, 'King Pawn must be a general-purpose assistant.');
-assert.match(responderSource, /secure AI service is available/, 'King Pawn must be honest when general AI is offline.');
+assert.match(responderSource, /internet connection is working|could not reach King Pawn’s answer service/, 'King Pawn must distinguish backend setup errors from actual connection errors.');
 const kingPawnServerSource = readFileSync(new URL('../server.mjs', import.meta.url), 'utf8');
 assert.match(kingPawnServerSource, /isKingPawnQuestion\(question\)/, 'The server must accept general non-empty questions.');
 assert.doesNotMatch(kingPawnServerSource, /isChessQuestion\(question/, 'The server must not keep the old chess-only request gate.');
@@ -290,3 +290,30 @@ assert.match(finalPremiumSource, /dataset\.gcBoardTheme = theme/, 'Premium appea
 assert.match(finalPremiumSource, /const boardTheme = api\.appearance\?\.theme/, 'Premium startup must not overwrite the main Settings board theme with an older saved value.');
 assert.match(finalUiSource, /savedSettings\.theme/, 'Delayed theme rendering must read the saved board theme rather than revert it.');
 assert.match(finalMainSource, /medieval: \{[\s\S]*?modern: \{/, 'The refined Medieval and Modern piece artwork must both be present.');
+
+const stockfishLogoSource = readFileSync(new URL('../src/stockfish-logo.js', import.meta.url), 'utf8');
+assert.match(stockfishLogoSource, /data:image\/webp;base64,/, 'The official Stockfish logo must be bundled locally for offline display.');
+assert.match(finalMainSource, /import \{ STOCKFISH_LOGO_DATA_URL \} from "\.\/stockfish-logo\.js"/, 'The Stockfish player badge must use the supplied official logo asset.');
+assert.match(finalMainSource, /mark\.src = STOCKFISH_LOGO_DATA_URL/, 'The player nameplate must render the real Stockfish image, not a drawn substitute.');
+assert.match(finalMainSource, /M15 88h70l-5 8H20z/, 'Medieval knight must use the refined horse silhouette.');
+assert.match(finalPremiumSource, /gc-medieval-preview.*<svg/s, 'The Medieval piece selector must preview the refined knight silhouette.');
+const embeddedLogo = stockfishLogoSource.match(/base64,([A-Za-z0-9+/=]+)/)?.[1] || '';
+assert.ok(embeddedLogo.length > 2000 && embeddedLogo.length % 4 === 0, 'The official Stockfish logo data URL must be complete base64.');
+assert.match(finalPremiumSource, /data-piece-style="medieval"/, 'The Settings panel must offer a visible Medieval piece-style card.');
+assert.match(finalPremiumSource, /syncPieceStyleOptions/, 'Piece-style cards must reflect and update the saved design.');
+assert.match(finalPremiumSource, /gc-piece-style-options/, 'Piece design choices must be presented in a visible selector area.');
+assert.match(finalWorkspaceCss, /gc-background-palette > button > span/, 'Background palette swatches must render visible color blocks.');
+assert.match(finalWorkspaceCss, /gc-piece-style-option\.active/, 'Selected piece design must have a visible active state.');
+assert.match(finalWorkspaceCss, /\.gc-settings-drawer \{[\s\S]*?width: min\(390px/, 'The Settings drawer must use a compact width.');
+const finalLayoutSource = readFileSync(new URL('../src/glass-final-ui.js', import.meta.url), 'utf8');
+assert.match(finalLayoutSource, /viewportHeight \* 0\.84/, 'The board should use more of the available workspace height.');
+assert.match(finalLayoutSource, /viewportWidth < 760 \? 720 : 1100/, 'Desktop boards should be allowed to grow larger than the old 920px cap.');
+assert.match(kingPawnServerSource, /backend is online, but its private AI provider key has not been configured/i, 'A missing King Pawn key must be described as a server-side setup issue.');
+assert.match(kingPawnServerSource, /providerResponse\.status === 429/, 'King Pawn must distinguish provider quota/rate-limit errors.');
+assert.match(kingPawnServerSource, /providerResponse\.status === 401 \|\| providerResponse\.status === 403/, 'King Pawn must distinguish invalid provider credentials.');
+assert.match(kingPawnServerSource, /KING_PAWN_MODEL \|\| 'gpt-6\.2-sol'/, 'King Pawn should default to the lower-cost everyday model.');
+const cloudSetupSource = readFileSync(new URL('../docs/CLOUD-SYNC-SETUP.md', import.meta.url), 'utf8');
+assert.match(cloudSetupSource, /VITE_SUPABASE_URL/, 'Cloud sync setup must document the Supabase URL.');
+assert.match(cloudSetupSource, /VITE_SUPABASE_PUBLISHABLE_KEY/, 'Cloud sync setup must document the Supabase publishable key.');
+assert.match(cloudSetupSource, /VITE_CLERK_PUBLISHABLE_KEY/, 'Cloud sync setup must document the Clerk publishable key.');
+assert.match(cloudSetupSource, /Third-Party Auth/, 'Cloud sync setup must document the Clerk/Supabase third-party trust configuration.');
