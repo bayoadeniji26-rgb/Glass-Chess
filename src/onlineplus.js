@@ -119,6 +119,8 @@ function loadState() {
       value.pieceSkin = 'custom';
       value.pieceSkinVersion = 2;
     }
+    // Migrate previous animal/emoji avatars into the new chess-themed icon set.
+    if (!AVATARS.includes(value.avatar)) value.avatar = '♔';
     if (!Array.isArray(value.friends)) value.friends = [];
     if (!Array.isArray(value.achievements)) value.achievements = [];
     if (!Array.isArray(value.missionClaimed)) value.missionClaimed = [];
