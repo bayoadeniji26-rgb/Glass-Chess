@@ -134,7 +134,7 @@ async function handleKingPawnRequest(req, res) {
   const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
   if (!apiKey) {
     return sendKingPawnJson(res, 503, {
-      error: 'The secure King Pawn AI service is not configured yet. The local chess advisor is available as a fallback.'
+      error: 'King Pawn’s backend is online, but its private AI provider key has not been configured. This is a server setup issue, not an internet connection problem. A site administrator must add the private AI key to the backend service environment.'
     }, cors.headers);
   }
 
