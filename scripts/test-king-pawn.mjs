@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict';
-import { createKingPawnResponder, isChessQuestion, OFF_TOPIC_REPLY } from '../src/king-pawn-responder.js';
+import { createKingPawnResponder, isChessQuestion, isKingPawnQuestion } from '../src/king-pawn-responder.js';
+
+assert.equal(isKingPawnQuestion('What is photosynthesis?'), true, 'General knowledge questions must be accepted.');
+assert.equal(isKingPawnQuestion('What happened in ancient Egypt?'), true, 'History questions must be accepted.');
+assert.equal(isKingPawnQuestion('   '), false, 'Empty messages must be rejected.');
 
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
@@ -91,17 +95,19 @@ assert.equal(remoteCalls, 1);
 assert.equal(capturedPayload.board.fen, START_FEN);
 assert.equal(capturedPayload.board.pgn, '1. e4 e5');
 assert.equal(capturedPayload.board.recentConversation[0].content, 'How do I improve at chess?');
-assert.match(capturedPayload.systemPrompt, /chess-only AI advisor/i);
+assert.match(capturedPayload.systemPrompt, /general-purpose assistant/i);
 
-const unrelated = await responder.ask('Dogs or cats?');
-assert.equal(unrelated, OFF_TOPIC_REPLY);
-assert.equal(remoteCalls, 1, 'Unrelated requests must be blocked before the AI provider is called.');
+const generalAnswer = await responder.ask('What is photosynthesis?');
+assert.equal(generalAnswer, 'A real AI answer about chess.');
+assert.equal(remoteCalls, 2, 'General knowledge questions must reach the configured AI provider.');
 
 responder.setAIAdapter(async () => { throw new Error('Simulated provider outage.'); });
 const fallback = await responder.ask('When was chess invented?');
 assert.match(fallback, /Local chess fallback/);
+const generalOffline = await responder.ask('What is the solar system?');
+assert.match(generalOffline, /general questions when the secure AI service is available/);
 
 responder.setAIAdapter(null);
 assert.equal(typeof responder.mode, 'string');
 
-console.log('King Pawn tests passed: broad chess questions, unrelated-topic rejection, contextual follow-ups, live board handoff, provider routing, and local fallback.');
+console.log('King Pawn tests passed: broad chess questions, general questions, contextual chess follow-ups, live board handoff, provider routing, and local fallback.');
