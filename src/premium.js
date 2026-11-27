@@ -202,6 +202,31 @@ function buildInterface() {
     </section>
     <section class="gc-view" data-view="custom">
       <div class="gc-card"><h4>Board themes</h4><div class="gc-board-themes" id="gc-theme-list"></div><p class="gc-muted">Changes the chessboard squares.</p></div>
+      <div class="gc-card gc-piece-customizer">
+        <div class="gc-row"><h4>Board piece design</h4><span class="gc-pill">Changes the pieces</span></div>
+        <p class="gc-muted">Choose the complete set you want on your board. The change happens immediately.</p>
+        <div class="gc-piece-style-options" role="group" aria-label="Choose chess piece design">
+          <button type="button" class="gc-piece-style-option" data-piece-style="glass" aria-pressed="false">
+            <span class="gc-piece-style-preview">♘</span><strong>Glass Classic</strong><small>Original translucent pieces</small>
+          </button>
+          <button type="button" class="gc-piece-style-option" data-piece-style="medieval" aria-pressed="false">
+            <span class="gc-piece-style-preview gc-medieval-preview">♞</span><strong>Medieval</strong><small>Carved, traditional silhouettes</small>
+          </button>
+          <button type="button" class="gc-piece-style-option" data-piece-style="modern" aria-pressed="false">
+            <span class="gc-piece-style-preview gc-modern-preview">♘</span><strong>Modern</strong><small>Clean geometric pieces</small>
+          </button>
+        </div>
+        <select id="gc-piece-style" class="gc-piece-style-select" aria-label="Piece design">
+          <option value="glass">Glass Classic · Original</option>
+          <option value="medieval">Medieval</option>
+          <option value="modern">Modern</option>
+        </select>
+        <div class="gc-piece-colors">
+          <label for="gc-white-piece-color">White pieces<input id="gc-white-piece-color" type="color" value="#f7f2e9" aria-label="White piece color"></label>
+          <label for="gc-black-piece-color">Black pieces<input id="gc-black-piece-color" type="color" value="#263244" aria-label="Black piece color"></label>
+        </div>
+        <p class="gc-muted">Pick Glass Classic, Medieval or Modern above, then choose your white and black piece colors here.</p>
+      </div>
       <div class="gc-card gc-background-customizer"><h4>Workspace background color</h4>
         <p class="gc-muted">Choose a ready-made color or pick any custom color. This changes the workspace behind the chessboard.</p>
         <div class="gc-background-palette" id="gc-background-list" aria-label="Background color palette">
@@ -221,7 +246,7 @@ function buildInterface() {
         </label>
         <p class="gc-muted">Your selection is saved automatically on this device.</p>
       </div>
-      <div class="gc-card gc-piece-customizer"><h4>Piece appearance</h4><label for="gc-piece-style">Piece design</label><select id="gc-piece-style"><option value="glass">Glass Classic · Original</option><option value="medieval">Medieval</option><option value="modern">Modern</option></select><div class="gc-piece-colors"><label for="gc-white-piece-color">White pieces<input id="gc-white-piece-color" type="color" value="#f7f2e9" aria-label="White piece color"></label><label for="gc-black-piece-color">Black pieces<input id="gc-black-piece-color" type="color" value="#263244" aria-label="Black piece color"></label></div><p class="gc-muted">Changes the pieces on the board, not the board squares. Your choices are saved on this device.</p></div>
+
       <div class="gc-card"><div class="gc-row"><h4>Sound effects</h4><label><input id="gc-sound-toggle" type="checkbox" style="width:auto"> Enable move sounds</label></div><p class="gc-muted">Light local sound effects for legal moves and puzzle results.</p></div>
       <div class="gc-card"><h4>Data and privacy</h4><p class="gc-muted">Profile, rating, statistics, saved games, and preferences are stored in this browser using local storage. Nothing is uploaded to a server.</p><div class="gc-actions"><button id="gc-export-data">Export profile data</button><button id="gc-reset-data">Reset profile data</button></div></div>
     </section>
@@ -913,16 +938,31 @@ function bindEvents() {
   $('gc-piece-style').value = appearance.pieceStyle;
   $('gc-white-piece-color').value = appearance.whitePieceColor;
   $('gc-black-piece-color').value = appearance.blackPieceColor;
-
+  const pieceStyleOptions = root.querySelector('.gc-piece-style-options');
+  const syncPieceStyleOptions = () => {
+    pieceStyleOptions.querySelectorAll('[data-piece-style]').forEach(button => {
+      const selected = button.dataset.pieceStyle === $('gc-piece-style').value;
+      button.classList.toggle('active', selected);
+      button.setAttribute('aria-pressed', String(selected));
+    });
+  };
   const savePieceAppearance = () => {
     api.updateAppearance?.({
       pieceStyle: $('gc-piece-style').value,
       whitePieceColor: $('gc-white-piece-color').value,
       blackPieceColor: $('gc-black-piece-color').value
     });
+    syncPieceStyleOptions();
     window.GlassChessOnlinePlus?.onManualAppearanceChange?.();
   };
+  pieceStyleOptions.addEventListener('click', event => {
+    const button = event.target.closest('[data-piece-style]');
+    if (!button) return;
+    $('gc-piece-style').value = button.dataset.pieceStyle;
+    savePieceAppearance();
+  });
   $('gc-piece-style').addEventListener('change', savePieceAppearance);
+  syncPieceStyleOptions();
   $('gc-white-piece-color').addEventListener('input', savePieceAppearance);
   $('gc-black-piece-color').addEventListener('input', savePieceAppearance);
 
