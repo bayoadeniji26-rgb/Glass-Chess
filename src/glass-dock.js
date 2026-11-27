@@ -9,7 +9,6 @@ import "./glass-dock.css";
     { id: "play", label: "Play & Online", icon: "♟", description: "Find opponents, invite friends, join rooms and manage matches.", terms: ["online multiplayer", "room chat", "quick match", "online"] },
     { id: "progress", label: "Progress", icon: "✦", description: "Your player profile, rating, achievements, XP and daily goals.", terms: ["player identity", "player profile", "rating", "daily missions"] },
     { id: "learn", label: "Learn", icon: "▤", description: "Chess puzzles, opening ideas and guided training tools.", terms: ["engine-generated puzzle", "training routine", "puzzle", "opening explorer"] },
-    { id: "style", label: "Appearance", icon: "◈", description: "Board themes, piece designs, colors, sound and motion.", terms: ["board themes", "piece appearance", "customize", "theme"] },
     { id: "settings", label: "Settings", icon: "⚙", description: "Engine personality, sound, animation and workspace preferences.", terms: ["sound & animation studio", "engine personality", "settings", "personality"] }
   ];
 
