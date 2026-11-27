@@ -401,8 +401,8 @@ function renderProfile() {
   root.querySelector('#gc-plus-xpbar').style.width = `${level.into / 250 * 100}%`;
   root.querySelector('#gc-plus-personality').value = state.personality;
   root.querySelector('#gc-plus-personality-note').textContent = PERSONALITIES[state.personality].note;
-  root.querySelector('#gc-plus-sound').checked = state.sound;
-  root.querySelector('#gc-plus-animations').checked = state.animations;
+  document.getElementById('gc-plus-sound').checked = state.sound;
+  document.getElementById('gc-plus-animations').checked = state.animations;
   applyBanner();
 }
 
@@ -426,16 +426,16 @@ function renderAchievements() {
 }
 
 function renderSkins() {
-  root.querySelector('#gc-plus-skin-xp').textContent = `${state.xp} XP`;
-  root.querySelector('#gc-plus-skins').innerHTML = SKINS.map(skin => {
+  document.getElementById('gc-plus-skin-xp').textContent = `${state.xp} XP`;
+  document.getElementById('gc-plus-skins').innerHTML = SKINS.map(skin => {
     const unlocked = state.xp >= skin.unlock;
     return `<button class="gc-plus-skin ${state.pieceSkin === skin.id ? 'active' : ''}" data-skin="${skin.id}" ${unlocked ? '' : 'disabled'}><span class="sample">${skin.icon} ♞</span><strong>${esc(skin.name)}</strong><div class="gc-plus-small">${unlocked ? esc(skin.desc) : `Unlock at ${skin.unlock} XP`}</div></button>`;
   }).join('');
   const current = SKINS.find(item => item.id === state.pieceSkin);
-  root.querySelector('#gc-plus-skin-current').textContent = current
+  document.getElementById('gc-plus-skin-current').textContent = current
     ? `${current.name} finish is active on the board. Select another finish or change a piece color to use a custom appearance.`
     : 'Custom piece colors are active. Your Glass, Medieval or Modern design stays selected.';
-  root.querySelectorAll('[data-skin]').forEach(button => button.addEventListener('click', () => {
+  document.querySelectorAll('#gc-plus-skins [data-skin]').forEach(button => button.addEventListener('click', () => {
     const skin = SKINS.find(item => item.id === button.dataset.skin);
     if (!skin || state.xp < skin.unlock) return;
     state.pieceSkin = skin.id;
@@ -973,8 +973,8 @@ function applyPieceSkin(applyPreset = false) {
       whitePieceColor: colors.white,
       blackPieceColor: colors.black
     });
-    const whitePicker = root.querySelector('#gc-white-piece-color');
-    const blackPicker = root.querySelector('#gc-black-piece-color');
+    const whitePicker = document.getElementById('gc-white-piece-color');
+    const blackPicker = document.getElementById('gc-black-piece-color');
     if (whitePicker) whitePicker.value = colors.white;
     if (blackPicker) blackPicker.value = colors.black;
   }
@@ -1081,9 +1081,9 @@ function bindUI() {
   });
   root.querySelector('#gc-plus-personality-apply').addEventListener('click', applyPersonality);
   root.querySelector('#gc-plus-settings-save').addEventListener('click', () => {
-    state.sound = root.querySelector('#gc-plus-sound').checked;
-    state.animations = root.querySelector('#gc-plus-animations').checked;
-    const legacySound = root.querySelector('#gc-sound-toggle');
+    state.sound = document.getElementById('gc-plus-sound').checked;
+    state.animations = document.getElementById('gc-plus-animations').checked;
+    const legacySound = document.getElementById('gc-sound-toggle');
     if (legacySound) { legacySound.checked = state.sound; legacySound.dispatchEvent(new Event('change', { bubbles: true })); }
     saveState(); applyPieceSkin(); toast('Sound and animation settings saved.');
   });
