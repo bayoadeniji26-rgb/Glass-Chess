@@ -1221,6 +1221,7 @@ export function mountOnlinePlus(chessApi, premiumRoot) {
       if (games >= 10) awardAchievement('ten-games');
     }
   };
+  document.dispatchEvent(new CustomEvent('glasschess:avatar-change', { detail: { avatar: state.avatar } }));
   if (api.engineReady) void applyPersonality();
   else {
     const wait = window.setInterval(() => {
