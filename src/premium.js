@@ -962,6 +962,10 @@ export function mount(chessApi) {
   if (document.getElementById('gc-premium')) return;
   api = chessApi;
   data = loadData();
+  // The main game settings are the source of truth for the board theme.
+  // Align Premium's older local preference before its theme renderer runs.
+  const boardTheme = api.appearance?.theme;
+  if (THEMES[boardTheme]) data.theme = boardTheme;
   startFen = START_FEN;
   moves = api.history.map(move => ({ from: move.from, to: move.to, promotion: move.promotion, san: move.san, color: move.color }));
   try { positions = api.calculatePositions(startFen, moves); }
